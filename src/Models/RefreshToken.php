@@ -1,0 +1,88 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * Class RefreshToken
+ *
+ * @package App\Models
+ *
+ * @property int $id
+ * @property int $user_id
+ * @property string $token
+ * @property string $device_type
+ * @property Carbon $expires_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ * @property-read User $user
+ */
+class RefreshToken extends Model
+{
+    protected $table = 'refresh_tokens';
+
+    protected $fillable = [
+        'user_id',
+        'token',
+        'device_type',
+        'expires_at'
+    ];
+
+    protected $casts = [
+        'expires_at' => 'datetime',
+    ];
+
+    /**
+     * Пользователь, которому принадлежит токен
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Проверяет, истек ли срок действия токена
+     */
+    public function isExpired(): bool
+    {
+        return $this->expires_at->isPast();
+    }
+
+    /**
+     * Создать или обновить токен для пользователя и устройства
+     */
+    public static function createOrUpdateToken(int $userId, string $token, string $deviceType, int $expiresInSeconds): self
+    {
+        $expiresAt = Carbon::now()->addSeconds($expiresInSeconds);
+        
+        $refreshToken = self::updateOrCreate(
+            ['user_id' => $userId, 'device_type' => $deviceType],
+            ['token' => $token, 'expires_at' => $expiresAt]
+        );
+        
+        return $refreshToken;
+    }
+
+    /**
+     * Найти действительный токен по его значению
+     */
+    public static function findValidToken(string $token): ?self
+    {
+        return self::where('token', $token)
+                   ->where('expires_at', '>', Carbon::now())
+                   ->first();
+    }
+    
+    /**
+     * Удалить токен
+     */
+    public static function removeToken(string $token): bool
+    {
+        return (bool) self::where('token', $token)->delete();
+    }
+} 

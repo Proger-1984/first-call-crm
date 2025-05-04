@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Авторизация через Telegram</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .login-container {
+            text-align: center;
+            margin: 40px 0;
+        }
+        .result {
+            background: #f1f1f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 30px;
+            white-space: pre-wrap;
+            border: 1px solid #ddd;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            margin-bottom: -1px;
+        }
+        .tab.active {
+            border: 1px solid #ddd;
+            border-bottom-color: #f9f9f9;
+            background-color: #f9f9f9;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #0088cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #006699;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info-box {
+            background-color: #e8f4fd;
+            border-left: 5px solid #0088cc;
+            padding: 15px;
+            margin: 20px 0;
+            line-height: 1.5;
+        }
+        .warning-box {
+            background-color: #fff8e1;
+            border-left: 5px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        code {
+            background: #f1f1f1;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Авторизация через Telegram</h1>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('tab1')">Войти через Telegram</div>
+            <div class="tab" onclick="switchTab('tab2')">Тестовый режим</div>
+            <div class="tab" onclick="switchTab('tab3')">Инструкция</div>
+        </div>
+        
+        <div id="tab1" class="tab-content active">
+            <div class="info-box">
+                Нажмите на кнопку ниже для авторизации через ваш аккаунт Telegram.
+                <br>Вам потребуется подтвердить доступ в приложении или веб-версии Telegram.
+            </div>
+            
+            <div class="login-container" id="telegram-widget-container">
+                <!-- Telegram виджет будет добавлен сюда -->
+                <div class="warning-box">
+                    Загрузка виджета авторизации Telegram...
+                </div>
+            </div>
+        </div>
+        
+        <div id="tab2" class="tab-content">
+            <div class="warning-box">
+                <strong>Тестовый режим</strong>: Используйте эту форму для тестирования авторизации без реального Telegram.
+            </div>
+            
+            <div class="input-group">
+                <label for="test-id">Telegram ID:</label>
+                <input type="text" id="test-id" value="123456789">
+            </div>
+            
+            <div class="input-group">
+                <label for="test-first-name">Имя:</label>
+                <input type="text" id="test-first-name" value="Test">
+            </div>
+            
+            <div class="input-group">
+                <label for="test-last-name">Фамилия:</label>
+                <input type="text" id="test-last-name" value="User">
+            </div>
+            
+            <div class="input-group">
+                <label for="test-username">Username:</label>
+                <input type="text" id="test-username" value="testuser">
+            </div>
+            
+            <button onclick="submitTestData()">Отправить тестовые данные</button>
+        </div>
+        
+        <div id="tab3" class="tab-content">
+            <h3>Как настроить авторизацию через Telegram</h3>
+            
+            <ol>
+                <li>Создайте бота через <a href="https://t.me/BotFather" target="_blank">@BotFather</a> в Telegram</li>
+                <li>Получите токен и имя бота</li>
+                <li>Добавьте в .env файл:
+                    <pre><code>TELEGRAM_BOT_TOKEN=ваш_токен
+TELEGRAM_BOT_USERNAME=имя_бота_без_@</code></pre>
+                </li>
+                <li>Настройте домен для бота через команду /setdomain в BotFather</li>
+                <li>Перезапустите сервер: <code>docker-compose restart</code></li>
+            </ol>
+            
+            <div class="info-box">
+                <strong>Примечание:</strong> Для работы на локальном компьютере необходимо настроить HTTPS с валидным сертификатом
+                или использовать сервис типа ngrok для получения публичного HTTPS URL.
+            </div>
+        </div>
+        
+        <div class="result" id="result">Здесь будет отображен результат авторизации</div>
+    </div>
+    
+    <script>
+        // Глобальные переменные
+        let botUsername = '';
+        
+        // Функция переключения вкладок
+        function switchTab(tabId) {
+            // Скрываем все вкладки
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Показываем выбранную вкладку
+            document.getElementById(tabId).classList.add('active');
+            document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+        }
+        
+        // Функция получения имени бота
+        function getBotUsername() {
+            fetch('/api/v1/config/telegram-bot-username')
+                .then(response => response.text())
+                .then(username => {
+                    if (username) {
+                        botUsername = username;
+                        loadTelegramWidget(username);
+                    } else {
+                        showError('Не удалось получить имя бота. Проверьте настройки в .env файле.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при получении имени бота:', error);
+                    showError('Ошибка при получении имени бота. Подробности в консоли разработчика.');
+                });
+        }
+        
+        // Функция загрузки виджета Telegram
+        function loadTelegramWidget(botName) {
+            const container = document.getElementById('telegram-widget-container');
+            container.innerHTML = ''; // Очищаем контейнер
+            
+            // Создаем элемент скрипта
+            const script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://telegram.org/js/telegram-widget.js?22';
+            script.setAttribute('data-telegram-login', botName);
+            script.setAttribute('data-size', 'large');
+            script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+            script.setAttribute('data-request-access', 'write');
+            
+            // Добавляем скрипт в контейнер
+            container.appendChild(script);
+        }
+        
+        // Функция авторизации через Telegram (вызывается виджетом)
+        function onTelegramAuth(user) {
+            console.log('Получены данные пользователя:', user);
+            document.getElementById('result').innerHTML = 'Данные пользователя:<br>' + 
+                                                       JSON.stringify(user, null, 2) + 
+                                                       '<br><br>Отправка на сервер...';
+            
+            // Отправляем данные на сервер
+            sendAuthDataToServer(user);
+        }
+        
+        // Функция отправки тестовых данных
+        function submitTestData() {
+            const testData = {
+                id: document.getElementById('test-id').value,
+                first_name: document.getElementById('test-first-name').value,
+                last_name: document.getElementById('test-last-name').value,
+                username: document.getElementById('test-username').value,
+                auth_date: Math.floor(Date.now() / 1000),
+                hash: 'test_hash' // Для тестового режима
+            };
+            
+            document.getElementById('result').innerHTML = 'Тестовые данные:<br>' + 
+                                                       JSON.stringify(testData, null, 2) + 
+                                                       '<br><br>Отправка на сервер...';
+            
+            // Отправляем тестовые данные
+            sendAuthDataToServer(testData);
+        }
+        
+        // Функция отправки данных на сервер
+        function sendAuthDataToServer(data) {
+            fetch('/api/v1/auth/telegram', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP ошибка: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(responseData => {
+                console.log('Ответ сервера:', responseData);
+                
+                let resultHtml = document.getElementById('result').innerHTML;
+                resultHtml += '<br><br>Ответ сервера:<br>' + JSON.stringify(responseData, null, 2);
+                
+                if (responseData.status === 'success' && responseData.data && responseData.data.token) {
+                    // Сохраняем токен
+                    localStorage.setItem('token', responseData.data.token);
+                    resultHtml += '<br><br><span class="success">✓ Авторизация успешна! Токен сохранен.</span>';
+                } else {
+                    resultHtml += '<br><br><span class="error">✗ Ошибка авторизации!</span>';
+                }
+                
+                document.getElementById('result').innerHTML = resultHtml;
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                let resultHtml = document.getElementById('result').innerHTML;
+                resultHtml += '<br><br><span class="error">✗ Ошибка при отправке запроса: ' + error.message + '</span>';
+                document.getElementById('result').innerHTML = resultHtml;
+            });
+        }
+        
+        // Функция отображения ошибки
+        function showError(message) {
+            const container = document.getElementById('telegram-widget-container');
+            container.innerHTML = `<div class="error">${message}</div>`;
+            document.getElementById('result').innerHTML = `<span class="error">Ошибка: ${message}</span>`;
+        }
+        
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Получаем имя бота при загрузке страницы
+            getBotUsername();
+        });
+    </script>
+</body>
+</html> 

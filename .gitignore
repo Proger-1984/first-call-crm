@@ -1,0 +1,116 @@
+# IDE и редакторы
+.idea/
+.vscode/
+*.sublime-*
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Зависимости
+/vendor/
+/node_modules/
+composer.lock
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Конфигурационные файлы
+.env
+.env.*
+!.env.example
+config/database.php
+config/*.local.php
+config/credentials.php
+config/secret.php
+
+# Логи и кэш
+/logs/
+/log/
+*.log
+var/cache/
+var/logs/
+var/log/
+*.cache
+
+# Файлы базы данных
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+/db/data/
+
+# Временные файлы
+/tmp/
+/temp/
+*.tmp
+*.temp
+
+# Файлы сборки и компиляции
+/build/
+/dist/
+/public/build/
+/public/dist/
+/public/hot/
+/public/storage/
+/public/uploads/
+
+# SSL сертификаты и ключи
+*.pem
+*.key
+*.crt
+*.csr
+*.srl
+docker/dev/nginx/ssl/
+
+# Docker специфичные файлы
+docker-compose.override.yml
+.docker-sync/
+.docker/
+
+# Специфичные для PHP
+phpunit.xml
+.phpunit.result.cache
+.phpunit.cache
+phpDocumentor.phar
+.php_cs.cache
+.php-cs-fixer.cache
+.phpdoc/
+.phpstan-cache/
+
+# Автоматически сгенерированные файлы
+/var/swagger/
+/var/docs/
+/storage/*.key
+
+# Резервные копии
+*.bak
+*.backup
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+.#*
+
+# Пользовательские файлы
+upload/
+/public/uploads/
+/storage/app/public/
+/storage/app/private/
+
+# Файлы тестирования и покрытия кода
+.phpunit.result.cache
+coverage/
+coverage.xml
+clover.xml
+.coverage
+
+# Кэш и временные файлы фреймворка
+bootstrap/cache/
+bootstrap/cache/*.php
+app/cache/
+app/logs/

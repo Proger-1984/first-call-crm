@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Telegram Login</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .login-container {
+            text-align: center;
+            margin: 50px 0;
+        }
+        .result {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Авторизация через Telegram</h1>
+    
+    <div class="login-container">
+        <!-- Виджет авторизации через Telegram -->
+        <script async src="https://telegram.org/js/telegram-widget.js?21" 
+            data-telegram-login="YOUR_BOT_USERNAME" 
+            data-size="large" 
+            data-radius="8"
+            data-onauth="onTelegramAuth(user)" 
+            data-request-access="write"></script>
+    </div>
+    
+    <div class="result" id="result">Нажмите на кнопку выше для авторизации через Telegram</div>
+    
+    <script>
+        // Обработчик авторизации
+        function onTelegramAuth(user) {
+            // Выводим данные в консоль для отладки
+            console.log('Received Telegram user data:', user);
+            
+            // Показываем данные на странице
+            document.getElementById('result').innerHTML = 'Получены данные пользователя:\n' + JSON.stringify(user, null, 2);
+            
+            // Отправляем данные на сервер для авторизации
+            fetch('/api/v1/auth/telegram', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(user)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Server response:', data);
+                
+                // Обновляем информацию на странице
+                document.getElementById('result').innerHTML += '\n\nОтвет от сервера:\n' + JSON.stringify(data, null, 2);
+                
+                // Если авторизация прошла успешно, сохраняем токен
+                if (data.status === 'success' && data.data && data.data.token) {
+                    localStorage.setItem('token', data.data.token);
+                    document.getElementById('result').innerHTML += '\n\nАвторизация успешна! Токен сохранен.';
+                }
+            })
+            .catch(error => {
+                console.error('Error sending auth data to server:', error);
+                document.getElementById('result').innerHTML += '\n\nОшибка при отправке данных на сервер: ' + error.message;
+            });
+        }
+        
+        // Заменяем имя бота сразу после загрузки страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Запрашиваем имя бота с сервера
+            fetch('/api/v1/config/telegram-bot-username')
+                .then(response => response.text())
+                .then(botUsername => {
+                    if (botUsername) {
+                        // Получаем скрипт виджета
+                        const widget = document.querySelector('script[data-telegram-login]');
+                        if (widget) {
+                            // Устанавливаем правильное имя бота
+                            widget.setAttribute('data-telegram-login', botUsername);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching bot username:', error);
+                });
+        });
+    </script>
+</body>
+</html> 
