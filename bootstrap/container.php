@@ -5,7 +5,10 @@ declare(strict_types=1);
 use App\Services\JwtService;
 use App\Services\AuthService;
 use App\Services\TelegramAuthService;
+use App\Services\TelegramService;
 use App\Services\UserSettingsService;
+use App\Services\TariffService;
+use App\Services\SourceService;
 use App\Controllers\AuthController;
 use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
@@ -39,16 +42,28 @@ return function (array $config) {
             return new JwtService($c);
         }),
         
+        TelegramService::class => factory(function (ContainerInterface $c) {
+            return new TelegramService($c);
+        }),
+        
         TelegramAuthService::class => factory(function (ContainerInterface $c) {
             return new TelegramAuthService($c);
         }),
         
-        UserSettingsService::class => factory(function () {
-            return new UserSettingsService();
+        UserSettingsService::class => factory(function (ContainerInterface $c) {
+            return new UserSettingsService($c);
         }),
         
         AuthService::class => factory(function (ContainerInterface $c) {
             return new AuthService($c);
+        }),
+        
+        TariffService::class => factory(function (ContainerInterface $c) {
+            return new TariffService($c);
+        }),
+        
+        SourceService::class => factory(function (ContainerInterface $c) {
+            return new SourceService($c);
         }),
         
         /** Контроллеры */

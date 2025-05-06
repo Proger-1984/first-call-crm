@@ -6,7 +6,10 @@ namespace App\Controllers;
 
 use App\Services\AuthService;
 use App\Traits\ResponseTrait;
+use Exception;
+use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
+use Psr\Container\NotFoundExceptionInterface;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -17,6 +20,10 @@ class AuthController
     private ContainerInterface $container;
     private AuthService $authService;
 
+    /**
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
     public function __construct(ContainerInterface $container)
     {
         $this->container = $container;
@@ -24,47 +31,55 @@ class AuthController
     }
 
     /**
-     * Login with telegram_id and password
-     * 
+     * Авторизация пользователя через приложение по логин|пароль
+     *
      * @param Request $request
      * @param Response $response
+     * @param string $deviceType
      * @return Response
+     * @throws Exception
      */
-    public function login(Request $request, Response $response): Response
+    public function login(Request $request, Response $response, string $deviceType = 'mobile'): Response
     {
         $data = $request->getParsedBody();
-        
-        // Validate input
-        if (!isset($data['telegram_id']) || !isset($data['password'])) {
-            return $this->respondWithError($response, 'Telegram ID and password are required', 400);
+
+        if (!isset($data['login']) || !isset($data['password'])) {
+            return $this->respondWithError($response, null, 'validation_error', 422);
         }
-        
-        // Определение типа устройства
-        $deviceType = $data['device_type'] ?? 'web';
-        if (!in_array($deviceType, ['web', 'mobile'])) {
-            $deviceType = 'web'; // Значение по умолчанию для неверных значений
-        }
-        
-        // Authenticate user
+
+        /** Проверка наличия пользователя */
         $result = $this->authService->authenticateUser(
-            $data['telegram_id'], 
-            $data['password'],
-            $deviceType
+            $data['login'], $data['password'], $deviceType
         );
         
         if (!$result) {
-            return $this->respondWithError($response, 'Invalid Telegram ID or password', 401);
+            return $this->respondWithError(
+                $response, null, 'invalid_credentials', 401
+            );
         }
-        
-        // Return tokens
+
+        /** Проверяем статус подписки
+         * 1 - Demo, 2 - Premium, 3 - Close (Доступ закрыт)
+         */
+        if ($result['user']['tariff'] == 3) {
+            return $this->respondWithError(
+                $response,
+                'Доступ запрещен: подписка истекла.',
+                'subscription_expired',
+                403
+            );
+        }
+
+        /** Возвращаем токены */
         return $this->respondWithData($response, [
+            'code' => 200,
             'status' => 'success',
             'data' => $result
-        ]);
+        ], 200);
     }
     
     /**
-     * Refresh tokens
+     * Обновление токенов доступа
      * 
      * @param Request $request
      * @param Response $response
@@ -72,35 +87,51 @@ class AuthController
      */
     public function refresh(Request $request, Response $response): Response
     {
-        $data = $request->getParsedBody();
-        
-        // Validate input
-        if (!isset($data['refresh_token'])) {
-            return $this->respondWithError($response, 'Refresh token is required', 400);
+        $refreshToken = $this->getTokenFromHeader($request);
+
+        if (!$refreshToken) {
+            return $this->respondWithError(
+                $response,
+                'Токен не предоставлен.',
+                'Refresh token not found',
+                401
+            );
         }
-        
-        // Определение типа устройства
-        $deviceType = $data['device_type'] ?? 'web';
-        if (!in_array($deviceType, ['web', 'mobile'])) {
-            $deviceType = 'web'; // Значение по умолчанию для неверных значений
-        }
-        
-        // Refresh tokens
-        $result = $this->authService->refreshToken($data['refresh_token'], $deviceType);
+
+        // Обновляем токены
+        $result = $this->authService->refreshToken($refreshToken, 'mobile');
         
         if (!$result) {
-            return $this->respondWithError($response, 'Invalid refresh token', 401);
+            return $this->respondWithError($response, 'Недействительный refresh token.', 'Refresh token expired', 401);
         }
-        
-        // Return new tokens
+
         return $this->respondWithData($response, [
+            'code' => 200,
             'status' => 'success',
             'data' => $result
-        ]);
+        ], 200);
+
+    }
+
+    private function getTokenFromHeader(Request $request): ?string
+    {
+        $header = $request->getHeaderLine('Authorization');
+
+        if (!$header) {
+            return null;
+        }
+
+        $parts = explode(' ', $header);
+
+        if (count($parts) !== 2 || $parts[0] !== 'Bearer') {
+            return null;
+        }
+
+        return $parts[1];
     }
 
     /**
-     * Logout user
+     * Выход из системы
      * 
      * @param Request $request
      * @param Response $response
@@ -108,23 +139,30 @@ class AuthController
      */
     public function logout(Request $request, Response $response): Response
     {
-        $data = $request->getParsedBody();
+        // Получаем ID пользователя из токена
+        $accessToken = $this->getTokenFromHeader($request);
         
-        // Validate input
-        if (!isset($data['refresh_token'])) {
-            return $this->respondWithError($response, 'Refresh token is required', 400);
+        if (!$accessToken) {
+            return $this->respondWithError(
+                $response,
+                'Токен не предоставлен.',
+                'Access token not found',
+                401
+            );
         }
+
+        // Получаем ID пользователя из токена без проверки валидности
+        $userId = $this->authService->getUserIdFromToken($accessToken);
         
-        // Logout user
-        $result = $this->authService->logout($data['refresh_token']);
+        // Выход из системы для мобильного устройства
+        $result = $this->authService->logoutByDeviceType($userId, 'mobile');
         
-        // Return success response even if token was invalid
+        // Возвращаем успешный ответ
         return $this->respondWithData($response, [
+            'code' => 200,
             'status' => 'success',
-            'data' => [
-                'logged_out' => $result
-            ]
-        ]);
+            'message' => 'Успешный выход из системы.'
+        ], 200);
     }
     
     /**

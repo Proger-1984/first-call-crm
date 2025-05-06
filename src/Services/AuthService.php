@@ -5,57 +5,58 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\User;
-use App\Services\JwtService;
-use App\Services\UserSettingsService;
+use Exception;
+use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
+use Psr\Container\NotFoundExceptionInterface;
 
-class AuthService
+class AuthService extends BaseAuthService
 {
-    private ContainerInterface $container;
-    private JwtService $jwtService;
-    private UserSettingsService $userSettingsService;
+    protected ContainerInterface $container;
+    protected JwtService $jwtService;
+    protected UserSettingsService $userSettingsService;
+    protected TariffService $tariffService;
 
+    /**
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
     public function __construct(ContainerInterface $container)
     {
-        $this->container = $container;
-        $this->jwtService = $container->get(JwtService::class);
+        parent::__construct($container);
         $this->userSettingsService = $container->get(UserSettingsService::class);
+        $this->tariffService = $container->get(TariffService::class);
     }
 
     /**
-     * Authenticate user by telegram_id and password
-     * 
-     * @param string $telegramId Telegram ID
-     * @param string $password Password
-     * @param string $deviceType Type of device ('web' or 'mobile')
-     * @return array|null Array with tokens or null if authentication failed
+     * Аутентификация пользователя по логин|пароль
+     *
+     * @param int $userId ID пользователя
+     * @param string $password Пароль пользователя
+     * @param string $deviceType Тип устройства ('web' или 'mobile')
+     * @return array|null Массив с токенами или null в случае неудачной аутентификации
+     * @throws Exception
      */
-    public function authenticateUser(string $telegramId, string $password, string $deviceType = 'web'): ?array
+    public function authenticateUser(int $userId, string $password, string $deviceType = 'web'): ?array
     {
-        // Find user by telegram_id
-        $user = User::where('telegram_id', $telegramId)->first();
-        
-        // Check if user exists and password is correct
-        if (!$user || !password_verify($password, $user->password)) {
+        /** Находим пользователя по ID */
+        $user = User::where('id', $userId)->first();
+
+        /** Проверяем существование пользователя и правильность пароля */
+        if (!$user) {
             return null;
         }
-        
-        // Generate tokens
+
+        /** @var User $user */
+        if (!$user->verifyPassword($password)) {
+            return null;
+        }
+
+        /** Генерируем токены */
         $tokens = $this->jwtService->createTokens($user->id, $deviceType);
-        
-        // Return user data and tokens
-        return [
-            'access_token' => $tokens['access_token'],
-            'refresh_token' => $tokens['refresh_token'],
-            'expires_in' => $tokens['expires_in'],
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'telegram_id' => $user->telegram_id,
-                'telegram_username' => $user->telegram_username,
-                'telegram_photo_url' => $user->telegram_photo_url
-            ]
-        ];
+
+        /** Возвращаем данные пользователя и токены */
+        return $this->createAuthResponse($user, $tokens);
     }
     
     /**
@@ -81,56 +82,11 @@ class AuthService
     }
     
     /**
-     * Register a new user with Telegram ID and password
-     * 
-     * @param array $userData User data
-     * @param string $deviceType Type of device ('web' or 'mobile')
-     * @return array|null Array with tokens or null if registration failed
-     */
-    public function registerUser(array $userData, string $deviceType = 'web'): ?array
-    {
-        // Check if telegram_id is already taken
-        if (User::where('telegram_id', $userData['telegram_id'])->exists()) {
-            return null;
-        }
-        
-        // Create user
-        $user = new User();
-        $user->name = $userData['name'];
-        $user->password = $userData['password']; // will be hashed by the model
-        $user->telegram_id = $userData['telegram_id'];
-        $user->telegram_username = $userData['telegram_username'] ?? null;
-        $user->save();
-        
-        // Create default settings for user
-        $this->userSettingsService->createDefaultSettings($user->id);
-        
-        // Generate tokens
-        $tokens = $this->jwtService->createTokens($user->id, $deviceType);
-        
-        // Return user data and tokens
-        return [
-            'access_token' => $tokens['access_token'],
-            'refresh_token' => $tokens['refresh_token'],
-            'expires_in' => $tokens['expires_in'],
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'telegram_id' => $user->telegram_id,
-                'telegram_username' => $user->telegram_username
-            ]
-        ];
-    }
-    
-    /**
-     * Get user ID from access token
-     * 
-     * @param string $accessToken Access token
-     * @return int|null User ID or null if token is invalid
+     * Получает ID пользователя из токена
      */
     public function getUserIdFromToken(string $accessToken): ?int
     {
-        return $this->jwtService->getUserIdFromAccessToken($accessToken);
+        return $this->jwtService->getUserIdFromToken($accessToken);
     }
     
     /**
@@ -158,5 +114,25 @@ class AuthService
         }
         
         return $user->removeAllRefreshTokens();
+    }
+
+    /**
+     * Выход из системы для конкретного типа устройства
+     * 
+     * @param int $userId ID пользователя
+     * @param string $deviceType Тип устройства ('web' или 'mobile')
+     * @return bool Результат операции
+     */
+    public function logoutByDeviceType(int $userId, string $deviceType): bool
+    {
+        $user = User::find($userId);
+        if (!$user) {
+            return false;
+        }
+        
+        // Удаляем все refresh токены для указанного типа устройства
+        return (bool) $user->refreshTokens()
+            ->where('device_type', $deviceType)
+            ->delete();
     }
 } 

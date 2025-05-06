@@ -34,21 +34,18 @@ class TelegramAuthController
      * Авторизация через Telegram
      * @throws Exception
      */
-    public function authenticate(Request $request, Response $response): Response
+    public function authenticate(Request $request, Response $response, $deviceType = 'web'): Response
     {
         $data = $request->getParsedBody();
         if (!$data) {
-            return $this->respondWithError($response, 'Нет данных для авторизации', 400);
+            return $this->respondWithError($response, null, 'validation_error', 422);
         }
-
-        /** Определение типа устройства */
-        $deviceType = 'web';
 
         /** Получаем токены авторизации через Telegram */
         $authData = $this->telegramAuthService->authenticateUserByTelegram($data, $deviceType);
 
         if (!$authData) {
-            return $this->respondWithError($response, 'Ошибка авторизации через Telegram', 401);
+            return $this->respondWithError($response, 'Ошибка авторизации через Telegram.', 'validation_error', 422);
         }
 
         $sameSite = '; SameSite=None';
@@ -65,7 +62,7 @@ class TelegramAuthController
 
         return $this->respondWithData($response, [
             'code' => 200,
-            'status' => 'Success',
+            'status' => 'success',
             'message' => 'Успешная авторизация через Telegram',
             'access_token' => $authData['access_token']
         ], 200, $cookie);

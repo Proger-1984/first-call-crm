@@ -40,6 +40,7 @@ class JwtService
 
     /**
      * Создает пару токенов (access и refresh) для пользователя
+     * @throws Exception
      */
     #[ArrayShape(['access_token' => "string", 'refresh_token' => "string", 'expires_in' => "int"])]
     public function createTokens(int $userId, string $deviceType = 'web'): array
@@ -76,6 +77,7 @@ class JwtService
 
     /**
      * Создает refresh токен для пользователя
+     * @throws Exception
      */
     public function createRefreshToken(int $userId): string
     {
@@ -86,7 +88,6 @@ class JwtService
             'iat' => $issuedAt->getTimestamp(),
             'exp' => $expire->getTimestamp(),
             'user_id' => $userId,
-            'jti' => bin2hex(random_bytes(16)) // Unique identifier для предотвращения повторного использования
         ];
 
         return JWT::encode($payload, $this->refreshSecret, $this->algorithm);
@@ -110,10 +111,10 @@ class JwtService
     public function verifyRefreshToken(string $token): ?stdClass
     {
         try {
-            // Проверяем валидность JWT
+            /** Проверяем валидность JWT */
             $decoded = JWT::decode($token, new Key($this->refreshSecret, $this->algorithm));
-            
-            // Проверяем, существует ли токен в базе данных
+
+            /** Проверяем, существует ли токен в базе данных */
             $refreshToken = RefreshToken::findValidToken($token);
             if (!$refreshToken) {
                 return null;
@@ -127,6 +128,7 @@ class JwtService
 
     /**
      * Обновляет пару токенов с помощью refresh токена
+     * @throws Exception
      */
     public function refreshTokens(string $refreshToken, string $deviceType = 'web'): ?array
     {
@@ -135,32 +137,31 @@ class JwtService
         if (!$decoded) {
             return null;
         }
-        
-        // Находим токен в базе данных
+
+        /** Находим токен в базе данных */
         $tokenRecord = RefreshToken::findValidToken($refreshToken);
         if (!$tokenRecord) {
             return null;
         }
-        
-        // Удаляем старый токен
+
+        /** Удаляем старый токен */
         RefreshToken::removeToken($refreshToken);
-        
-        // Создаем новые токены
+
+        /** Создаем новые токены */
         return $this->createTokens($decoded->user_id, $tokenRecord->device_type);
     }
     
     /**
-     * Получает ID пользователя из access токена
+     * Получает ID пользователя из access токена без проверки валидности
      */
-    public function getUserIdFromAccessToken(string $token): ?int
+    public function getUserIdFromToken(string $token): ?int
     {
-        $decoded = $this->verifyAccessToken($token);
-        
-        if (!$decoded || !isset($decoded->user_id)) {
+        try {
+            $decoded = JWT::decode($token, new Key($this->accessSecret, $this->algorithm));
+            return isset($decoded->user_id) ? (int) $decoded->user_id : null;
+        } catch (Exception) {
             return null;
         }
-        
-        return (int) $decoded->user_id;
     }
     
     /**

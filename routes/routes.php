@@ -13,15 +13,15 @@ return function (App $app) {
     
     /** API Routes v1 */
     $app->group('/api/v1', function (RouteCollectorProxy $group) use ($container) {
-    /** Маршруты для аутентификации */
+        /** Маршруты для аутентификации */
         $group->group('/auth', function (RouteCollectorProxy $group) use ($container) {
-            /** Telegram Auth */
+            /** Авторизация через Telegram */
             $group->post('/telegram', [TelegramAuthController::class, 'authenticate']);
 
-            /** App Auth */
+            /** Авторизация через приложение */
             $group->post('/login', [AuthController::class, 'login']);
-            $group->post('/refresh', [AuthController::class, 'refresh']);
-            $group->post('/logout', [AuthController::class, 'logout']);
+            $group->get('/refresh', [AuthController::class, 'refresh']);
+            $group->get('/logout', [AuthController::class, 'logout']);
             $group->post('/logout-all', [AuthController::class, 'logoutAll'])->add(new AuthMiddleware($container));
         });
 
@@ -37,13 +37,12 @@ return function (App $app) {
         });
 
         /** Защищенные маршруты (требуют аутентификации) */
-        $group->group('', function (RouteCollectorProxy $group) {
-            /** Маршруты пользователя */
-            $group->group('/users', function (RouteCollectorProxy $group) {
-                $group->get('/settings', [UserController::class, 'getSettings']);
-                $group->put('/settings', [UserController::class, 'updateSettings']);
-            });
+        /** Маршруты пользователя */
+        $group->group('/me', function (RouteCollectorProxy $group) {
+            $group->get('/settings', [UserController::class, 'getSettings']);
+            $group->put('/settings', [UserController::class, 'updateSettings']);
         })->add(new AuthMiddleware($container));
+
     });
 
     /** Маршруты для веб-интерфейса авторизации через Telegram */

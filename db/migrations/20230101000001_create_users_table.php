@@ -14,7 +14,7 @@ class CreateUsersTable
         Manager::schema()->create('users', function ($table) {
             $table->increments('id');
             $table->string('name');
-            $table->string('password');
+            $table->string('password_hash');
             $table->string('telegram_id')->unique();
             $table->string('telegram_username')->nullable();
             $table->string('telegram_photo_url')->nullable();

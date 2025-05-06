@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Middleware;
 
 use App\Services\JwtService;
+use App\Traits\ResponseTrait;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -12,10 +13,14 @@ use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
+use Slim\Psr7\Factory\ResponseFactory;
 
 class AuthMiddleware implements MiddlewareInterface
 {
+    use ResponseTrait;
+
     private JwtService $jwtService;
+    private ResponseFactory $responseFactory;
 
     /**
      * @throws ContainerExceptionInterface
@@ -24,6 +29,7 @@ class AuthMiddleware implements MiddlewareInterface
     public function __construct(ContainerInterface $container)
     {
         $this->jwtService = $container->get(JwtService::class);
+        $this->responseFactory = new ResponseFactory();
     }
 
     public function process(Request $request, RequestHandler $handler): Response
@@ -31,17 +37,27 @@ class AuthMiddleware implements MiddlewareInterface
         $token = $this->getTokenFromHeader($request);
 
         if (!$token) {
-            return $this->respondWithUnauthorized('Токен не предоставлен');
+            return $this->respondWithError(
+                $this->responseFactory->createResponse(),
+                'Токен не предоставлен.',
+                'Access token not found',
+                401
+            );
         }
 
         $decoded = $this->jwtService->verifyAccessToken($token);
 
         if (!$decoded) {
-            return $this->respondWithUnauthorized('Недействительный или истекший токен');
+            return $this->respondWithError(
+                $this->responseFactory->createResponse(),
+                'Недействительный или истекший токен.',
+                'token_expired',
+                401
+            );
         }
 
-        // Добавляем данные о пользователе в запрос
-        $userId = $decoded->sub;
+        /** Добавляем данные о пользователе в запрос */
+        $userId = $decoded->user_id;
         $request = $request->withAttribute('userId', $userId);
 
         return $handler->handle($request);
@@ -62,18 +78,5 @@ class AuthMiddleware implements MiddlewareInterface
         }
 
         return $parts[1];
-    }
-
-    private function respondWithUnauthorized(string $message = 'Unauthorized'): Response
-    {
-        $response = new \Slim\Psr7\Response();
-        $response->getBody()->write(json_encode([
-            'status' => 'error',
-            'message' => $message,
-        ]));
-
-        return $response
-            ->withHeader('Content-Type', 'application/json')
-            ->withStatus(401);
     }
 } 

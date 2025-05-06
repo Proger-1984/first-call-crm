@@ -4,15 +4,25 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Traits\ResponseTrait;
 use App\Services\UserSettingsService;
+use Exception;
+use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
+use Psr\Container\NotFoundExceptionInterface;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
 class UserController
 {
+    use ResponseTrait;
+
     private UserSettingsService $userSettingsService;
 
+    /**
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
     public function __construct(ContainerInterface $container)
     {
         $this->userSettingsService = $container->get(UserSettingsService::class);
@@ -23,13 +33,14 @@ class UserController
      */
     public function getSettings(Request $request, Response $response): Response
     {
-        $userId = $request->getAttribute('user_id');
+        $userId = $request->getAttribute('userId');
         $settings = $this->userSettingsService->getUserSettings($userId);
 
-        return $this->respondWithJson($response, [
+        return $this->respondWithData($response, [
+            'code' => 200,
             'status' => 'success',
-            'data' => $settings,
-        ]);
+            'data' => $settings
+        ], 200);
     }
 
     /**
@@ -37,23 +48,24 @@ class UserController
      */
     public function updateSettings(Request $request, Response $response): Response
     {
-        $userId = $request->getAttribute('user_id');
+        $userId = $request->getAttribute('userId');
         $data = $request->getParsedBody();
 
         if (!is_array($data)) {
-            return $this->respondWithError($response, 'Неверные данные', 400);
+            return $this->respondWithError($response, null, 'validation_error', 422);
         }
 
         try {
-            $updatedSettings = $this->userSettingsService->updateUserSettings($userId, $data);
+            $this->userSettingsService->updateUserSettings($userId, $data);
 
-            return $this->respondWithJson($response, [
+            return $this->respondWithData($response, [
+                'code' => 200,
                 'status' => 'success',
-                'message' => 'Настройки успешно обновлены',
-                'data' => $updatedSettings,
-            ]);
-        } catch (\Exception $e) {
-            return $this->respondWithError($response, 'Ошибка при обновлении настроек: ' . $e->getMessage(), 500);
+                'message' => 'Настройки успешно обновлены.',
+            ], 200);
+
+        } catch (Exception $e) {
+            return $this->respondWithError($response, 'Ошибка при обновлении настроек.', '', 500);
         }
     }
 
@@ -81,28 +93,5 @@ class UserController
             'status' => 'success',
             'data' => $categories,
         ]);
-    }
-
-    /**
-     * Возвращает JSON ответ
-     */
-    private function respondWithJson(Response $response, array $data, int $status = 200): Response
-    {
-        $response->getBody()->write(json_encode($data));
-
-        return $response
-            ->withHeader('Content-Type', 'application/json')
-            ->withStatus($status);
-    }
-
-    /**
-     * Возвращает ответ с ошибкой
-     */
-    private function respondWithError(Response $response, string $message, int $status = 400): Response
-    {
-        return $this->respondWithJson($response, [
-            'status' => 'error',
-            'message' => $message,
-        ], $status);
     }
 } 
