@@ -102,16 +102,16 @@ class UserSettingsService
             $settings = $this->createDefaultSettings($userId);
         }
         
-        if (isset($data['log_events'])) {
-            $settings->log_events = (bool) $data['log_events'];
+        if (isset($data['settings']['log_events'])) {
+            $settings->log_events = (bool) $data['settings']['log_events'];
         }
         
-        if (isset($data['auto_call'])) {
-            $settings->auto_call = (bool) $data['auto_call'];
+        if (isset($data['settings']['auto_call'])) {
+            $settings->auto_call = (bool) $data['settings']['auto_call'];
         }
         
-        if (isset($data['telegram_notifications'])) {
-            $settings->telegram_notifications = (bool) $data['telegram_notifications'];
+        if (isset($data['settings']['telegram_notifications'])) {
+            $settings->telegram_notifications = (bool) $data['settings']['telegram_notifications'];
         }
         
         $settings->save();
