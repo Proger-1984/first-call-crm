@@ -33,14 +33,57 @@ class UserController
      */
     public function getSettings(Request $request, Response $response): Response
     {
-        $userId = $request->getAttribute('userId');
-        $settings = $this->userSettingsService->getUserSettings($userId);
+        try {
 
-        return $this->respondWithData($response, [
-            'code' => 200,
-            'status' => 'success',
-            'data' => $settings
-        ], 200);
+            $userId = $request->getAttribute('userId');
+            $settings = $this->userSettingsService->getUserSettings($userId);
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'data' => $settings
+            ], 200);
+
+        } catch (Exception) {
+            return $this->respondWithError($response,null,null,500);
+        }
+    }
+
+    /**
+     * Валидация данных настроек
+     * 
+     * @param array $data Данные для валидации
+     * @return string|null Сообщение с ошибкой или null если валидация прошла успешно
+     */
+    private function validateSettingsData(array $data): string|null
+    {
+        if (!is_array($data)) {
+            return 'Данные должны быть переданы в формате JSON';
+        }
+
+        $allFields = ['settings', 'sources', 'categories'];
+        $missingFields = [];
+        foreach ($allFields as $field) {
+            if (!array_key_exists($field, $data)) {
+                $missingFields[] = $field;
+            }
+        }
+        if (!empty($missingFields)) {
+            return 'Отсутствуют ключи: ' . implode(', ', $missingFields);
+        }
+
+        $requiredFields = ['settings', 'sources', 'categories'];
+        $emptyFields = [];
+        foreach ($requiredFields as $field) {
+            if (empty($data[$field])) {
+                $emptyFields[] = $field;
+            }
+        }
+        if (!empty($emptyFields)) {
+            return 'Пустые значения: ' . implode(', ', $emptyFields);
+        }
+
+        return null;
     }
 
     /**
@@ -48,14 +91,17 @@ class UserController
      */
     public function updateSettings(Request $request, Response $response): Response
     {
-        $userId = $request->getAttribute('userId');
-        $data = $request->getParsedBody();
-
-        if (!is_array($data)) {
-            return $this->respondWithError($response, null, 'validation_error', 422);
-        }
-
         try {
+
+            $userId = $request->getAttribute('userId');
+            $data = $request->getParsedBody();
+
+            $errors = $this->validateSettingsData($data);
+            if (!is_null($errors)) {
+                $message = 'Неверный формат запроса. ' . $errors;
+                return $this->respondWithError($response, $message,null,400);
+            }
+
             $this->userSettingsService->updateUserSettings($userId, $data);
 
             return $this->respondWithData($response, [
@@ -64,35 +110,29 @@ class UserController
                 'message' => 'Настройки успешно обновлены.',
             ], 200);
 
-        } catch (Exception $e) {
-            return $this->respondWithError($response, 'Ошибка при обновлении настроек.', '', 500);
+        } catch (Exception) {
+            return $this->respondWithError($response,null,null,500);
         }
+
     }
 
     /**
-     * Получение всех доступных источников
+     * Валидация данных статуса телефона
+     * 
+     * @param array $data Данные для валидации
+     * @return string|null Сообщение с ошибкой или null если валидация прошла успешно
      */
-    public function getSources(Request $request, Response $response): Response
+    private function validatePhoneStatusData(array $data): string|null
     {
-        $sources = $this->userSettingsService->getAllSources();
+        if (!isset($data['status'])) {
+            return 'Отсутствует обязательное поле status';
+        }
 
-        return $this->respondWithJson($response, [
-            'status' => 'success',
-            'data' => $sources,
-        ]);
-    }
+        if (!is_bool($data['status'])) {
+            return 'Поле status должно быть boolean';
+        }
 
-    /**
-     * Получение всех доступных категорий
-     */
-    public function getCategories(Request $request, Response $response): Response
-    {
-        $categories = $this->userSettingsService->getAllCategories();
-
-        return $this->respondWithJson($response, [
-            'status' => 'success',
-            'data' => $categories,
-        ]);
+        return null;
     }
 
     /**
@@ -100,24 +140,26 @@ class UserController
      */
     public function updatePhoneStatus(Request $request, Response $response): Response
     {
-        $userId = $request->getAttribute('userId');
-        $data = $request->getParsedBody();
-
-        if (!is_array($data) || !isset($data['status'])) {
-            return $this->respondWithError($response, null, 'validation_error', 422);
-        }
-
         try {
+            $userId = $request->getAttribute('userId');
+            $data = $request->getParsedBody();
+
+            $errors = $this->validatePhoneStatusData($data);
+            if ($errors !== null) {
+                $message = 'Неверный формат запроса. ' . $errors;
+                return $this->respondWithError($response, $message, "validation_error", 400);
+            }
+
             $this->userSettingsService->updatePhoneStatus($userId, $data['status']);
 
             return $this->respondWithData($response, [
                 'code' => 200,
                 'status' => 'success',
-                'message' => 'Статус телефона успешно обновлен.',
+                'message' => 'Статус телефона успешно обновлен',
             ], 200);
 
-        } catch (Exception $e) {
-            return $this->respondWithError($response, 'Ошибка при обновлении статуса телефона.', '', 500);
+        } catch (Exception) {
+            return $this->respondWithError($response, null, null, 500);
         }
     }
 } 

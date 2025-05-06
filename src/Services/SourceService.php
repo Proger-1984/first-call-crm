@@ -32,7 +32,7 @@ class SourceService
      */
     public function setUserSources(User $user, array $sourceIds): void
     {
-        /** Проверяем, что все источники существуют */
+        // Проверяем, что все источники существуют
         $existingSources = Manager::table('sources')
             ->whereIn('id', $sourceIds)
             ->pluck('id')

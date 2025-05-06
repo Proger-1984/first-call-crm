@@ -39,7 +39,7 @@ class TelegramAuthService extends BaseAuthService
      */
     public function checkTelegramAuthorization(array $auth_data): bool
     {
-        /** Проверяем обязательные поля */
+        // Проверяем обязательные поля
         $check_fields = ['id', 'auth_date', 'hash'];
         foreach ($check_fields as $field) {
             if (!isset($auth_data[$field])) {
@@ -47,38 +47,38 @@ class TelegramAuthService extends BaseAuthService
             }
         }
 
-        /** Проверяем, что авторизация не устарела (не старше 1 дня) */
+        // Проверяем, что авторизация не устарела (не старше 1 дня)
         if ((time() - $auth_data['auth_date']) > 86400) {
             return false;
         }
 
-        /** Проверка токена бота */
+        // Проверка токена бота
         if (empty($this->botToken)) {
             return false;
         }
 
-        /** Отделяем хеш от остальных данных */
+        // Отделяем хеш от остальных данных
         $data_check_arr = $auth_data;
         $hash = $data_check_arr['hash'];
         unset($data_check_arr['hash']);
 
-        /** Сортируем массив по ключам */
+        // Сортируем массив по ключам
         ksort($data_check_arr);
 
-        /** Формируем строку данных */
+        // Формируем строку данных
         $data_check_string = '';
         foreach ($data_check_arr as $key => $value) {
             $data_check_string .= $key . '=' . $value . "\n";
         }
         $data_check_string = trim($data_check_string);
 
-        /** Создаем секретный ключ на основе токена бота */
+        // Создаем секретный ключ на основе токена бота
         $secret_key = hash('sha256', $this->botToken, true);
 
-        /** Вычисляем хеш для проверки */
+        // Вычисляем хеш для проверки
         $hash_check = hash_hmac('sha256', $data_check_string, $secret_key);
 
-        /** Сравниваем хеши */
+        // Сравниваем хеши
         return hash_equals($hash, $hash_check);
     }
 
@@ -89,12 +89,12 @@ class TelegramAuthService extends BaseAuthService
      */
     public function authenticateUserByTelegram(array $auth_data, string $deviceType = 'web'): ?array
     {
-        /** Проверяем данные телеграм авторизации */
+        // Проверяем данные телеграм авторизации
         if (!$this->checkTelegramAuthorization($auth_data)) {
             return null;
         }
 
-        /** Находим или создаем пользователя */
+        // Находим или создаем пользователя
         $user = User::query()->firstOrNew(['telegram_id' => $auth_data['id']]);
         $isNewUser = !$user->exists;
 
@@ -103,13 +103,13 @@ class TelegramAuthService extends BaseAuthService
          */
         $generatedPassword = null;
         if ($isNewUser) {
-            /** Новый пользователь */
+            // Новый пользователь
             $generatedPassword = PasswordGenerator::generate(6);
             $user->name = $auth_data['first_name'] . (isset($auth_data['last_name']) ? ' ' . $auth_data['last_name'] : '');
             $user->password_hash = $generatedPassword;
         }
 
-        /** Обновляем данные Telegram */
+        // Обновляем данные Telegram
         $user->telegram_id = $auth_data['id'];
         $user->telegram_username = $auth_data['username'] ?? null;
         $user->telegram_photo_url = $auth_data['photo_url'] ?? null;
@@ -117,16 +117,16 @@ class TelegramAuthService extends BaseAuthService
         $user->telegram_hash = $auth_data['hash'];
         $user->save();
 
-        /** Создаем настройки для нового пользователя */
+        // Создаем настройки для нового пользователя
         if ($isNewUser) {
 
-            /** Настройки по умолчанию для нового пользователя */
+            // Настройки по умолчанию для нового пользователя
             $this->userSettingsService->createDefaultSettings($user->id);
 
-            /** Назначаем демо-тариф для нового пользователя */
+            // Назначаем демо-тариф для нового пользователя
             $this->tariffService->assignDemoTariff($user);
 
-            /** Устанавливаем все источники для нового пользователя */
+            // Устанавливаем все источники для нового пользователя
             $allSources = $this->sourceService->getAllSources();
             $sourceIds = [];
             foreach ($allSources as $source) {
@@ -139,7 +139,7 @@ class TelegramAuthService extends BaseAuthService
                 $this->sourceService->setUserSources($user, $sourceIds);
             }
 
-            /** Отправляем уведомление о регистрации */
+            // Отправляем уведомление о регистрации
             $this->telegramService->sendRegistrationNotification(
                 (string)$auth_data['id'],
                 (string)$user->id,
@@ -148,10 +148,10 @@ class TelegramAuthService extends BaseAuthService
             );
         }
 
-        /** Генерируем JWT токены */
+        // Генерируем JWT токены
         $tokens = $this->jwtService->createTokens($user->id, $deviceType);
         
-        /** Возвращаем токены и данные пользователя */
+        // Возвращаем токены и данные пользователя
         return $this->createAuthResponse($user, $tokens);
     }
 } 

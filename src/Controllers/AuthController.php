@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Services\AuthService;
+use App\Services\LogService;
 use App\Traits\ResponseTrait;
 use Exception;
 use Psr\Container\ContainerExceptionInterface;
@@ -19,6 +20,7 @@ class AuthController
 
     private ContainerInterface $container;
     private AuthService $authService;
+    private LogService $logService;
 
     /**
      * @throws ContainerExceptionInterface
@@ -28,89 +30,165 @@ class AuthController
     {
         $this->container = $container;
         $this->authService = $container->get(AuthService::class);
+        $this->logService = $container->get(LogService::class);
     }
 
     /**
-     * Авторизация пользователя через приложение по логин|пароль
+     * Валидация данных авторизации
+     * @param mixed $data Данные для валидации
+     * @return string|null Текст с ошибкой или null если ошибок нет
+     * 1. Проверяем, что данные являются массивом
+     * 2. Проверяем наличие всех полей
+     * 3. Проверяем заполненность обязательных полей
+     */
+    private function validateLoginData(mixed $data): string|null
+    {
+        if (!is_array($data)) {
+            return 'Данные должны быть переданы в формате JSON';
+        }
+
+        $requiredFields = ['login', 'password'];
+        $missingFields = [];
+        foreach ($requiredFields as $field) {
+            if (!array_key_exists($field, $data)) {
+                $missingFields[] = $field;
+            }
+        }
+        if (!empty($missingFields)) {
+            return 'Отсутствуют обязательные поля: ' . implode(', ', $missingFields);
+        }
+
+        $emptyFields = [];
+        foreach ($requiredFields as $field) {
+            if (empty($data[$field])) {
+                $emptyFields[] = $field;
+            }
+        }
+        if (!empty($emptyFields)) {
+            return 'Обязательные поля не заполнены: ' . implode(', ', $emptyFields);
+        }
+        
+        return null;
+    }
+
+    /**
+     * Авторизация через логин и пароль (приложение)
+     * @param Request $request
+     * @param Response $response
+     * @param string $deviceType
+     * @return Response
+     */
+    public function login(Request $request, Response $response, string $deviceType = 'mobile'): Response
+    {
+        try {
+
+            $data = $request->getParsedBody();
+            $errors = $this->validateLoginData($data);
+
+            if (!is_null($errors)) {
+                $message = 'Неверный формат запроса. ' . $errors;
+                $this->logService->warning('Неверный формат запроса', [
+                    'code'   => 400,
+                    'errors' => $errors,
+                    'data'   => $data],
+                    'mobile_auth'
+                );
+
+                return $this->respondWithError($response, $message,null,400);
+            }
+
+            // Проверка наличия пользователя */
+            $result = $this->authService->authenticateUser(
+                $data['login'], $data['password'], $deviceType
+            );
+
+            if (!$result) {
+                $this->logService->error('Неверный логин или пароль', [
+                    'code'   => 422,
+                    'errors' => null,
+                    'data'   => $data],
+                    'mobile_auth'
+                );
+
+                return $this->respondWithError($response,null,'invalid_credentials',401);
+            }
+
+            /** Проверяем статус подписки
+             * 1 - Demo
+             * 2 - Premium
+             * 3 - Close (Доступ закрыт)
+             */
+            if ($result['user']['tariff'] == 3) {
+                return $this->respondWithError(
+                    $response,
+                    'Доступ запрещен: подписка истекла',
+                    'subscription_expired',
+                    403
+                );
+            }
+
+            /** Возвращаем токены */
+            return $this->respondWithData($response, [
+                'code'          => 200,
+                'status'        => 'success',
+                'access_token'  => $result['access_token'],
+                'refresh_token' => $result['refresh_token'],
+                'expires_in'    => $result['expires_in'],
+            ], 200);
+
+        } catch (Exception $e) {
+            $this->logService->warning('Внутренняя ошибка сервера', [
+                'code'   => 500,
+                'errors' => $e->getMessage(),
+                'data'   => $data ?? null],
+                'mobile_auth'
+            );
+
+            return $this->respondWithError($response,null,null,500);
+        }
+    }
+
+    /**
+     * Обновление токенов доступа
      *
      * @param Request $request
      * @param Response $response
      * @param string $deviceType
      * @return Response
-     * @throws Exception
      */
-    public function login(Request $request, Response $response, string $deviceType = 'mobile'): Response
+    public function refresh(Request $request, Response $response, string $deviceType = 'mobile'): Response
     {
-        $data = $request->getParsedBody();
+        try {
 
-        if (!isset($data['login']) || !isset($data['password'])) {
-            return $this->respondWithError($response, null, 'validation_error', 422);
+            $refreshToken = $this->getTokenFromHeader($request);
+
+            if (!$refreshToken) {
+                return $this->respondWithError(
+                    $response,
+                    'Refresh token not found',
+                    'token_not_found',
+                    401
+                );
+            }
+
+            // Обновляем токены
+            $result = $this->authService->refreshToken($refreshToken, $deviceType);
+
+            if (!$result) {
+                return $this->respondWithError($response,'Refresh token expired','token_expired',401);
+            }
+
+            return $this->respondWithData($response, [
+                'code'          => 200,
+                'status'        => 'success',
+                'access_token'  => $result['access_token'],
+                'refresh_token' => $result['refresh_token'],
+                'expires_in'    => $result['expires_in'],
+            ], 200);
+
+        } catch (Exception) {
+            return $this->respondWithError($response,null,null,500);
         }
-
-        /** Проверка наличия пользователя */
-        $result = $this->authService->authenticateUser(
-            $data['login'], $data['password'], $deviceType
-        );
-        
-        if (!$result) {
-            return $this->respondWithError(
-                $response, null, 'invalid_credentials', 401
-            );
-        }
-
-        /** Проверяем статус подписки
-         * 1 - Demo, 2 - Premium, 3 - Close (Доступ закрыт)
-         */
-        if ($result['user']['tariff'] == 3) {
-            return $this->respondWithError(
-                $response,
-                'Доступ запрещен: подписка истекла.',
-                'subscription_expired',
-                403
-            );
-        }
-
-        /** Возвращаем токены */
-        return $this->respondWithData($response, [
-            'code' => 200,
-            'status' => 'success',
-            'data' => $result
-        ], 200);
-    }
-    
-    /**
-     * Обновление токенов доступа
-     * 
-     * @param Request $request
-     * @param Response $response
-     * @return Response
-     */
-    public function refresh(Request $request, Response $response): Response
-    {
-        $refreshToken = $this->getTokenFromHeader($request);
-
-        if (!$refreshToken) {
-            return $this->respondWithError(
-                $response,
-                'Токен не предоставлен.',
-                'Refresh token not found',
-                401
-            );
-        }
-
-        // Обновляем токены
-        $result = $this->authService->refreshToken($refreshToken, 'mobile');
-        
-        if (!$result) {
-            return $this->respondWithError($response, 'Недействительный refresh token.', 'Refresh token expired', 401);
-        }
-
-        return $this->respondWithData($response, [
-            'code' => 200,
-            'status' => 'success',
-            'data' => $result
-        ], 200);
-
     }
 
     private function getTokenFromHeader(Request $request): ?string
@@ -132,72 +210,48 @@ class AuthController
 
     /**
      * Выход из системы
-     * 
+     *
      * @param Request $request
      * @param Response $response
+     * @param string $deviceType
      * @return Response
      */
-    public function logout(Request $request, Response $response): Response
+    public function logout(Request $request, Response $response, string $deviceType = 'mobile'): Response
     {
-        // Получаем ID пользователя из токена
-        $accessToken = $this->getTokenFromHeader($request);
-        
-        if (!$accessToken) {
-            return $this->respondWithError(
-                $response,
-                'Токен не предоставлен.',
-                'Access token not found',
-                401
-            );
-        }
+        try {
 
-        // Получаем ID пользователя из токена без проверки валидности
-        $userId = $this->authService->getUserIdFromToken($accessToken);
-        
-        // Если не удалось получить ID пользователя, просто возвращаем успешный ответ
-        if (!$userId) {
+            $accessToken = $this->getTokenFromHeader($request);
+
+            if (!$accessToken) {
+                return $this->respondWithError(
+                    $response,
+                    'Access token not found',
+                    'token_not_found',
+                    401
+                );
+            }
+
+            // Получаем ID пользователя из токена без проверки валидности
+            $userId = $this->authService->getUserIdFromToken($accessToken);
+
+            if (!$userId) {
+                return $this->respondWithData($response, [
+                    'code' => 200,
+                    'status' => 'success',
+                    'message' => 'Успешный выход из системы.'
+                ], 200);
+            }
+
+            $this->authService->logoutByDeviceType($userId, $deviceType);
+
             return $this->respondWithData($response, [
                 'code' => 200,
                 'status' => 'success',
                 'message' => 'Успешный выход из системы.'
             ], 200);
+
+        } catch (Exception) {
+            return $this->respondWithError($response,null,null,500);
         }
-        
-        // Выход из системы для мобильного устройства
-        $this->authService->logoutByDeviceType($userId, 'mobile');
-        
-        // Возвращаем успешный ответ
-        return $this->respondWithData($response, [
-            'code' => 200,
-            'status' => 'success',
-            'message' => 'Успешный выход из системы.'
-        ], 200);
-    }
-    
-    /**
-     * Logout from all devices
-     * 
-     * @param Request $request
-     * @param Response $response
-     * @return Response
-     */
-    public function logoutAll(Request $request, Response $response): Response
-    {
-        // Получаем ID пользователя из токена с помощью middleware
-        $userId = $request->getAttribute('user_id');
-        
-        if (!$userId) {
-            return $this->respondWithError($response, 'Unauthorized', 401);
-        }
-        
-        // Logout from all devices
-        $result = $this->authService->logoutFromAllDevices($userId);
-        
-        return $this->respondWithData($response, [
-            'status' => 'success',
-            'data' => [
-                'logged_out' => $result
-            ]
-        ]);
     }
 } 

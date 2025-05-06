@@ -1,0 +1,747 @@
+openapi: 3.0.0
+info:
+  title: First Call API
+  version: 1.0.0
+  description: |
+    REST API для crm и мобильного приложения.
+    
+    ## Аутентификация
+    API использует JWT токены для аутентификации. Получить токен можно через:
+    - Авторизацию через Telegram (для crm)
+    - Авторизацию через логин и пароль (для приложения)
+    
+    ## Общие принципы
+    - Все запросы где требуется аунтификация должны содержать `Authorization: BearerAuth`
+    - Все запросы должны содержать заголовок `Content-Type: application/json`
+    - Все ответы возвращаются в формате JSON
+    - В случае ошибки возвращается объект с полями `code`, `status`, `message` и `error`
+    
+    ## Коды ответов
+    - 200: Успешный запрос
+    - 400: Неверный формат запроса (неправильный формат JSON, отсутствие|пустые обязательные поля, неверный тип данных)
+    - 401: Не авторизован
+    - 403: Доступ запрещен
+    - 404: Ресурс не найден
+    - 422: Ошибка валидации (нарушение бизнес-правил, неверный формат данных, конфликт значений)
+    - 500: Внутренняя ошибка сервера
+
+servers:
+  - url: http://localhost:8080
+    description: Локальный сервер разработки
+  - url: https://rest-api.firstcall.com
+    description: Продакшн сервер
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT токен доступа
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: HTTP код ошибки
+          example: 400
+        status:
+          type: string
+          description: Статус ответа
+          example: error
+        message:
+          type: string
+          description: Сообщение об ошибке
+          example: Неверный формат данных
+        error:
+          type: string
+          description: Код ошибки для программной обработки
+          example: validation_error
+
+    Source:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID источника
+          example: 1
+        name:
+          type: string
+          description: Название источника
+          example: "Телефонный звонок"
+        enabled:
+          type: boolean
+          description: Включен ли источник
+          example: true
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID категории
+          example: 1
+        name:
+          type: string
+          description: Название категории
+          example: "Важные звонки"
+        enabled:
+          type: boolean
+          description: Включена ли категория
+          example: true
+
+    PhoneStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: boolean
+          description: Статус телефона (true - занят, false - свободен)
+          example: true
+
+    TelegramAuth:
+      type: object
+      required:
+        - id
+        - first_name
+        - auth_date
+        - hash
+      properties:
+        id:
+          type: integer
+          description: Telegram ID пользователя
+          example: 123456789
+        first_name:
+          type: string
+          description: Имя пользователя
+          example: John
+        last_name:
+          type: string
+          description: Фамилия пользователя
+          example: Doe
+        username:
+          type: string
+          description: Имя пользователя в Telegram
+          example: johndoe
+        photo_url:
+          type: string
+          description: URL фотографии пользователя
+          example: https://t.me/i/userpic/320/123456789.jpg
+        auth_date:
+          type: integer
+          description: Дата авторизации (Unix timestamp)
+          example: 1616432400
+        hash:
+          type: string
+          description: Хеш для проверки данных
+          example: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+
+    LoginCredentials:
+      type: object
+      required:
+        - login
+        - password
+      properties:
+        login:
+          type: string
+          description: Логин
+          example: "111"
+        password:
+          type: string
+          description: Пароль
+          example: "password123"
+
+    UserSettings:
+      type: object
+      properties:
+        settings:
+          type: object
+          properties:
+            log_events:
+              type: boolean
+              description: Включено ли логирование событий
+              example: true
+            auto_call:
+              type: boolean
+              description: Включен ли автоматический звонок
+              example: false
+            telegram_notifications:
+              type: boolean
+              description: Включены ли уведомления в Telegram
+              example: true
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                description: ID источника
+                example: 1
+              name:
+                type: string
+                description: Название источника
+                example: "Телефонный звонок"
+              enabled:
+                type: boolean
+                description: Включен ли источник
+                example: true
+        categories:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                description: ID категории
+                example: 1
+              name:
+                type: string
+                description: Название категории
+                example: "Важные звонки"
+              enabled:
+                type: boolean
+                description: Включена ли категория
+                example: true
+
+    AuthResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: HTTP код ответа
+          example: 200
+        status:
+          type: string
+          description: Статус ответа
+          example: success
+        access_token:
+          type: string
+          description: JWT токен доступа
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        refresh_token:
+          type: string
+          description: Токен для обновления доступа
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        expires_in:
+          type: integer
+          description: Время жизни токена в секундах
+          example: 3600
+
+paths:
+  /api/v1/auth/telegram:
+    post:
+      summary: Авторизация через Telegram
+      description: |
+        Авторизация пользователя через Telegram.
+        
+        Для авторизации необходимо передать данные, полученные от Telegram Login Widget.
+        Все данные должны быть подписаны с помощью секретного ключа бота.
+        
+        При успешной авторизации:
+        - В теле ответа возвращается access_token
+        - В куках устанавливается refresh_token
+      tags:
+        - Аутентификация
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramAuth'
+      responses:
+        '200':
+          description: Успешная авторизация
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  message:
+                    type: string
+                    description: Сообщение об успешной авторизации
+                    example: "Успешная авторизация через Telegram"
+                  access_token:
+                    type: string
+                    description: JWT токен доступа
+                    example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: "refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; path=/api/v1/auth; domain=.example.com; max-age=2592000; expires=Wed, 06 May 2024 12:00:00 GMT; HttpOnly; Secure; SameSite=None"
+        '400':
+          description: |
+            Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: error
+                message: Неверный формат запроса
+                error: validation_error
+        '422':
+          description: Ошибка валидации данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 422
+                status: error
+                message: Ошибка авторизации через Telegram
+                error: validation_error
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: Внутренняя ошибка сервера
+                error: internal_error
+
+  /api/v1/auth/login:
+    post:
+      summary: Авторизация через приложение
+      description: |
+        Авторизация пользователя через логин и пароль.
+        
+        После успешной авторизации возвращается:
+        - access_token - JWT токен для доступа к API
+        - refresh_token - токен для обновления access_token
+        - expires_in - время жизни токена в секундах
+      tags:
+        - Аутентификация
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginCredentials'
+      responses:
+        '200':
+          description: Успешная авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: |
+            Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: error
+                message: Неверный формат запроса
+                error: validation_error
+        '401':
+          description: |
+            Ошибка авторизации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 401
+                status: error
+                message: Неверный логин или пароль
+                error: invalid_credentials
+        '403':
+          description: |
+            Доступ запрещен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: error
+                message: "Доступ запрещен: подписка истекла"
+                error: subscription_expired
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: Внутренняя ошибка сервера
+                error: internal_error
+
+  /api/v1/auth/refresh:
+    get:
+      summary: Обновление токена access_token
+      description: |
+        Обновление JWT токена доступа с помощью refresh токена.
+        
+        Refresh токен должен быть передан в заголовке Authorization.
+      tags:
+        - Аутентификация
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Токен успешно обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: "Токен отсутствует или недействителен"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Refresh token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Refresh token expired"
+                    error: "token_expired"
+        '500':
+          description: "Внутренняя ошибка сервера"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/auth/logout:
+    get:
+      summary: Выход из системы
+      description: |
+        Выход пользователя из системы.
+
+        Access токен должен быть передан в заголовке Authorization.
+
+        Текущий токен будет признан недействительным.
+      tags:
+        - Аутентификация
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Успешный выход
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Успешный выход из системы
+        '401':
+          description: Токен отсутствует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 401
+                status: error
+                message: Access token not found
+                error: token_not_found
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: Внутренняя ошибка сервера
+                error: internal_error
+
+  /api/v1/config/telegram-bot-username:
+    get:
+      summary: Получение имени бота
+      description: Получение имени бота Telegram для авторизации
+      tags:
+        - Конфигурация
+      responses:
+        '200':
+          description: Имя бота получено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username:
+                    type: string
+                    description: Имя бота в Telegram
+                    example: "firstcall_bot"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: Внутренняя ошибка сервера
+                error: internal_error
+
+  /api/v1/me/settings:
+    get:
+      summary: Получение настроек пользователя
+      description: |
+        Получение всех настроек пользователя.
+        
+        Access токен должен быть передан в заголовке Authorization.
+      tags:
+        - Пользователь
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Настройки получены
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/UserSettings'
+        '401':
+          description: "Токен отсутствует или недействителен"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+        '500':
+          description: "Внутренняя ошибка сервера"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+    put:
+      summary: Обновление настроек пользователя
+      description: |
+        Обновление настроек пользователя.
+
+        Access токен должен быть передан в заголовке Authorization.
+        
+        Можно обновить как отдельные настройки, так и все сразу.
+      tags:
+        - Пользователь
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSettings'
+      responses:
+        '200':
+          description: Настройки обновлены
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: "Настройки успешно обновлены"
+        '400':
+          description: "Неверный формат запроса"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_json:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Неверный формат запроса"
+                    error: "validation_error"
+        '401':
+          description: "Токен отсутствует или недействителен"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+        '500':
+          description: "Внутренняя ошибка сервера"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/me/phone-status:
+    put:
+      summary: Обновить статус телефона
+      description: |
+        Обновляет статус телефона пользователя (занят/свободен).
+        
+        Этот статус может использоваться для маршрутизации звонков и отображения
+        текущего состояния пользователя в интерфейсе.
+      tags:
+        - Пользователь
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PhoneStatus'
+      responses:
+        '200':
+          description: Статус телефона успешно обновлен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Статус телефона успешно обновлен
+        '400':
+          description: "Неверный формат запроса"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_json:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Неверный формат запроса. Данные должны быть переданы в формате JSON"
+                    error: "validation_error"
+                missing_status:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Неверный формат запроса. Отсутствует обязательное поле status"
+                    error: "validation_error"
+                invalid_status_type:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Неверный формат запроса. Поле status должно быть boolean"
+                    error: "validation_error"
+        '401':
+          description: "Токен отсутствует или недействителен"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+        '500':
+          description: "Внутренняя ошибка сервера"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error" 

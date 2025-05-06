@@ -9,6 +9,7 @@ use App\Services\TelegramService;
 use App\Services\UserSettingsService;
 use App\Services\TariffService;
 use App\Services\SourceService;
+use App\Services\LogService;
 use App\Controllers\AuthController;
 use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
@@ -64,6 +65,10 @@ return function (array $config) {
         
         SourceService::class => factory(function (ContainerInterface $c) {
             return new SourceService($c);
+        }),
+        
+        LogService::class => factory(function (ContainerInterface $c) {
+            return new LogService($c->get(LoggerInterface::class));
         }),
         
         /** Контроллеры */

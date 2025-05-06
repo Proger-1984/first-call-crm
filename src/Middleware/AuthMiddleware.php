@@ -39,8 +39,8 @@ class AuthMiddleware implements MiddlewareInterface
         if (!$token) {
             return $this->respondWithError(
                 $this->responseFactory->createResponse(),
-                'Токен не предоставлен.',
                 'Access token not found',
+                'token_not_found',
                 401
             );
         }
@@ -50,13 +50,13 @@ class AuthMiddleware implements MiddlewareInterface
         if (!$decoded) {
             return $this->respondWithError(
                 $this->responseFactory->createResponse(),
-                'Недействительный или истекший токен.',
+                'Access token expired',
                 'token_expired',
                 401
             );
         }
 
-        /** Добавляем данные о пользователе в запрос */
+        // Добавляем данные о пользователе в запрос
         $userId = $decoded->user_id;
         $request = $request->withAttribute('userId', $userId);
 

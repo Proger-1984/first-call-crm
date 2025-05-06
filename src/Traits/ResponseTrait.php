@@ -53,43 +53,49 @@ trait ResponseTrait
      *
      * @param ResponseInterface $response Объект ответа
      * @param string|null $errorMessage Текст ошибки
+     * @param string|null $error
      * @param int $errorCode Код ошибки (опционально)
-     * @param string $error
      * @return ResponseInterface
      */
     protected function respondWithError(
         ResponseInterface $response, 
         string|null $errorMessage,
-        string $error,
+        string|null $error,
         int $errorCode
     ): ResponseInterface
     {
         return match ($errorCode) {
 
             /** Ошибки аутентификации */
+            400 => $this->respondWithData($response, [
+                'code' => $errorCode,
+                'status' => 'error',
+                'message' => $errorMessage ?: 'Неверный формат запроса',
+                'error' => $error ?: 'validation_error',
+            ], 400),
             401 => $this->respondWithData($response, [
                 'code' => $errorCode,
                 'status' => 'error',
-                'message' => $errorMessage ?: 'Неверный логин или пароль.',
+                'message' => $errorMessage ?: 'Неверный логин или пароль',
                 'error' => $error
             ], 401),
             422 => $this->respondWithData($response, [
                 'code' => $errorCode,
                 'status' => 'error',
-                'message' => $errorMessage ?: 'Ошибка валидации.',
-                'error' => $error
+                'message' => $errorMessage ?: 'Ошибка валидации',
+                'error' => $error ?: 'validation_error',
             ], 422),
             403 => $this->respondWithData($response, [
                 'code' => $errorCode,
                 'status' => 'error',
-                'message' => $errorMessage ?: 'Доступ запрещен.',
+                'message' => $errorMessage ?: 'Доступ запрещен',
                 'error' => $error
             ], 403),
             500 => $this->respondWithData($response, [
-                'code' => $errorCode,
-                'status' => 'error',
-                'message' => $errorMessage ?: 'Внутренняя ошибка сервера.',
-                'error' => $error
+                'code'    => $errorCode,
+                'status'  => 'error',
+                'message' => $errorMessage ?: 'Внутренняя ошибка сервера',
+                'error'   => $error ?: 'internal_error',
             ], 500),
 
 
