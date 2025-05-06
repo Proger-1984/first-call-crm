@@ -154,8 +154,17 @@ class AuthController
         // Получаем ID пользователя из токена без проверки валидности
         $userId = $this->authService->getUserIdFromToken($accessToken);
         
+        // Если не удалось получить ID пользователя, просто возвращаем успешный ответ
+        if (!$userId) {
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'message' => 'Успешный выход из системы.'
+            ], 200);
+        }
+        
         // Выход из системы для мобильного устройства
-        $result = $this->authService->logoutByDeviceType($userId, 'mobile');
+        $this->authService->logoutByDeviceType($userId, 'mobile');
         
         // Возвращаем успешный ответ
         return $this->respondWithData($response, [
