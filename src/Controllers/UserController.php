@@ -94,4 +94,30 @@ class UserController
             'data' => $categories,
         ]);
     }
+
+    /**
+     * Обновление статуса телефона пользователя
+     */
+    public function updatePhoneStatus(Request $request, Response $response): Response
+    {
+        $userId = $request->getAttribute('userId');
+        $data = $request->getParsedBody();
+
+        if (!is_array($data) || !isset($data['status'])) {
+            return $this->respondWithError($response, null, 'validation_error', 422);
+        }
+
+        try {
+            $this->userSettingsService->updatePhoneStatus($userId, $data['status']);
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'message' => 'Статус телефона успешно обновлен.',
+            ], 200);
+
+        } catch (Exception $e) {
+            return $this->respondWithError($response, 'Ошибка при обновлении статуса телефона.', '', 500);
+        }
+    }
 } 

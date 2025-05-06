@@ -83,6 +83,7 @@ class UserSettingsService
                 'log_events' => $settings->log_events,
                 'auto_call' => $settings->auto_call,
                 'telegram_notifications' => $settings->telegram_notifications,
+                'phone_status' => $user->phone_status,
             ],
             'sources' => $sources,
             'categories' => $categories
@@ -210,5 +211,15 @@ class UserSettingsService
     public function getAllCategories(): array
     {
         return Category::all()->toArray();
+    }
+
+    /**
+     * Обновляет статус телефона пользователя
+     */
+    public function updatePhoneStatus(int $userId, bool $status): void
+    {
+        $user = User::findOrFail($userId);
+        $user->phone_status = $status;
+        $user->save();
     }
 } 

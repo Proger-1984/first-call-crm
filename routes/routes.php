@@ -41,6 +41,7 @@ return function (App $app) {
         $group->group('/me', function (RouteCollectorProxy $group) {
             $group->get('/settings', [UserController::class, 'getSettings']);
             $group->put('/settings', [UserController::class, 'updateSettings']);
+            $group->put('/phone-status', [UserController::class, 'updatePhoneStatus']);
         })->add(new AuthMiddleware($container));
 
     });
