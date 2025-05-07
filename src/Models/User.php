@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 /**
  * Class User
@@ -33,6 +34,7 @@ use Illuminate\Database\Eloquent\Builder;
  * @property int|null $tariff_id
  * @property Carbon|null $tariff_expires_at
  * @property bool $is_trial_used
+ * @property bool $phone_status
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * 
@@ -52,6 +54,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class User extends Model
 {
+    use HasFactory;
+
     protected $table = 'users';
 
     protected $fillable = [
@@ -107,6 +111,9 @@ class User extends Model
     /**
      * Источники, выбранные пользователем
      * @return BelongsToMany<Source>
+     * @method BelongsToMany<Source> sources()
+     * @method BelongsToMany<Source> sources() attach(array|int $ids, array $attributes = [], bool $touch = true)
+     * @method BelongsToMany<Source> sources() detach(array|int $ids = null, bool $touch = true)
      */
     public function sources(): BelongsToMany
     {

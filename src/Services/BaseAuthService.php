@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\User;
+use Exception;
 use JetBrains\PhpStorm\ArrayShape;
 use Psr\Container\ContainerInterface;
 
@@ -39,10 +40,11 @@ abstract class BaseAuthService
 
     /**
      * Обновляет токены
+     * @throws Exception
      */
-    public function refreshToken(string $refreshToken, string $deviceType = 'web'): ?array
+    public function refreshToken(string $refreshToken): ?array
     {
-        $newTokens = $this->jwtService->refreshTokens($refreshToken, $deviceType);
+        $newTokens = $this->jwtService->refreshTokens($refreshToken);
         
         if (!$newTokens) {
             return null;

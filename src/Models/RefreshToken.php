@@ -21,6 +21,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read User $user
+ * 
+ * @method static self|null find(int $id)
+ * @method static self findOrFail(int $id)
+ * @method static self updateOrCreate(array $attributes, array $values = [])
+ * @method static self where(string $column, mixed $operator = null, mixed $value = null)
+ * @method static self|null first()
  */
 class RefreshToken extends Model
 {
@@ -59,13 +65,11 @@ class RefreshToken extends Model
     public static function createOrUpdateToken(int $userId, string $token, string $deviceType, int $expiresInSeconds): self
     {
         $expiresAt = Carbon::now()->addSeconds($expiresInSeconds);
-        
-        $refreshToken = self::updateOrCreate(
+
+        return self::updateOrCreate(
             ['user_id' => $userId, 'device_type' => $deviceType],
             ['token' => $token, 'expires_at' => $expiresAt]
         );
-        
-        return $refreshToken;
     }
 
     /**

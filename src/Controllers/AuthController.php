@@ -97,7 +97,7 @@ class AuthController
                 return $this->respondWithError($response, $message,null,400);
             }
 
-            // Проверка наличия пользователя */
+            // Проверка наличия пользователя
             $result = $this->authService->authenticateUser(
                 $data['login'], $data['password'], $deviceType
             );
@@ -127,7 +127,7 @@ class AuthController
                 );
             }
 
-            /** Возвращаем токены */
+            // Возвращаем токены
             return $this->respondWithData($response, [
                 'code'          => 200,
                 'status'        => 'success',

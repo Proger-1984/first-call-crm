@@ -6,8 +6,8 @@ use Psr\Log\LoggerInterface;
 
 class LogService
 {
-    private $logger;
-    private $logPath;
+    private LoggerInterface $logger;
+    private string $logPath;
 
     public function __construct(LoggerInterface $logger, string $logPath = null)
     {

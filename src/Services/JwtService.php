@@ -130,7 +130,7 @@ class JwtService
      * Обновляет пару токенов с помощью refresh токена
      * @throws Exception
      */
-    public function refreshTokens(string $refreshToken, string $deviceType = 'web'): ?array
+    public function refreshTokens(string $refreshToken): ?array
     {
         $decoded = $this->verifyRefreshToken($refreshToken);
         

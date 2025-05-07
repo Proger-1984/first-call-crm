@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\UserSettings;
 use App\Models\Source;
 use App\Models\Category;
+use JetBrains\PhpStorm\ArrayShape;
 use Psr\Container\ContainerInterface;
 use Illuminate\Database\Capsule\Manager;
 
@@ -25,7 +26,7 @@ class UserSettingsService
      */
     public function createDefaultSettings(int $userId): UserSettings
     {
-        /** Создаем запись в таблице настроек */
+        // Создаем запись в таблице настроек
         $settings = new UserSettings([
             'user_id' => $userId,
             'log_events' => false,
@@ -40,17 +41,18 @@ class UserSettingsService
     /**
      * Получает настройки пользователя
      */
+    #[ArrayShape(['settings' => "array", 'sources' => "mixed[]", 'categories' => "mixed"])]
     public function getUserSettings(int $userId): array
     {
         $user = User::with(['settings', 'sources', 'categories'])->findOrFail($userId);
 
-        /** Получаем все источники */
+        // Получаем все источники
         $allSources = Source::all();
 
-        /** Получаем ID активных источников пользователя */
+        // Получаем ID активных источников пользователя
         $userSourceIds = $user->sources->pluck('id')->toArray();
 
-        /** Формируем массив источников с флагом enabled */
+        // Формируем массив источников с флагом enabled
         $sources = $allSources->map(function($source) use ($userSourceIds) {
             return [
                 'id' => $source->id,
@@ -59,7 +61,7 @@ class UserSettingsService
             ];
         })->toArray();
 
-        /** Получаем категории пользователя с их статусом */
+        // Получаем категории пользователя с их статусом
         $categories = $user->categories()
             ->select('categories.*', 'user_categories.enabled')
             ->get()
@@ -72,9 +74,10 @@ class UserSettingsService
             })
             ->toArray();
 
+        /** @var UserSettings $settings */
         $settings = $user->settings;
         if (!$settings) {
-            /** Создаем настройки с значениями по умолчанию */
+            // Создаем настройки с значениями по умолчанию
             $settings = $this->createDefaultSettings($userId);
         }
         
@@ -93,11 +96,12 @@ class UserSettingsService
     /**
      * Обновляет настройки пользователя
      */
+    #[ArrayShape(['settings' => "array", 'sources' => "mixed[]", 'categories' => "mixed"])]
     public function updateUserSettings(int $userId, array $data): array
     {
         $user = User::with('settings')->findOrFail($userId);
         
-        /** Обновляем настройки */
+        // Обновляем настройки
         $settings = $user->settings;
         if (!$settings) {
             $settings = $this->createDefaultSettings($userId);
@@ -117,9 +121,9 @@ class UserSettingsService
         
         $settings->save();
 
-        /** Обновляем источники */
+        // Обновляем источники
         if (isset($data['sources']) && is_array($data['sources'])) {
-            /** Получаем ID источников, которые нужно включить */
+            // Получаем ID источников, которые нужно включить
             $enabledSourceIds = collect($data['sources'])
                 ->filter(function($source) {
                     return isset($source['enabled']) && $source['enabled'] === true;
@@ -127,30 +131,30 @@ class UserSettingsService
                 ->pluck('id')
                 ->toArray();
 
-            /** Проверяем существование источников */
+            // Проверяем существование источников
             $existingSources = Source::whereIn('id', $enabledSourceIds)->pluck('id')->toArray();
 
-            /** Сначала удаляем все связи пользователя с источниками */
+            // Сначала удаляем все связи пользователя с источниками
             $user->sources()->detach();
 
-            /** Затем добавляем только включенные источники */
+            // Затем добавляем только включенные источники
             if (!empty($existingSources)) {
                 $user->sources()->attach($existingSources);
             }
         }
 
-        /** Обновляем категории */
+        // Обновляем категории
         if (isset($data['categories']) && is_array($data['categories'])) {
-            /** Получаем все существующие категории */
+            // Получаем все существующие категории
             $allCategories = Category::all();
             
-            /** Получаем текущие связи пользователя с категориями */
+            // Получаем текущие связи пользователя с категориями
             $currentUserCategories = $user->categories()
                 ->select('categories.id', 'user_categories.enabled')
                 ->get()
                 ->keyBy('id');
 
-            /** Формируем массив для upsert */
+            // Формируем массив для upsert
             $now = date('Y-m-d H:i:s');
             $pivotData = [];
             
@@ -159,16 +163,16 @@ class UserSettingsService
                     continue;
                 }
                 
-                /** Проверяем существование категории */
+                // Проверяем существование категории
                 if (!$allCategories->contains('id', $categoryData['id'])) {
                     continue;
                 }
 
-                /** Проверяем, есть ли уже связь с этой категорией */
+                // Проверяем, есть ли уже связь с этой категорией
                 $categoryId = $categoryData['id'];
                 $isEnabled = (bool)$categoryData['enabled'];
                 
-                /** Если связь существует и статус не изменился, пропускаем */
+                // Если связь существует и статус не изменился, пропускаем
                 if ($currentUserCategories->has($categoryId) && 
                     $currentUserCategories->get($categoryId)->enabled === $isEnabled) {
                     continue;
@@ -183,7 +187,7 @@ class UserSettingsService
                 ];
             }
             
-            /** Обновляем только изменившиеся связи */
+            // Обновляем только изменившиеся связи
             if (!empty($pivotData)) {
                 Manager::table('user_categories')->upsert(
                     $pivotData,
@@ -195,22 +199,6 @@ class UserSettingsService
 
         /** Возвращаем обновленные настройки */
         return $this->getUserSettings($userId);
-    }
-    
-    /**
-     * Получает список всех доступных источников
-     */
-    public function getAllSources(): array
-    {
-        return Source::all()->toArray();
-    }
-    
-    /**
-     * Получает список всех доступных категорий
-     */
-    public function getAllCategories(): array
-    {
-        return Category::all()->toArray();
     }
 
     /**
