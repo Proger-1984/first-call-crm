@@ -61,7 +61,7 @@ class UserController
             return 'Данные должны быть переданы в формате JSON';
         }
 
-        $allFields = ['settings', 'sources', 'categories'];
+        $allFields = ['settings', 'sources', 'active_subscriptions'];
         $missingFields = [];
         foreach ($allFields as $field) {
             if (!array_key_exists($field, $data)) {
@@ -72,7 +72,7 @@ class UserController
             return 'Отсутствуют ключи: ' . implode(', ', $missingFields);
         }
 
-        $requiredFields = ['settings', 'sources', 'categories'];
+        $requiredFields = ['settings', 'sources', 'active_subscriptions'];
         $emptyFields = [];
         foreach ($requiredFields as $field) {
             if (empty($data[$field])) {

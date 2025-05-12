@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Models\User;
 use App\Services\AuthService;
 use App\Services\LogService;
 use App\Traits\ResponseTrait;
@@ -99,7 +100,7 @@ class AuthController
 
             // Проверка наличия пользователя
             $result = $this->authService->authenticateUser(
-                $data['login'], $data['password'], $deviceType
+                (int)$data['login'], $data['password'], $deviceType
             );
 
             if (!$result) {
@@ -113,15 +114,14 @@ class AuthController
                 return $this->respondWithError($response,null,'invalid_credentials',401);
             }
 
-            /** Проверяем статус подписки
-             * 1 - Demo
-             * 2 - Premium
-             * 3 - Close (Доступ закрыт)
-             */
-            if ($result['user']['tariff'] == 3) {
+            // Получаем пользователя для проверки активных подписок
+            $user = User::find($result['user']['id']);
+            
+            // Проверяем, что у пользователя есть хотя бы одна активная подписка или демо-версия
+            if (!$user->hasAnyActiveSubscription() && !$user->hasActiveDemoSubscription()) {
                 return $this->respondWithError(
                     $response,
-                    'Доступ запрещен: подписка истекла',
+                    'Доступ запрещен: Нет активных подписок',
                     'subscription_expired',
                     403
                 );

@@ -2,42 +2,40 @@
 
 namespace App\Console\Commands;
 
-use App\Models\User;
-use App\Services\TariffService;
+use App\Services\SubscriptionService;
 use Illuminate\Console\Command;
-use Carbon\Carbon;
 
 class CheckExpiredTariffs extends Command
 {
-    protected $signature = 'tariffs:check-expired';
-    protected $description = 'Check and handle expired tariffs';
+    protected $signature = 'subscriptions:check-expired';
+    protected $description = 'Check and mark expired subscriptions';
 
-    private TariffService $tariffService;
+    private SubscriptionService $subscriptionService;
 
-    public function __construct(TariffService $tariffService)
+    public function __construct(SubscriptionService $subscriptionService)
     {
         parent::__construct();
-        $this->tariffService = $tariffService;
+        $this->subscriptionService = $subscriptionService;
     }
 
     public function handle()
     {
-        $expiredUsers = User::where('tariff_expires_at', '<', Carbon::now())
-            ->whereNotNull('tariff_expires_at')
-            ->get();
-
-        foreach ($expiredUsers as $user) {
-            // Здесь можно добавить логику обработки истекшего тарифа
-            // Например, отправить уведомление пользователю
-            $this->info("User {$user->id} tariff has expired");
-            
-            // Можно также сбросить тариф
-            $user->update([
-                'tariff_id' => null,
-                'tariff_expires_at' => null
-            ]);
+        $count = $this->subscriptionService->checkExpiredSubscriptions();
+        $this->info("Processed {$count} expired subscriptions");
+        
+        // Проверяем подписки, которые скоро истекут (через 3 дня или меньше)
+        $soonExpiring = $this->subscriptionService->getSoonExpiringSubscriptions(3);
+        $this->info("Found {$soonExpiring->count()} subscriptions expiring soon");
+        
+        foreach ($soonExpiring as $subscription) {
+            $this->line(
+                "Subscription ID: {$subscription->id}, " .
+                "User: {$subscription->user->name}, " .
+                "Category: {$subscription->category->name}, " .
+                "Location: {$subscription->location->getFullName()}, " .
+                "Expires: {$subscription->end_date->format('Y-m-d H:i:s')}"
+            );
+            // Здесь можно добавить логику отправки уведомлений пользователям
         }
-
-        $this->info("Checked {$expiredUsers->count()} expired tariffs");
     }
 } 

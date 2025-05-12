@@ -45,8 +45,8 @@ class JwtService
     #[ArrayShape(['access_token' => "string", 'refresh_token' => "string", 'expires_in' => "int"])]
     public function createTokens(int $userId, string $deviceType = 'web'): array
     {
-        $accessToken = $this->createAccessToken($userId);
-        $refreshToken = $this->createRefreshToken($userId);
+        $accessToken = $this->createAccessToken($userId, $deviceType);
+        $refreshToken = $this->createRefreshToken($userId, $deviceType);
         
         /** Сохраняем refresh token в базу данных */
         User::find($userId)?->createOrUpdateRefreshToken($refreshToken, $deviceType, $this->refreshExpiration);
@@ -61,15 +61,21 @@ class JwtService
     /**
      * Создает access токен для пользователя
      */
-    public function createAccessToken(int $userId): string
+    public function createAccessToken(int $userId, string $deviceType): string
     {
         $issuedAt = new DateTime();
         $expire = (clone $issuedAt)->modify("+{$this->accessExpiration} seconds");
+        
+        // Получаем роль пользователя
+        $user = User::find($userId);
+        $role = $user ? $user->role : 'user';
 
         $payload = [
             'iat' => $issuedAt->getTimestamp(),
             'exp' => $expire->getTimestamp(),
-            'user_id' => $userId
+            'user_id' => $userId,
+            'role' => $role,
+            'device_type' => $deviceType
         ];
 
         return JWT::encode($payload, $this->accessSecret, $this->algorithm);
@@ -79,15 +85,21 @@ class JwtService
      * Создает refresh токен для пользователя
      * @throws Exception
      */
-    public function createRefreshToken(int $userId): string
+    public function createRefreshToken(int $userId, string $deviceType): string
     {
         $issuedAt = new DateTime();
         $expire = (clone $issuedAt)->modify("+{$this->refreshExpiration} seconds");
+        
+        // Получаем роль пользователя
+        $user = User::find($userId);
+        $role = $user ? $user->role : 'user';
 
         $payload = [
             'iat' => $issuedAt->getTimestamp(),
             'exp' => $expire->getTimestamp(),
             'user_id' => $userId,
+            'role' => $role,
+            'device_type' => $deviceType
         ];
 
         return JWT::encode($payload, $this->refreshSecret, $this->algorithm);
@@ -115,7 +127,10 @@ class JwtService
             $decoded = JWT::decode($token, new Key($this->refreshSecret, $this->algorithm));
 
             /** Проверяем, существует ли токен в базе данных */
-            $refreshToken = RefreshToken::findValidToken($token);
+            $refreshToken = RefreshToken::where('token', $token)
+                ->where('expires_at', '>', new DateTime())
+                ->first();
+                
             if (!$refreshToken) {
                 return null;
             }
@@ -139,13 +154,16 @@ class JwtService
         }
 
         /** Находим токен в базе данных */
-        $tokenRecord = RefreshToken::findValidToken($refreshToken);
+        $tokenRecord = RefreshToken::where('token', $refreshToken)
+            ->where('expires_at', '>', new DateTime())
+            ->first();
+            
         if (!$tokenRecord) {
             return null;
         }
 
         /** Удаляем старый токен */
-        RefreshToken::removeToken($refreshToken);
+        $tokenRecord->delete();
 
         /** Создаем новые токены */
         return $this->createTokens($decoded->user_id, $tokenRecord->device_type);
@@ -165,10 +183,33 @@ class JwtService
     }
     
     /**
+     * Получает роль пользователя из access токена без проверки валидности
+     */
+    public function getRoleFromToken(string $token): ?string
+    {
+        try {
+            $decoded = JWT::decode($token, new Key($this->accessSecret, $this->algorithm));
+            return isset($decoded->role) ? $decoded->role : null;
+        } catch (Exception) {
+            return null;
+        }
+    }
+    
+    /**
      * Удаляет refresh токен (при выходе из системы)
      */
     public function removeRefreshToken(string $refreshToken): bool
     {
-        return RefreshToken::removeToken($refreshToken);
+        try {
+            $token = RefreshToken::where('token', $refreshToken)->first();
+            
+            if ($token) {
+                return (bool) $token->delete();
+            }
+            
+            return false;
+        } catch (Exception) {
+            return false;
+        }
     }
 } 

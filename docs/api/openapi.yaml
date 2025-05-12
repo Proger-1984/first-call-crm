@@ -25,6 +25,18 @@ info:
     - 422: Ошибка валидации (нарушение бизнес-правил, неверный формат данных, конфликт значений)
     - 500: Внутренняя ошибка сервера
 
+tags:
+  - name: Аутентификация
+    description: Методы для авторизации и управления токенами
+  - name: Пользователь
+    description: Методы для работы с данными пользователя
+  - name: Подписки
+    description: Методы для управления подписками
+  - name: Конфигурация
+    description: Методы для получения конфигурационных данных
+  - name: Администрирование
+    description: Методы для администраторов системы
+
 servers:
   - url: http://localhost:8080
     description: Локальный сервер разработки
@@ -163,7 +175,7 @@ components:
             log_events:
               type: boolean
               description: Включено ли логирование событий
-              example: true
+              example: false
             auto_call:
               type: boolean
               description: Включен ли автоматический звонок
@@ -171,7 +183,7 @@ components:
             telegram_notifications:
               type: boolean
               description: Включены ли уведомления в Telegram
-              example: true
+              example: false
         sources:
           type: array
           items:
@@ -184,27 +196,27 @@ components:
               name:
                 type: string
                 description: Название источника
-                example: "Телефонный звонок"
+                example: "Авито"
               enabled:
                 type: boolean
                 description: Включен ли источник
                 example: true
-        categories:
+        active_subscriptions:
           type: array
           items:
             type: object
             properties:
               id:
                 type: integer
-                description: ID категории
-                example: 1
+                description: ID подписки
+                example: 3
               name:
                 type: string
-                description: Название категории
-                example: "Важные звонки"
+                description: Название подписки
+                example: "Аренда. Жилая|Москва, Московская область"
               enabled:
                 type: boolean
-                description: Включена ли категория
+                description: Включена ли подписка
                 example: true
 
     AuthResponse:
@@ -230,6 +242,28 @@ components:
           type: integer
           description: Время жизни токена в секундах
           example: 3600
+
+    SubscriptionRequest:
+      type: object
+      required:
+        - tariff_id
+        - category_ids
+        - location_id
+      properties:
+        tariff_id:
+          type: integer
+          description: ID тарифа
+          example: 1
+        category_ids:
+          type: array
+          description: Массив ID категорий
+          items:
+            type: integer
+          example: [1, 2]
+        location_id:
+          type: integer
+          description: ID локации
+          example: 1
 
 paths:
   /api/v1/auth/telegram:
@@ -525,6 +559,11 @@ paths:
         Получение всех настроек пользователя.
         
         Access токен должен быть передан в заголовке Authorization.
+        
+        В ответе возвращаются:
+        - Настройки пользователя (логирование, автозвонок, уведомления, статус телефона)
+        - Список источников с их статусами
+        - Список активных подписок
       tags:
         - Пользователь
       security:
@@ -545,6 +584,34 @@ paths:
                     example: success
                   data:
                     $ref: '#/components/schemas/UserSettings'
+              example:
+                code: 200
+                status: success
+                data:
+                  settings:
+                    log_events: false
+                    auto_call: false
+                    telegram_notifications: false
+                  sources:
+                    - id: 1
+                      name: "Авито"
+                      enabled: true
+                    - id: 2
+                      name: "Яндекс.Н"
+                      enabled: true
+                    - id: 3
+                      name: "Циан"
+                      enabled: true
+                    - id: 4
+                      name: "ЮЛА"
+                      enabled: true
+                  active_subscriptions:
+                    - id: 3
+                      name: "Аренда. Жилая|Москва, Московская область"
+                      enabled: true
+                    - id: 2
+                      name: "Продажа. Жилая|Москва, Московская область"
+                      enabled: true
         '401':
           description: "Токен отсутствует или недействителен"
           content:
@@ -584,6 +651,8 @@ paths:
         Access токен должен быть передан в заголовке Authorization.
         
         Можно обновить как отдельные настройки, так и все сразу.
+        
+        При обновлении источников необходимо передать все источники, даже если их статус не меняется.
       tags:
         - Пользователь
       security:
@@ -594,6 +663,31 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UserSettings'
+            example:
+              settings:
+                log_events: false
+                auto_call: false
+                telegram_notifications: false
+              sources:
+                - id: 1
+                  name: "Авито"
+                  enabled: true
+                - id: 2
+                  name: "Яндекс.Н"
+                  enabled: true
+                - id: 3
+                  name: "Циан"
+                  enabled: true
+                - id: 4
+                  name: "ЮЛА"
+                  enabled: true
+              active_subscriptions:
+                - id: 3
+                  name: "Аренда. Жилая|Москва, Московская область"
+                  enabled: true
+                - id: 2
+                  name: "Продажа. Жилая|Москва, Московская область"
+                  enabled: true
       responses:
         '200':
           description: Настройки обновлены
@@ -611,6 +705,8 @@ paths:
                   message:
                     type: string
                     example: "Настройки успешно обновлены"
+                  data:
+                    $ref: '#/components/schemas/UserSettings'
         '400':
           description: "Неверный формат запроса"
           content:
@@ -744,4 +840,278 @@ paths:
                 code: 500
                 status: error
                 message: "Внутренняя ошибка сервера"
-                error: "internal_error" 
+                error: "internal_error"
+
+  /api/v1/admin/subscriptions/activate:
+    post:
+      summary: Массовая активация подписок (Admin)
+      description: |
+        Активирует несколько подписок одновременно.
+        
+        Этот метод доступен только для администраторов.
+        Позволяет активировать несколько подписок за один запрос.
+        
+        В случае успешной активации всех подписок возвращается код 200.
+        Если некоторые подписки были активированы успешно, а некоторые с ошибками,
+        возвращается код 207 (Multi-Status) с детальной информацией о результатах.
+        Если ни одна подписка не была активирована, возвращается код 400.
+      tags:
+        - Администрирование
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subscription_ids
+                - payment_method
+              properties:
+                subscription_ids:
+                  type: array
+                  description: Массив ID подписок для активации
+                  items:
+                    type: integer
+                  example: [1, 2, 3]
+                payment_method:
+                  type: string
+                  description: Метод оплаты
+                  example: "cash"
+                notes:
+                  type: string
+                  description: Дополнительные заметки
+                  example: "Оплата наличными"
+                duration_hours:
+                  type: integer
+                  description: Продолжительность подписки в часах
+                  example: 720
+      responses:
+        '200':
+          description: Все подписки успешно активированы
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Все подписки успешно активированы
+                  data:
+                    type: object
+                    properties:
+                      activated_subscriptions:
+                        type: array
+                        items:
+                          type: object
+        '207':
+          description: Некоторые подписки активированы успешно, некоторые с ошибками
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 207
+                  status:
+                    type: string
+                    example: partial_success
+                  message:
+                    type: string
+                    example: Некоторые подписки активированы успешно, некоторые с ошибками
+        '400':
+          description: Неверный формат запроса или ни одна подписка не была активирована
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                validation_error:
+                  value:
+                    code: 400
+                    status: error
+                    message: Отсутствует или неверный формат subscription_ids
+                    error: validation_error
+                payment_method_missing:
+                  value:
+                    code: 400
+                    status: error
+                    message: Отсутствует обязательное поле payment_method
+                    error: validation_error
+        '401':
+          description: Токен отсутствует или недействителен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Доступ запрещен (не администратор)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: error
+                message: У вас нет доступа к этому ресурсу
+                error: access_denied
+        '404':
+          description: Запрашиваемые подписки не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: Некоторые подписки не найдены
+                error: not_found
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/subscriptions:
+    post:
+      summary: Создание заявки на подписку
+      description: |
+        Создает заявку на подписку для пользователя.
+        
+        Пользователь может создать несколько подписок для разных категорий одновременно.
+        Для демо-тарифа доступна только одна категория. При выборе платного тарифа
+        и наличии активной демо-подписки, демо-подписка автоматически отменяется.
+        
+        Требуется аутентификация с помощью JWT токена.
+      tags:
+        - Подписки
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionRequest'
+            examples:
+              singleCategory:
+                summary: Запрос с одной категорией
+                value:
+                  tariff_id: 1
+                  category_ids: [1]
+                  location_id: 1
+              multipleCategories:
+                summary: Запрос с несколькими категориями
+                value:
+                  tariff_id: 2
+                  category_ids: [1, 2]
+                  location_id: 1
+      responses:
+        '200':
+          description: Заявка на подписку успешно создана
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  message:
+                    type: string
+                    description: Сообщение о результате операции
+                    example: "Заявки на подписку успешно созданы"
+        '400':
+          description: Неверный формат запроса или бизнес-ограничения
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                validation_error:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Неверный формат запроса. Отсутствует или неверный формат tariff_id"
+                    error: "validation_error"
+                demo_limit:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Для демо-тарифа доступна только одна категория"
+                    error: "validation_error"
+                already_used_trial:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Вы уже использовали демо-тариф ранее"
+                    error: "validation_error"
+                subscription_exists:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не удалось создать подписки. Возможно, они уже существуют"
+                    error: "operation_failed"
+        '401':
+          description: Токен отсутствует или недействителен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+        '404':
+          description: Запрашиваемый ресурс не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                tariff_not_found:
+                  value:
+                    code: 404
+                    status: error
+                    message: "Указанный тариф не найден"
+                    error: "not_found"
+                location_not_found:
+                  value:
+                    code: 404
+                    status: error
+                    message: "Указанная локация не найдена"
+                    error: "not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: Внутренняя ошибка сервера
+                error: internal_error 

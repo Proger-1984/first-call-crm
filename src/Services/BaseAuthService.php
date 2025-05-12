@@ -33,7 +33,8 @@ abstract class BaseAuthService
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
-                'tariff' => $user->tariff_id
+                'role' => $user->role,
+                'has_subscription' => $user->hasAnyActiveSubscription()
             ]
         ];
     }
@@ -62,7 +63,7 @@ abstract class BaseAuthService
      */
     public function getUserIdFromToken(string $accessToken): ?int
     {
-        return $this->jwtService->getUserIdFromAccessToken($accessToken);
+        return $this->jwtService->getUserIdFromToken($accessToken);
     }
 
     /**

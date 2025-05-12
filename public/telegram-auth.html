@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тестирование авторизации через Telegram</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #0088cc;
+            margin-bottom: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .auth-result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        button {
+            background-color: #0088cc;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #006699;
+        }
+    </style>
+</head>
+<body>
+    <h1>Тестирование авторизации через Telegram</h1>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Шаг 1: Войти через Telegram</h2>
+            <p>Нажмите на кнопку ниже, чтобы авторизоваться через Telegram:</p>
+            <div id="telegram-login-container"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Шаг 2: Результат авторизации</h2>
+            <p>После авторизации здесь будет показан результат:</p>
+            <div id="auth-result" class="auth-result">
+                <pre id="auth-data"></pre>
+            </div>
+            <button id="clear-result" style="display: none;">Очистить результат</button>
+        </div>
+    </div>
+
+    <script>
+        // Функция для отображения результата авторизации
+        function displayAuthResult(data, isError = false) {
+            const resultElement = document.getElementById('auth-result');
+            const dataElement = document.getElementById('auth-data');
+            const clearButton = document.getElementById('clear-result');
+            
+            resultElement.className = 'auth-result ' + (isError ? 'error' : 'success');
+            resultElement.style.display = 'block';
+            
+            dataElement.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+            clearButton.style.display = 'block';
+        }
+        
+        // Функция, вызываемая после авторизации через Telegram
+        function onTelegramAuth(user) {
+            console.log('Telegram auth data:', user);
+            
+            // Отправляем данные на сервер для аутентификации
+            fetch('/api/v1/auth/telegram', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(user)
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayAuthResult({
+                    telegramUser: user,
+                    serverResponse: data
+                });
+                
+                // Если есть токен доступа, сохраняем его
+                if (data.access_token) {
+                    localStorage.setItem('access_token', data.access_token);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                displayAuthResult('Ошибка при отправке данных: ' + error.message, true);
+            });
+        }
+        
+        // Загрузка виджета Telegram Login
+        function loadTelegramWidget() {
+            fetch('/api/v1/config/telegram-bot-username')
+                .then(response => response.text())
+                .then(botUsername => {
+                    if (!botUsername) {
+                        throw new Error('Имя бота Telegram не настроено');
+                    }
+                    
+                    const script = document.createElement('script');
+                    script.src = 'https://telegram.org/js/telegram-widget.js?21';
+                    script.setAttribute('data-telegram-login', botUsername);
+                    script.setAttribute('data-size', 'large');
+                    script.setAttribute('data-auth-url', '#');
+                    script.setAttribute('data-request-access', 'write');
+                    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+                    
+                    const container = document.getElementById('telegram-login-container');
+                    container.appendChild(script);
+                })
+                .catch(error => {
+                    console.error('Error loading Telegram widget:', error);
+                    const container = document.getElementById('telegram-login-container');
+                    container.innerHTML = `<div class="error">Ошибка загрузки виджета Telegram: ${error.message}</div>`;
+                });
+        }
+        
+        // Кнопка очистки результата
+        document.getElementById('clear-result').addEventListener('click', function() {
+            document.getElementById('auth-result').style.display = 'none';
+            document.getElementById('auth-data').textContent = '';
+            this.style.display = 'none';
+        });
+        
+        // Загружаем виджет при загрузке страницы
+        document.addEventListener('DOMContentLoaded', loadTelegramWidget);
+    </script>
+</body>
+</html> 

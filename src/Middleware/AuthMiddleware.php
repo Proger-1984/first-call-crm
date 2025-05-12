@@ -59,24 +59,27 @@ class AuthMiddleware implements MiddlewareInterface
         // Добавляем данные о пользователе в запрос
         $userId = $decoded->user_id;
         $request = $request->withAttribute('userId', $userId);
+        
+        // Добавляем роль пользователя, если она есть в токене
+        if (isset($decoded->role)) {
+            $request = $request->withAttribute('userRole', $decoded->role);
+        }
 
         return $handler->handle($request);
     }
 
     private function getTokenFromHeader(Request $request): ?string
     {
-        $header = $request->getHeaderLine('Authorization');
-
-        if (!$header) {
+        $authHeader = $request->getHeaderLine('Authorization');
+        
+        if (!$authHeader) {
             return null;
         }
-
-        $parts = explode(' ', $header);
-
-        if (count($parts) !== 2 || $parts[0] !== 'Bearer') {
-            return null;
+        
+        if (strpos($authHeader, 'Bearer ') === 0) {
+            return substr($authHeader, 7);
         }
-
-        return $parts[1];
+        
+        return null;
     }
 } 

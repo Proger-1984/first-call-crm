@@ -15,7 +15,7 @@ class AuthService extends BaseAuthService
     protected ContainerInterface $container;
     protected JwtService $jwtService;
     protected UserSettingsService $userSettingsService;
-    protected TariffService $tariffService;
+    protected SubscriptionService $subscriptionService;
 
     /**
      * @throws ContainerExceptionInterface
@@ -25,7 +25,7 @@ class AuthService extends BaseAuthService
     {
         parent::__construct($container);
         $this->userSettingsService = $container->get(UserSettingsService::class);
-        $this->tariffService = $container->get(TariffService::class);
+        $this->subscriptionService = $container->get(SubscriptionService::class);
     }
 
     /**
@@ -58,17 +58,18 @@ class AuthService extends BaseAuthService
         /** Возвращаем данные пользователя и токены */
         return $this->createAuthResponse($user, $tokens);
     }
-    
+
     /**
      * Refresh tokens
-     * 
+     *
      * @param string $refreshToken Refresh token
      * @param string $deviceType Type of device ('web' or 'mobile')
      * @return array|null Array with new tokens or null if refresh failed
+     * @throws Exception
      */
     public function refreshToken(string $refreshToken, string $deviceType = 'web'): ?array
     {
-        $newTokens = $this->jwtService->refreshTokens($refreshToken, $deviceType);
+        $newTokens = $this->jwtService->refreshTokens($refreshToken);
         
         if (!$newTokens) {
             return null;
@@ -87,33 +88,6 @@ class AuthService extends BaseAuthService
     public function getUserIdFromToken(string $accessToken): ?int
     {
         return $this->jwtService->getUserIdFromToken($accessToken);
-    }
-    
-    /**
-     * Logout user
-     * 
-     * @param string $refreshToken Refresh token
-     * @return bool True if logout successful
-     */
-    public function logout(string $refreshToken): bool
-    {
-        return $this->jwtService->removeRefreshToken($refreshToken);
-    }
-    
-    /**
-     * Logout user from all devices
-     * 
-     * @param int $userId User ID
-     * @return bool True if logout successful
-     */
-    public function logoutFromAllDevices(int $userId): bool
-    {
-        $user = User::find($userId);
-        if (!$user) {
-            return false;
-        }
-        
-        return $user->removeAllRefreshTokens();
     }
 
     /**

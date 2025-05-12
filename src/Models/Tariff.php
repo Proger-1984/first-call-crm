@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,7 +27,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * 
  * @method static Tariff|null find(int $id)
  * @method static Tariff findOrFail(int $id)
- * @method static Tariff where(string $column, mixed $operator = null, mixed $value = null)
+ * @method static Builder|self where($column, $operator = null, $value = null)
  */
 class Tariff extends Model
 {

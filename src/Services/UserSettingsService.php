@@ -7,10 +7,8 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\UserSettings;
 use App\Models\Source;
-use App\Models\Category;
 use JetBrains\PhpStorm\ArrayShape;
 use Psr\Container\ContainerInterface;
-use Illuminate\Database\Capsule\Manager;
 
 class UserSettingsService
 {
@@ -41,38 +39,33 @@ class UserSettingsService
     /**
      * Получает настройки пользователя
      */
-    #[ArrayShape(['settings' => "array", 'sources' => "mixed[]", 'categories' => "mixed"])]
+    #[ArrayShape(['settings' => "array", 'sources' => "mixed[]", 'active_subscriptions' => "mixed"])]
     public function getUserSettings(int $userId): array
     {
-        $user = User::with(['settings', 'sources', 'categories'])->findOrFail($userId);
+        $user = User::with(['settings', 'sources', 'activeSubscriptions.category', 'activeSubscriptions.location'])->findOrFail($userId);
 
         // Получаем все источники
         $allSources = Source::all();
 
-        // Получаем ID активных источников пользователя
-        $userSourceIds = $user->sources->pluck('id')->toArray();
-
         // Формируем массив источников с флагом enabled
-        $sources = $allSources->map(function($source) use ($userSourceIds) {
+        $sources = $allSources->map(function($source) use ($user) {
             return [
                 'id' => $source->id,
                 'name' => $source->name,
-                'enabled' => in_array($source->id, $userSourceIds)
+                'enabled' => $user->sources->contains(function($userSource) use ($source) {
+                    return $userSource->id === $source->id && $userSource->pivot->enabled;
+                })
             ];
         })->toArray();
 
-        // Получаем категории пользователя с их статусом
-        $categories = $user->categories()
-            ->select('categories.*', 'user_categories.enabled')
-            ->get()
-            ->map(function($category) {
-                return [
-                    'id' => $category->id,
-                    'name' => $category->name,
-                    'enabled' => (bool)$category->enabled
-                ];
-            })
-            ->toArray();
+        // Получаем активные подписки пользователя
+        $activeSubscriptions = $user->activeSubscriptions->map(function($subscription) {
+            return [
+                'id' => $subscription->id,
+                'name' => $subscription->category->name . ' | ' . $subscription->location->getFullName(),
+                'enabled' => $subscription->is_enabled
+            ];
+        })->toArray();
 
         /** @var UserSettings $settings */
         $settings = $user->settings;
@@ -86,17 +79,16 @@ class UserSettingsService
                 'log_events' => $settings->log_events,
                 'auto_call' => $settings->auto_call,
                 'telegram_notifications' => $settings->telegram_notifications,
-                'phone_status' => $user->phone_status,
             ],
             'sources' => $sources,
-            'categories' => $categories
+            'active_subscriptions' => $activeSubscriptions
         ];
     }
     
     /**
      * Обновляет настройки пользователя
      */
-    #[ArrayShape(['settings' => "array", 'sources' => "mixed[]", 'categories' => "mixed"])]
+    #[ArrayShape(['settings' => "array", 'sources' => "mixed[]", 'active_subscriptions' => "mixed"])]
     public function updateUserSettings(int $userId, array $data): array
     {
         $user = User::with('settings')->findOrFail($userId);
@@ -123,77 +115,29 @@ class UserSettingsService
 
         // Обновляем источники
         if (isset($data['sources']) && is_array($data['sources'])) {
-            // Получаем ID источников, которые нужно включить
-            $enabledSourceIds = collect($data['sources'])
-                ->filter(function($source) {
-                    return isset($source['enabled']) && $source['enabled'] === true;
-                })
-                ->pluck('id')
-                ->toArray();
-
-            // Проверяем существование источников
-            $existingSources = Source::whereIn('id', $enabledSourceIds)->pluck('id')->toArray();
-
-            // Сначала удаляем все связи пользователя с источниками
-            $user->sources()->detach();
-
-            // Затем добавляем только включенные источники
-            if (!empty($existingSources)) {
-                $user->sources()->attach($existingSources);
+            foreach ($data['sources'] as $source) {
+                if (!isset($source['id']) || !isset($source['enabled'])) {
+                    continue;
+                }
+                
+                if ($source['enabled']) {
+                    $user->enableSource((int)$source['id']);
+                } else {
+                    $user->disableSource((int)$source['id']);
+                }
             }
         }
 
-        // Обновляем категории
-        if (isset($data['categories']) && is_array($data['categories'])) {
-            // Получаем все существующие категории
-            $allCategories = Category::all();
-            
-            // Получаем текущие связи пользователя с категориями
-            $currentUserCategories = $user->categories()
-                ->select('categories.id', 'user_categories.enabled')
-                ->get()
-                ->keyBy('id');
-
-            // Формируем массив для upsert
-            $now = date('Y-m-d H:i:s');
-            $pivotData = [];
-            
-            foreach ($data['categories'] as $categoryData) {
-                if (!isset($categoryData['id']) || !isset($categoryData['enabled'])) {
+        // Обновляем статусы активных подписок
+        if (isset($data['active_subscriptions']) && is_array($data['active_subscriptions'])) {
+            foreach ($data['active_subscriptions'] as $subscription) {
+                if (!isset($subscription['id']) || !isset($subscription['enabled'])) {
                     continue;
                 }
                 
-                // Проверяем существование категории
-                if (!$allCategories->contains('id', $categoryData['id'])) {
-                    continue;
-                }
-
-                // Проверяем, есть ли уже связь с этой категорией
-                $categoryId = $categoryData['id'];
-                $isEnabled = (bool)$categoryData['enabled'];
-                
-                // Если связь существует и статус не изменился, пропускаем
-                if ($currentUserCategories->has($categoryId) && 
-                    $currentUserCategories->get($categoryId)->enabled === $isEnabled) {
-                    continue;
-                }
-                
-                $pivotData[] = [
-                    'user_id' => $userId,
-                    'category_id' => $categoryId,
-                    'enabled' => $isEnabled,
-                    'created_at' => $now,
-                    'updated_at' => $now
-                ];
-            }
-            
-            // Обновляем только изменившиеся связи
-            if (!empty($pivotData)) {
-                Manager::table('user_categories')->upsert(
-                    $pivotData,
-                    ['user_id', 'category_id'],
-                    ['enabled', 'updated_at']
-                );
+                $user->activeSubscriptions()
+                    ->where('id', $subscription['id'])
+                    ->update(['is_enabled' => (bool)$subscription['enabled']]);
             }
         }
 

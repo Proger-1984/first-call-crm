@@ -81,13 +81,13 @@ class TelegramAuthController
         try {
 
             $data = $request->getParsedBody();
-            $errors = $this->validateTelegramAuthData($data);
+            $validationError = $this->validateTelegramAuthData($data);
 
-            if (!is_null($errors)) {
-                $message = 'Неверный формат запроса. ' . $errors;
+            if (!is_null($validationError)) {
+                $message = 'Неверный формат запроса. ' . $validationError;
                 $this->logService->warning('Неверный формат запроса', [
                     'code'   => 400,
-                    'errors' => $errors,
+                    'errors' => $message,
                     'data'   => $data],
                     'telegram_auth'
                 );
@@ -164,7 +164,6 @@ class TelegramAuthController
             return $response->withHeader('Content-Type', 'text/plain');
 
         } catch (Exception) {
-
             return $this->respondWithError($response,null,null,500);
         }
     }

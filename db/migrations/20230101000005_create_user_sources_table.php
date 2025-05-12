@@ -14,6 +14,7 @@ class CreateUserSourcesTable
         Manager::schema()->create('user_sources', function ($table) {
             $table->integer('user_id');
             $table->integer('source_id');
+            $table->boolean('enabled')->default(true);
             $table->timestamps();
             
             $table->primary(['user_id', 'source_id']);

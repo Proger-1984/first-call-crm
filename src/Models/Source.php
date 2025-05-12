@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Concerns\HasAttributes;
-use Illuminate\Database\Eloquent\Concerns\HasRelationships;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -16,14 +15,11 @@ use Illuminate\Database\Eloquent\Builder;
  *
  * @package App\Models
  *
- * @mixin Model
- * @mixin HasAttributes
- * @mixin HasRelationships
- *
  * @property int $id
  * @property string $name
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
+ * @property bool $is_active
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  * 
  * @method static Builder|Source where(string $column, mixed $operator = null, mixed $value = null)
  * @method static Builder|Source whereIn(string $column, array $values)
@@ -33,10 +29,12 @@ use Illuminate\Database\Eloquent\Builder;
 class Source extends Model
 {
     use HasFactory;
-    use HasAttributes;
-    use HasRelationships;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'is_active'];
+    
+    protected $casts = [
+        'is_active' => 'boolean'
+    ];
 
     /**
      * Пользователи, которые выбрали этот источник
@@ -45,6 +43,25 @@ class Source extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_sources')
+                    ->withPivot('enabled')
                     ->withTimestamps();
+    }
+    
+    /**
+     * Пользователи, у которых этот источник включен
+     * @return BelongsToMany<User>
+     */
+    public function enabledUsers(): BelongsToMany
+    {
+        return $this->users()->wherePivot('enabled', true);
+    }
+    
+    /**
+     * Пользователи, у которых этот источник отключен
+     * @return BelongsToMany<User>
+     */
+    public function disabledUsers(): BelongsToMany
+    {
+        return $this->users()->wherePivot('enabled', false);
     }
 } 

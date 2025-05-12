@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\Source;
 use App\Utils\PasswordGenerator;
 use Exception;
 use Psr\Container\ContainerExceptionInterface;
@@ -15,9 +16,7 @@ class TelegramAuthService extends BaseAuthService
 {
     private string $botToken;
     private TelegramService $telegramService;
-    private TariffService $tariffService;
     private UserSettingsService $userSettingsService;
-    protected SourceService $sourceService;
 
     /**
      * @throws ContainerExceptionInterface
@@ -29,9 +28,7 @@ class TelegramAuthService extends BaseAuthService
         $config = $container->get('config');
         $this->botToken = $config['telegram']['bot_token'] ?? '';
         $this->telegramService = $container->get(TelegramService::class);
-        $this->tariffService = $container->get(TariffService::class);
         $this->userSettingsService = $container->get(UserSettingsService::class);
-        $this->sourceService = $container->get(SourceService::class);
     }
 
     /**
@@ -119,24 +116,16 @@ class TelegramAuthService extends BaseAuthService
 
         // Создаем настройки для нового пользователя
         if ($isNewUser) {
-
             // Настройки по умолчанию для нового пользователя
             $this->userSettingsService->createDefaultSettings($user->id);
 
-            // Назначаем демо-тариф для нового пользователя
-            $this->tariffService->assignDemoTariff($user);
-
-            // Устанавливаем все источники для нового пользователя
-            $allSources = $this->sourceService->getAllSources();
-            $sourceIds = [];
-            foreach ($allSources as $source) {
-                if (isset($source->id)) {
-                    $sourceIds[] = (int)$source->id;
+            // В модели User мы добавили автоматическое добавление всех источников при создании пользователя
+            // (метод booted() в User.php), но на всякий случай проверим, что источники добавлены
+            if (!$user->sources()->exists()) {
+                $allSources = Source::all();
+                foreach ($allSources as $source) {
+                    $user->enableSource($source->id);
                 }
-            }
-
-            if (!empty($sourceIds)) {
-                $this->sourceService->setUserSources($user, $sourceIds);
             }
 
             // Отправляем уведомление о регистрации

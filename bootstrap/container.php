@@ -7,8 +7,7 @@ use App\Services\AuthService;
 use App\Services\TelegramAuthService;
 use App\Services\TelegramService;
 use App\Services\UserSettingsService;
-use App\Services\TariffService;
-use App\Services\SourceService;
+use App\Services\SubscriptionService;
 use App\Services\LogService;
 use App\Controllers\AuthController;
 use App\Controllers\TelegramAuthController;
@@ -59,12 +58,8 @@ return function (array $config) {
             return new AuthService($c);
         }),
         
-        TariffService::class => factory(function (ContainerInterface $c) {
-            return new TariffService($c);
-        }),
-        
-        SourceService::class => factory(function (ContainerInterface $c) {
-            return new SourceService($c);
+        SubscriptionService::class => factory(function (ContainerInterface $c) {
+            return new SubscriptionService($c);
         }),
         
         LogService::class => factory(function (ContainerInterface $c) {
