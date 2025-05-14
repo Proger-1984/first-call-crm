@@ -17,15 +17,26 @@ return function (App $app) {
     
     // API Routes v1
     $app->group('/api/v1', function (RouteCollectorProxy $group) use ($container) {
-        // Маршруты для аутентификации
-        $group->group('/auth', function (RouteCollectorProxy $group) use ($container) {
-            // Авторизация через Telegram
-            $group->post('/telegram', [TelegramAuthController::class, 'authenticate']);
 
-            // Авторизация через приложение
+        /** Маршруты для аутентификации
+         * Авторизация/Регистрация через Telegram - authenticate
+         * Перепривязка Telegram - rebindTelegram
+         * Авторизация через приложение - login
+         * Обновление токена access_token - refresh
+         * Выход из системы - logout
+         * Выход со всех устройств - logoutAll
+         */
+        $group->group('/auth', function (RouteCollectorProxy $group) use ($container) {
+            $group->post('/telegram', [TelegramAuthController::class, 'authenticate']);
+            $group->post('/telegram/rebind', [TelegramAuthController::class, 'rebindTelegram'])
+                ->add(new AuthMiddleware($container));
+
             $group->post('/login', [AuthController::class, 'login']);
             $group->get('/refresh', [AuthController::class, 'refresh']);
-            $group->get('/logout', [AuthController::class, 'logout']);
+            $group->get('/logout', [AuthController::class, 'logout'])
+                ->add(new AuthMiddleware($container));
+            $group->get('/logout-all', [AuthController::class, 'logoutAll'])
+                ->add(new AuthMiddleware($container));
         });
 
         // Маршруты конфигурации
@@ -33,12 +44,25 @@ return function (App $app) {
             $group->get('/telegram-bot-username', [TelegramAuthController::class, 'getBotUsername']);
         });
 
-        /** Защищенные маршруты (требуют аутентификации) */
-        // Маршруты пользователя
+        /** Защищенные маршруты пользователя (требуют аутентификации)
+         * Получение настроек пользователя - getSettings
+         * Обновление настроек пользователя - updateSettings
+         * Обновление статуса телефона пользователя - updatePhoneStatus
+         * Получение полной информации о пользователе - getUserInfo
+         * Получение статуса телефона и автозвонка - getUserStatus
+         * Обновление статуса автозвонка - updateAutoCall
+         * Получение логина для приложения - getAppLogin
+         * Генерация нового пароля для приложения - generatePassword
+         */
         $group->group('/me', function (RouteCollectorProxy $group) {
             $group->get('/settings', [UserController::class, 'getSettings']);
             $group->put('/settings', [UserController::class, 'updateSettings']);
             $group->put('/phone-status', [UserController::class, 'updatePhoneStatus']);
+            $group->get('/info', [UserController::class, 'getUserInfo']);
+            $group->get('/status', [UserController::class, 'getUserStatus']);
+            $group->put('/auto-call', [UserController::class, 'updateAutoCall']);
+            $group->get('/app-login', [UserController::class, 'getAppLogin']);
+            $group->post('/generate-password', [UserController::class, 'generatePassword']);
         })->add(new AuthMiddleware($container));
             
         // Маршруты для работы с подписками

@@ -154,4 +154,18 @@ class UserSettingsService
         $user->phone_status = $status;
         $user->save();
     }
+
+    /**
+     * Обновляет статус автозвонка
+     * 
+     * @param int $userId ID пользователя
+     * @param bool $autoCall Новый статус автозвонка
+     * @return void
+     */
+    public function updateAutoCall(int $userId, bool $autoCall): void
+    {
+        $settings = UserSettings::firstOrNew(['user_id' => $userId]);
+        $settings->auto_call = $autoCall;
+        $settings->save();
+    }
 } 

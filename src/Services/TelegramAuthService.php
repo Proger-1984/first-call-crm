@@ -17,6 +17,7 @@ class TelegramAuthService extends BaseAuthService
     private string $botToken;
     private TelegramService $telegramService;
     private UserSettingsService $userSettingsService;
+    private User $userModel;
 
     /**
      * @throws ContainerExceptionInterface
@@ -29,6 +30,7 @@ class TelegramAuthService extends BaseAuthService
         $this->botToken = $config['telegram']['bot_token'] ?? '';
         $this->telegramService = $container->get(TelegramService::class);
         $this->userSettingsService = $container->get(UserSettingsService::class);
+        $this->userModel = $container->get(User::class);
     }
 
     /**
@@ -143,4 +145,86 @@ class TelegramAuthService extends BaseAuthService
         // Возвращаем токены и данные пользователя
         return $this->createAuthResponse($user, $tokens);
     }
+
+    /**
+     * Перепривязывает Telegram аккаунт к существующему пользователю
+     *
+     * @param int $userId ID пользователя
+     * @param array $telegramData Данные от Telegram
+     * @return array Результат операции с детальной информацией
+     */
+    public function rebindTelegramAccount(int $userId, array $telegramData): array
+    {
+        try {
+            $user = $this->userModel->find($userId);
+
+            if (!$user) {
+                return [
+                    'success' => false,
+                    'error' => 'user_not_found',
+                    'message' => 'Пользователь не найден'
+                ];
+            }
+
+            // Сохраняем старый Telegram ID для уведомления
+            $oldTelegramId = $user->telegram_id;
+
+            // Проверяем, не привязан ли уже этот Telegram ID к другому пользователю
+            $existingUser = $this->userModel->where('telegram_id', $telegramData['id'])
+                ->where('id', '!=', $userId)
+                ->first();
+                
+            if ($existingUser) {
+                return [
+                    'success' => false,
+                    'error' => 'telegram_already_bound',
+                    'message' => 'Этот Telegram аккаунт уже привязан к другому пользователю'
+                ];
+            }
+
+            // Обновляем данные пользователя
+            $user->telegram_id = $telegramData['id'];
+            $user->telegram_username = $telegramData['username'] ?? null;
+            $user->telegram_photo_url = $telegramData['photo_url'] ?? null;
+            $user->telegram_auth_date = $telegramData['auth_date'];
+            $user->telegram_hash = $telegramData['hash'];
+
+            if (!$user->save()) {
+                return [
+                    'success' => false,
+                    'error' => 'save_failed',
+                    'message' => 'Не удалось сохранить данные пользователя'
+                ];
+            }
+
+            // Формируем имя пользователя из данных Telegram
+            $userName = $user->username ?? $telegramData['first_name'] . 
+                (isset($telegramData['last_name']) ? ' ' . $telegramData['last_name'] : '');
+
+            // Отправляем уведомление о перепривязке
+            $this->telegramService->sendRebindNotification(
+                (string)$telegramData['id'],
+                (string)$userId,
+                $userName,
+                $oldTelegramId ? (string)$oldTelegramId : null
+            );
+
+            return [
+                'success' => true,
+                'message' => 'Telegram аккаунт успешно перепривязан',
+                'data' => [
+                    'user_id' => $userId,
+                    'telegram_id' => $telegramData['id'],
+                    'old_telegram_id' => $oldTelegramId
+                ]
+            ];
+        } catch (Exception) {
+            return [
+                'success' => false,
+                'error' => 'internal_error',
+                'message' => 'Внутренняя ошибка сервера при перепривязке Telegram аккаунта'
+            ];
+        }
+    }
+
 } 

@@ -343,6 +343,22 @@ class User extends Model
     }
 
     /**
+     * Получить ID пользователя
+     */
+    public function getId(): int
+    {
+        return $this->id;
+    }
+
+    /**
+     * Получить Telegram ID пользователя
+     */
+    public function getTelegramId(): string
+    {
+        return $this->telegram_id;
+    }
+
+    /**
      * Создает заявку на подписку (ожидающую подтверждения администратором)
      * Для демо-тарифа подписка активируется автоматически
      * 

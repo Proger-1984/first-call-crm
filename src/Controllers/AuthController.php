@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Models\User;
 use App\Services\AuthService;
 use App\Services\LogService;
+use App\Services\JwtService;
 use App\Traits\ResponseTrait;
 use Exception;
 use Psr\Container\ContainerExceptionInterface;
@@ -22,6 +23,7 @@ class AuthController
     private ContainerInterface $container;
     private AuthService $authService;
     private LogService $logService;
+    private JwtService $jwtService;
 
     /**
      * @throws ContainerExceptionInterface
@@ -32,6 +34,7 @@ class AuthController
         $this->container = $container;
         $this->authService = $container->get(AuthService::class);
         $this->logService = $container->get(LogService::class);
+        $this->jwtService = $container->get(JwtService::class);
     }
 
     /**
@@ -149,18 +152,33 @@ class AuthController
     }
 
     /**
-     * Обновление токенов доступа
-     *
+     * Обновление токена доступа
+     * 
      * @param Request $request
      * @param Response $response
-     * @param string $deviceType
      * @return Response
+     * 
+     * @throws Exception
+     * 
+     * @api {get} /api/v1/auth/refresh Обновление токена доступа
+     * @apiName RefreshToken
+     * @apiGroup Auth
+     * 
+     * @apiError token_not_found Токен не найден
+     * @apiError token_expired Токен истек
+     * @apiError invalid_token Недействительный токен
+     * @apiError invalid_token_type Неверный тип токена
      */
-    public function refresh(Request $request, Response $response, string $deviceType = 'mobile'): Response
+    public function refresh(Request $request, Response $response): Response
     {
         try {
-
+            // Пытаемся получить токен из заголовка
             $refreshToken = $this->getTokenFromHeader($request);
+            
+            // Если токен не найден в заголовке, пробуем получить из куки
+            if (!$refreshToken) {
+                $refreshToken = $request->getCookieParams()['refreshToken'] ?? null;
+            }
 
             if (!$refreshToken) {
                 return $this->respondWithError(
@@ -171,13 +189,51 @@ class AuthController
                 );
             }
 
-            // Обновляем токены
-            $result = $this->authService->refreshToken($refreshToken, $deviceType);
-
-            if (!$result) {
-                return $this->respondWithError($response,'Refresh token expired','token_expired',401);
+            // Декодируем токен для получения типа устройства
+            $tokenData = $this->jwtService->decodeRefreshToken($refreshToken);
+            if (!$tokenData) {
+                return $this->respondWithError(
+                    $response,
+                    'Invalid refresh token',
+                    'invalid_token',
+                    401
+                );
             }
 
+            // Обновляем токены
+            $result = $this->authService->refreshToken($refreshToken);
+            if (!$result) {
+                return $this->respondWithError(
+                    $response,
+                    'Refresh token expired',
+                    'token_expired',
+                    401
+                );
+            }
+
+            // Если это веб-клиент, устанавливаем куки
+            if ($tokenData['device_type'] === 'web') {
+                $sameSite = '; SameSite=None';
+                $expiresGMT = gmdate('D, d M Y H:i:s T', $result['expires_in']);
+
+                $cookie[] = sprintf(
+                    'refreshToken=%s; path=/api/v1/auth; domain=.%s; max-age=%d; expires=%s; HttpOnly; Secure%s',
+                    urlencode($result['refresh_token']),
+                    $_ENV['HOST'],
+                    (int)$result['expires_in'],
+                    $expiresGMT,
+                    $sameSite
+                );
+
+                return $this->respondWithData($response, [
+                    'code'         => 200,
+                    'status'       => 'success',
+                    'access_token' => $result['access_token'],
+                    'expires_in'   => $result['expires_in'],
+                ], 200, $cookie);
+            }
+
+            // Для мобильного приложения возвращаем токены в теле ответа
             return $this->respondWithData($response, [
                 'code'          => 200,
                 'status'        => 'success',
@@ -187,7 +243,7 @@ class AuthController
             ], 200);
 
         } catch (Exception) {
-            return $this->respondWithError($response,null,null,500);
+            return $this->respondWithError($response, null, null, 500);
         }
     }
 
@@ -213,13 +269,11 @@ class AuthController
      *
      * @param Request $request
      * @param Response $response
-     * @param string $deviceType
      * @return Response
      */
-    public function logout(Request $request, Response $response, string $deviceType = 'mobile'): Response
+    public function logout(Request $request, Response $response): Response
     {
         try {
-
             $accessToken = $this->getTokenFromHeader($request);
 
             if (!$accessToken) {
@@ -231,23 +285,47 @@ class AuthController
                 );
             }
 
-            // Получаем ID пользователя из токена без проверки валидности
-            $userId = $this->authService->getUserIdFromToken($accessToken);
-
-            if (!$userId) {
-                return $this->respondWithData($response, [
-                    'code' => 200,
-                    'status' => 'success',
-                    'message' => 'Успешный выход из системы.'
-                ], 200);
-            }
-
-            $this->authService->logoutByDeviceType($userId, $deviceType);
+            $this->authService->logoutByAccessToken($accessToken);
 
             return $this->respondWithData($response, [
                 'code' => 200,
                 'status' => 'success',
                 'message' => 'Успешный выход из системы.'
+            ], 200);
+
+        } catch (Exception) {
+            return $this->respondWithError($response,null,null,500);
+        }
+    }
+
+    /**
+     * Выход из всех устройств
+     *
+     * @param Request $request
+     * @param Response $response
+     * @return Response
+     */
+    public function logoutAll(Request $request, Response $response): Response
+    {
+        try {
+            // Получаем ID пользователя из атрибутов запроса (установлен AuthMiddleware)
+            $userId = $request->getAttribute('userId');
+
+            if (!$userId) {
+                return $this->respondWithError(
+                    $response,
+                    'User not found',
+                    'user_not_found',
+                    404
+                );
+            }
+
+            $this->authService->logoutFromAllDevices($userId);
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'message' => 'Успешный выход из всех устройств.'
             ], 200);
 
         } catch (Exception) {

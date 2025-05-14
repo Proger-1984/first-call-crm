@@ -60,15 +60,19 @@ class AuthService extends BaseAuthService
     }
 
     /**
-     * Refresh tokens
+     * Обновление токенов
      *
      * @param string $refreshToken Refresh token
-     * @param string $deviceType Type of device ('web' or 'mobile')
-     * @return array|null Array with new tokens or null if refresh failed
+     * @return array|null Массив с новыми токенами или null если обновление не удалось
      * @throws Exception
      */
-    public function refreshToken(string $refreshToken, string $deviceType = 'web'): ?array
+    public function refreshToken(string $refreshToken): ?array
     {
+        $tokenData = $this->jwtService->decodeRefreshToken($refreshToken);
+        if (!$tokenData) {
+            return null;
+        }
+
         $newTokens = $this->jwtService->refreshTokens($refreshToken);
         
         if (!$newTokens) {
@@ -81,32 +85,40 @@ class AuthService extends BaseAuthService
             'expires_in' => $newTokens['expires_in']
         ];
     }
-    
-    /**
-     * Получает ID пользователя из токена
-     */
-    public function getUserIdFromToken(string $accessToken): ?int
-    {
-        return $this->jwtService->getUserIdFromToken($accessToken);
-    }
 
     /**
-     * Выход из системы для конкретного типа устройства
+     * Выход из системы по access токену
      * 
-     * @param int $userId ID пользователя
-     * @param string $deviceType Тип устройства ('web' или 'mobile')
+     * @param string $accessToken Access token
      * @return bool Результат операции
      */
-    public function logoutByDeviceType(int $userId, string $deviceType): bool
+    public function logoutByAccessToken(string $accessToken): bool
     {
-        $user = User::find($userId);
+        $tokenData = $this->jwtService->decodeAccessToken($accessToken);
+        if (!$tokenData) {
+            return false;
+        }
+
+        $user = User::find($tokenData['user_id']);
         if (!$user) {
             return false;
         }
-        
+
         // Удаляем все refresh токены для указанного типа устройства
         return (bool) $user->refreshTokens()
-            ->where('device_type', $deviceType)
+            ->where('device_type', $tokenData['device_type'])
             ->delete();
     }
+
+    /**
+     * Выход из всех устройств
+     * 
+     * @param int $userId ID пользователя
+     * @return bool Результат операции
+     */
+    public function logoutFromAllDevices(int $userId): bool
+    {
+        return parent::logoutFromAllDevices($userId);
+    }
+
 } 

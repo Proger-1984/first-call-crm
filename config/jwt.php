@@ -9,6 +9,6 @@ return [
     'access_expiration' => (int)$_ENV['JWT_ACCESS_EXPIRATION'],
 
     /** Настройки refresh токена */
-    'refresh_secret' => $_ENV['JWT_SECRET'],
+    'refresh_secret' => $_ENV['JWT_REFRESH_SECRET'],
     'refresh_expiration' => (int)$_ENV['JWT_REFRESH_EXPIRATION'],
 ];

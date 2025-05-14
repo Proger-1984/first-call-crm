@@ -59,14 +59,6 @@ abstract class BaseAuthService
     }
 
     /**
-     * Получает ID пользователя из токена
-     */
-    public function getUserIdFromToken(string $accessToken): ?int
-    {
-        return $this->jwtService->getUserIdFromToken($accessToken);
-    }
-
-    /**
      * Выход из системы
      */
     public function logout(string $refreshToken): bool

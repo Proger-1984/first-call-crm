@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $auto_call
  * @property bool $telegram_notifications
  * @property Carbon $created_at
+ * @method static UserSettings firstOrNew(array $data)
  * @property Carbon $updated_at
  */
 class UserSettings extends Model

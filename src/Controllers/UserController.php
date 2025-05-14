@@ -12,12 +12,19 @@ use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use App\Models\User;
+use Carbon\Carbon;
+use App\Utils\PasswordGenerator;
+use App\Services\TelegramService;
+use App\Services\UserService;
 
 class UserController
 {
     use ResponseTrait;
 
     private UserSettingsService $userSettingsService;
+    private TelegramService $telegramService;
+    private UserService $userService;
 
     /**
      * @throws ContainerExceptionInterface
@@ -26,6 +33,8 @@ class UserController
     public function __construct(ContainerInterface $container)
     {
         $this->userSettingsService = $container->get(UserSettingsService::class);
+        $this->telegramService = $container->get(TelegramService::class);
+        $this->userService = $container->get(UserService::class);
     }
 
     /**
@@ -160,6 +169,199 @@ class UserController
 
         } catch (Exception) {
             return $this->respondWithError($response, null, null, 500);
+        }
+    }
+
+    /**
+     * Получение полной информации о пользователе
+     */
+    public function getUserInfo(Request $request, Response $response): Response
+    {
+        try {
+            $userId = $request->getAttribute('userId');
+            $user = User::with(['settings', 'activeSubscriptions'])->find($userId);
+
+            if (!$user) {
+                return $this->respondWithError($response, 'Пользователь не найден', 'not_found', 404);
+            }
+
+            // Получаем самую позднюю активную подписку
+            $latestSubscription = $user->activeSubscriptions
+                ->sortByDesc('end_date')
+                ->first();
+
+            // Формируем текст о статусе подписки
+            $subscriptionStatusText = 'Нет активных подписок';
+            if ($latestSubscription) {
+                $endDate = $latestSubscription->end_date;
+                $remainingDays = Carbon::now()->diffInDays($endDate, false);
+                $subscriptionStatusText = sprintf(
+                    "Доступ до %s\nОсталось %d дней",
+                    $endDate->format('d.m.Y H:i'),
+                    $remainingDays
+                );
+            }
+
+            // Формируем ответ
+            $responseData = [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'telegram_photo_url' => $user->telegram_photo_url,
+                    'role' => $user->role,
+                    'is_trial_used' => $user->is_trial_used,
+                    'phone_status' => $user->phone_status,
+                    'auto_call' => $user->settings ? $user->settings->auto_call : false,
+                    'has_active_subscription' => $user->hasAnyActiveSubscription(),
+                    'subscription_status_text' => $subscriptionStatusText
+                ]
+            ];
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'data' => $responseData
+            ], 200);
+
+        } catch (Exception $e) {
+            return $this->respondWithError($response, $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Получение статуса телефона и автозвонка пользователя
+     */
+    public function getUserStatus(Request $request, Response $response): Response
+    {
+        try {
+            $userId = $request->getAttribute('userId');
+            $user = User::with(['settings'])->find($userId);
+
+            if (!$user) {
+                return $this->respondWithError($response, 'Пользователь не найден', 'not_found', 404);
+            }
+
+            // Формируем ответ
+            $responseData = [
+                'phone_status' => $user->phone_status,
+                'auto_call' => $user->settings ? $user->settings->auto_call : false
+            ];
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'data' => $responseData
+            ], 200);
+
+        } catch (Exception $e) {
+            return $this->respondWithError($response, $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Валидация данных автозвонка
+     * 
+     * @param array $data Данные для валидации
+     * @return string|null Сообщение с ошибкой или null если валидация прошла успешно
+     */
+    private function validateAutoCallData(array $data): string|null
+    {
+        if (!isset($data['auto_call'])) {
+            return 'Отсутствует обязательное поле auto_call';
+        }
+
+        if (!is_bool($data['auto_call'])) {
+            return 'Поле auto_call должно быть boolean';
+        }
+
+        return null;
+    }
+
+    /**
+     * Обновление статуса автозвонка
+     */
+    public function updateAutoCall(Request $request, Response $response): Response
+    {
+        try {
+            $userId = $request->getAttribute('userId');
+            $data = $request->getParsedBody();
+
+            $errors = $this->validateAutoCallData($data);
+            if ($errors !== null) {
+                $message = 'Неверный формат запроса. ' . $errors;
+                return $this->respondWithError($response, $message, "validation_error", 400);
+            }
+
+            $this->userSettingsService->updateAutoCall($userId, $data['auto_call']);
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'message' => 'Статус автозвонка успешно обновлен',
+            ], 200);
+
+        } catch (Exception $e) {
+            return $this->respondWithError($response, $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Получение логина для приложения
+     */
+    public function getAppLogin(Request $request, Response $response): Response
+    {
+        try {
+            $userId = $request->getAttribute('userId');
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'data' => [
+                    'login' => (string)$userId
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+            return $this->respondWithError($response, $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Генерация нового пароля для приложения
+     */
+    public function generatePassword(Request $request, Response $response): Response
+    {
+        try {
+            $userId = $request->getAttribute('userId');
+            $user = $this->userService->getUserById($userId);
+
+            if (!$user) {
+                return $this->respondWithError($response, 'Пользователь не найден', 'not_found', 404);
+            }
+
+            $newPassword = PasswordGenerator::generate(6);
+            $this->userService->updateUserPassword($userId, $newPassword);
+
+            // Отправляем уведомление через Telegram
+            $this->telegramService->sendPasswordNotification(
+                $user->getTelegramId(),
+                (string)$user->getId(),
+                $newPassword
+            );
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'message' => 'Новый пароль сгенерирован и отправлен в Telegram'
+            ], 200);
+
+        } catch (Exception $e) {
+            return $this->respondWithError(
+                $response,
+                'Ошибка при генерации пароля: ' . $e->getMessage(),
+                null,
+                500
+            );
         }
     }
 } 

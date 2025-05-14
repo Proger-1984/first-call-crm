@@ -7,6 +7,7 @@ namespace App\Services;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
+use Exception;
 
 class TelegramService
 {
@@ -68,13 +69,63 @@ class TelegramService
      */
     public function sendRegistrationNotification(string $chatId, string $login, string $username, string $password): bool
     {
-        $message = "🎉 <b>$username, добро пожаловать в First Call!</b>\n\n" .
-                  "Ваша регистрация успешно завершена.\n\n" .
-                  "Для входа через приложение используйте следующие данные:\n" .
-                  "👤 <b>Логин:</b> $login\n" .
-                  "🔑 <b>Пароль:</b> $password\n\n" .
-                  "⚠️ <i>Сохраните эти данные в надежном месте. Пароль больше не будет доступен, но можно сгенерировать новый через личный кабинет https://realtor.first-call.ru</i>";
+        try {
+            $message = "🎉 <b>$username, добро пожаловать в First Call!</b>\n\n" .
+                "Ваша регистрация успешно завершена.\n\n" .
+                "Для входа через приложение используйте следующие данные:\n" .
+                "👤 <b>Логин:</b> $login\n" .
+                "🔑 <b>Пароль:</b> $password\n\n" .
+                "⚠️ <i>Сохраните эти данные в надежном месте. Пароль больше не будет доступен, но можно сгенерировать новый через личный кабинет https://realtor.first-call.ru</i>";
 
-        return $this->sendMessage($chatId, $message);
+            return $this->sendMessage($chatId, $message);
+        } catch (Exception) {
+            return false;
+        }
+    }
+
+    /**
+     * Отправляет уведомление о перепривязке Telegram аккаунта
+     * 
+     * @param string $telegramId Новый Telegram ID пользователя
+     * @param string $userId ID пользователя в системе
+     * @param string $userName Имя пользователя
+     * @param string|null $oldTelegramId Старый Telegram ID пользователя
+     * @return bool Успешность отправки
+     */
+    public function sendRebindNotification(string $telegramId, string $userId, string $userName, ?string $oldTelegramId): bool
+    {
+        try {
+            $message = "🔄 *Перепривязка Telegram аккаунта*\n\n";
+            $message .= "👤 Пользователь: `$userName`\n";
+            $message .= "🆔 ID в системе: `$userId`\n";
+            $message .= "📱 Новый Telegram ID: `$telegramId`\n";
+            
+            if ($oldTelegramId) {
+                $message .= "📱 Старый Telegram ID: `$oldTelegramId`\n";
+            }
+            
+            $message .= "\n⏰ Время: " . date('Y-m-d H:i:s');
+
+            return $this->sendMessage($telegramId, $message);
+        } catch (Exception) {
+            return false;
+        }
+    }
+
+    /**
+     * Отправляет уведомление с новым паролем для приложения
+     */
+    public function sendPasswordNotification(string $telegramId, string $userId, string $newPassword): bool
+    {
+        try {
+            $message = "🔑 *Новый пароль для приложения*\n\n";
+            $message .= "Ваш логин: `$userId`\n";
+            $message .= "Новый пароль: `$newPassword`\n\n";
+            $message .= "Используйте эти данные для входа в мобильное приложение.";
+
+            return $this->sendMessage($telegramId, $message);
+        } catch (Exception) {
+            return false;
+        }
     }
 } 

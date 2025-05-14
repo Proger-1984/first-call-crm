@@ -14,6 +14,9 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 use Slim\Psr7\Factory\ResponseFactory;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+use Exception;
 
 class AuthMiddleware implements MiddlewareInterface
 {
@@ -39,33 +42,38 @@ class AuthMiddleware implements MiddlewareInterface
         if (!$token) {
             return $this->respondWithError(
                 $this->responseFactory->createResponse(),
-                'Access token not found',
+                'Token not found',
                 'token_not_found',
                 401
             );
         }
 
-        $decoded = $this->jwtService->verifyAccessToken($token);
+        // Проверяем, что это access токен, а не refresh токен
+        try {
+            $decoded = JWT::decode($token, new Key($this->jwtService->getAccessSecret(), $this->jwtService->getAlgorithm()));
+            
+            // Проверяем, что это именно access токен
+            if (!isset($decoded->device_type)) {
+                return $this->respondWithError(
+                    $this->responseFactory->createResponse(),
+                    'Invalid token type',
+                    'invalid_token_type',
+                    401
+                );
+            }
 
-        if (!$decoded) {
+            // Добавляем ID пользователя в атрибуты запроса
+            $request = $request->withAttribute('userId', $decoded->user_id);
+            
+            return $handler->handle($request);
+        } catch (Exception) {
             return $this->respondWithError(
                 $this->responseFactory->createResponse(),
-                'Access token expired',
-                'token_expired',
+                'Invalid token',
+                'invalid_token',
                 401
             );
         }
-
-        // Добавляем данные о пользователе в запрос
-        $userId = $decoded->user_id;
-        $request = $request->withAttribute('userId', $userId);
-        
-        // Добавляем роль пользователя, если она есть в токене
-        if (isset($decoded->role)) {
-            $request = $request->withAttribute('userRole', $decoded->role);
-        }
-
-        return $handler->handle($request);
     }
 
     private function getTokenFromHeader(Request $request): ?string

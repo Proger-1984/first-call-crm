@@ -14,7 +14,6 @@ use JetBrains\PhpStorm\ArrayShape;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
-use stdClass;
 
 class JwtService
 {
@@ -64,7 +63,7 @@ class JwtService
     public function createAccessToken(int $userId, string $deviceType): string
     {
         $issuedAt = new DateTime();
-        $expire = (clone $issuedAt)->modify("+{$this->accessExpiration} seconds");
+        $expire = (clone $issuedAt)->modify("+$this->accessExpiration seconds");
         
         // Получаем роль пользователя
         $user = User::find($userId);
@@ -88,7 +87,7 @@ class JwtService
     public function createRefreshToken(int $userId, string $deviceType): string
     {
         $issuedAt = new DateTime();
-        $expire = (clone $issuedAt)->modify("+{$this->refreshExpiration} seconds");
+        $expire = (clone $issuedAt)->modify("+$this->refreshExpiration seconds");
         
         // Получаем роль пользователя
         $user = User::find($userId);
@@ -106,26 +105,36 @@ class JwtService
     }
 
     /**
-     * Проверяет access токен
+     * Проверяет access токен и возвращает данные из него
+     * 
+     * @param string $token Access token
+     * @return array|null Массив с данными токена или null если токен невалиден
      */
-    public function verifyAccessToken(string $token): ?stdClass
+    public function decodeAccessToken(string $token): ?array
     {
         try {
-            return JWT::decode($token, new Key($this->accessSecret, $this->algorithm));
+            $decoded = JWT::decode($token, new Key($this->accessSecret, $this->algorithm));
+            return [
+                'user_id' => $decoded->user_id,
+                'device_type' => $decoded->device_type,
+                'expires_at' => $decoded->exp
+            ];
         } catch (Exception) {
             return null;
         }
     }
 
     /**
-     * Проверяет refresh токен
+     * Проверяет refresh токен и возвращает данные из него
+     * 
+     * @param string $token Refresh token
+     * @return array|null Массив с данными токена или null если токен невалиден
      */
-    public function verifyRefreshToken(string $token): ?stdClass
+    public function decodeRefreshToken(string $token): ?array
     {
         try {
-            /** Проверяем валидность JWT */
             $decoded = JWT::decode($token, new Key($this->refreshSecret, $this->algorithm));
-
+            
             /** Проверяем, существует ли токен в базе данных */
             $refreshToken = RefreshToken::where('token', $token)
                 ->where('expires_at', '>', new DateTime())
@@ -135,7 +144,11 @@ class JwtService
                 return null;
             }
             
-            return $decoded;
+            return [
+                'user_id' => $decoded->user_id,
+                'device_type' => $decoded->device_type,
+                'expires_at' => $decoded->exp
+            ];
         } catch (Exception) {
             return null;
         }
@@ -147,9 +160,9 @@ class JwtService
      */
     public function refreshTokens(string $refreshToken): ?array
     {
-        $decoded = $this->verifyRefreshToken($refreshToken);
+        $tokenData = $this->decodeRefreshToken($refreshToken);
         
-        if (!$decoded) {
+        if (!$tokenData) {
             return null;
         }
 
@@ -166,33 +179,7 @@ class JwtService
         $tokenRecord->delete();
 
         /** Создаем новые токены */
-        return $this->createTokens($decoded->user_id, $tokenRecord->device_type);
-    }
-    
-    /**
-     * Получает ID пользователя из access токена без проверки валидности
-     */
-    public function getUserIdFromToken(string $token): ?int
-    {
-        try {
-            $decoded = JWT::decode($token, new Key($this->accessSecret, $this->algorithm));
-            return isset($decoded->user_id) ? (int) $decoded->user_id : null;
-        } catch (Exception) {
-            return null;
-        }
-    }
-    
-    /**
-     * Получает роль пользователя из access токена без проверки валидности
-     */
-    public function getRoleFromToken(string $token): ?string
-    {
-        try {
-            $decoded = JWT::decode($token, new Key($this->accessSecret, $this->algorithm));
-            return isset($decoded->role) ? $decoded->role : null;
-        } catch (Exception) {
-            return null;
-        }
+        return $this->createTokens($tokenData['user_id'], $tokenData['device_type']);
     }
     
     /**
@@ -211,5 +198,21 @@ class JwtService
         } catch (Exception) {
             return false;
         }
+    }
+
+    /**
+     * Получает секретный ключ для access токенов
+     */
+    public function getAccessSecret(): string
+    {
+        return $this->accessSecret;
+    }
+
+    /**
+     * Получает алгоритм шифрования
+     */
+    public function getAlgorithm(): string
+    {
+        return $this->algorithm;
     }
 } 

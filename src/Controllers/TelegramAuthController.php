@@ -167,4 +167,97 @@ class TelegramAuthController
             return $this->respondWithError($response,null,null,500);
         }
     }
+
+    /**
+     * Перепривязка Telegram аккаунта
+     * 
+     * @param Request $request
+     * @param Response $response
+     * @return Response
+     */
+    public function rebindTelegram(Request $request, Response $response): Response
+    {
+        try {
+            $data = $request->getParsedBody();
+            $userId = $request->getAttribute('userId');
+            $validationError = $this->validateTelegramAuthData($data);
+
+            if (!is_null($validationError)) {
+                $message = 'Неверный формат запроса. ' . $validationError;
+                $this->logService->warning('Неверный формат запроса', [
+                    'code'   => 400,
+                    'errors' => $message,
+                    'user_id' => $userId,
+                    'data'   => $data],
+                    'telegram_rebind'
+                );
+
+                return $this->respondWithError($response, $message, 'validation_error', 400);
+            }
+
+            // Проверяем данные телеграм авторизации
+            if (!$this->telegramAuthService->checkTelegramAuthorization($data)) {
+                $message = 'Невалидные данные авторизации Telegram при перепривязке';
+                $this->logService->error($message, [
+                    'code'   => 422,
+                    'errors' => null,
+                    'user_id' => $userId,
+                    'data' => $data],
+                    'telegram_rebind'
+                );
+                return $this->respondWithError($response, $message, 'invalid_telegram_data', 422);
+            }
+
+            $result = $this->telegramAuthService->rebindTelegramAccount((int)$userId, $data);
+
+            if (!$result['success']) {
+                $this->logService->error($result['message'], [
+                    'code'   => 422,
+                    'error' => $result['error'],
+                    'user_id' => $userId,
+                    'data' => $data],
+                    'telegram_rebind'
+                );
+
+                $statusCode = match($result['error']) {
+                    'user_not_found' => 404,
+                    'telegram_already_bound' => 409,
+                    'save_failed' => 422,
+                    default => 500
+                };
+
+                return $this->respondWithError(
+                    $response, 
+                    $result['message'], 
+                    $result['error'],
+                    $statusCode,
+                    $result['details'] ?? null
+                );
+            }
+
+            $this->logService->info($result['message'], [
+                    'code' => 200,
+                    'user_id' => $userId,
+                    'data' => $result['data']]
+                ,'telegram_rebind'
+            );
+
+            return $this->respondWithData($response, [
+                'code'    => 200,
+                'status'  => 'success',
+                'message' => $result['message'],
+                'data'    => $result['data']
+            ], 200);
+
+        } catch (Exception $e) {
+            $this->logService->warning('Внутренняя ошибка сервера', [
+                'code'   => 500,
+                'errors' => $e->getMessage(),
+                'data'   => $data ?? null],
+                'telegram_rebind'
+            );
+
+            return $this->respondWithError($response, 'Внутренняя ошибка сервера', 'internal_error', 500);
+        }
+    }
 } 

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тестирование перепривязки Telegram</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #0088cc;
+            margin-bottom: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .auth-result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        button {
+            background-color: #0088cc;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #006699;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .token-status {
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .token-valid {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .token-invalid {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Тестирование перепривязки Telegram</h1>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Шаг 1: Проверка токена</h2>
+            <p>Для перепривязки Telegram аккаунта необходимо быть авторизованным в системе.</p>
+            <div id="token-status" class="token-status">
+                Проверка токена...
+            </div>
+        </div>
+        
+        <div class="card" id="rebind-section" style="display: none;">
+            <h2>Шаг 2: Перепривязка Telegram</h2>
+            <p>Нажмите на кнопку ниже, чтобы перепривязать Telegram аккаунт:</p>
+            <div id="telegram-login-container"></div>
+            <button id="logout-telegram" style="margin-top: 10px; background-color: #dc3545;">Выйти из текущего аккаунта Telegram</button>
+        </div>
+        
+        <div class="card">
+            <h2>Шаг 3: Результат перепривязки</h2>
+            <p>После перепривязки здесь будет показан результат:</p>
+            <div id="auth-result" class="auth-result">
+                <pre id="auth-data"></pre>
+            </div>
+            <button id="clear-result" style="display: none;">Очистить результат</button>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Данные для приложения</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">Логин для входа</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="appLogin" readonly>
+                    <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('appLogin')">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="mb-3">
+                <button type="button" class="btn btn-primary" onclick="generatePassword()">
+                    Сгенерировать пароль
+                </button>
+            </div>
+            <div class="mb-3">
+                <a href="https://play.google.com/store/apps/details?id=com.firstcall.app" class="btn btn-outline-primary" target="_blank">
+                    <i class="bi bi-android2"></i> Скачать приложение
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Функция для отображения результата
+        function displayAuthResult(data, isError = false) {
+            const resultElement = document.getElementById('auth-result');
+            const dataElement = document.getElementById('auth-data');
+            const clearButton = document.getElementById('clear-result');
+            
+            resultElement.className = 'auth-result ' + (isError ? 'error' : 'success');
+            resultElement.style.display = 'block';
+            
+            dataElement.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+            clearButton.style.display = 'block';
+        }
+        
+        // Функция для проверки токена
+        function checkToken() {
+            const token = localStorage.getItem('access_token');
+            const tokenStatus = document.getElementById('token-status');
+            const rebindSection = document.getElementById('rebind-section');
+            
+            if (!token) {
+                tokenStatus.className = 'token-status token-invalid';
+                tokenStatus.textContent = 'Токен не найден. Пожалуйста, авторизуйтесь в системе.';
+                rebindSection.style.display = 'none';
+                return false;
+            }
+            
+            // Проверяем токен через API
+            fetch('/api/v1/me/info', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    tokenStatus.className = 'token-status token-valid';
+                    tokenStatus.textContent = 'Токен действителен. Можно приступать к перепривязке.';
+                    rebindSection.style.display = 'block';
+                    return true;
+                } else {
+                    throw new Error('Токен недействителен');
+                }
+            })
+            .catch(error => {
+                tokenStatus.className = 'token-status token-invalid';
+                tokenStatus.textContent = 'Токен недействителен. Пожалуйста, авторизуйтесь заново.';
+                rebindSection.style.display = 'none';
+                return false;
+            });
+        }
+        
+        // Функция, вызываемая после авторизации через Telegram
+        function onTelegramAuth(user) {
+            console.log('Telegram auth data:', user);
+            
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                displayAuthResult('Ошибка: токен не найден. Пожалуйста, авторизуйтесь в системе.', true);
+                return;
+            }
+            
+            // Отправляем данные на сервер для перепривязки
+            fetch('/api/v1/auth/telegram/rebind', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(user)
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayAuthResult({
+                    telegramUser: user,
+                    serverResponse: data
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                displayAuthResult('Ошибка при отправке данных: ' + error.message, true);
+            });
+        }
+        
+        // Функция для выхода из текущего аккаунта Telegram
+        function logoutTelegram() {
+            // Очищаем данные авторизации Telegram
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.close();
+            }
+            
+            // Очищаем локальное хранилище от данных Telegram
+            localStorage.removeItem('telegram_auth_data');
+            
+            // Получаем имя бота и создаем новый виджет
+            fetch('/api/v1/config/telegram-bot-username')
+                .then(response => response.text())
+                .then(botUsername => {
+                    if (!botUsername) {
+                        throw new Error('Имя бота Telegram не настроено');
+                    }
+                    
+                    // Удаляем виджет
+                    const container = document.getElementById('telegram-login-container');
+                    container.innerHTML = '';
+                    
+                    // Создаем новый iframe с принудительной авторизацией
+                    const iframe = document.createElement('iframe');
+                    iframe.style.width = '100%';
+                    iframe.style.height = '50px';
+                    iframe.style.border = 'none';
+                    iframe.style.overflow = 'hidden';
+                    
+                    // Добавляем параметры для принудительной авторизации
+                    const randomParam = 't=' + new Date().getTime();
+                    iframe.src = `/telegram-widget.html?${randomParam}&bot=${encodeURIComponent(botUsername)}&force=true`;
+                    
+                    container.appendChild(iframe);
+                })
+                .catch(error => {
+                    console.error('Error loading Telegram widget:', error);
+                    const container = document.getElementById('telegram-login-container');
+                    container.innerHTML = `<div class="error">Ошибка загрузки виджета Telegram: ${error.message}</div>`;
+                });
+        }
+        
+        // Загрузка виджета Telegram Login
+        function loadTelegramWidget() {
+            fetch('/api/v1/config/telegram-bot-username')
+                .then(response => response.text())
+                .then(botUsername => {
+                    if (!botUsername) {
+                        throw new Error('Имя бота Telegram не настроено');
+                    }
+                    
+                    const container = document.getElementById('telegram-login-container');
+                    container.innerHTML = '';
+                    
+                    // Создаем iframe
+                    const iframe = document.createElement('iframe');
+                    iframe.style.width = '100%';
+                    iframe.style.height = '50px';
+                    iframe.style.border = 'none';
+                    iframe.style.overflow = 'hidden';
+                    
+                    // Добавляем случайный параметр и имя бота
+                    const randomParam = 't=' + new Date().getTime();
+                    iframe.src = `/telegram-widget.html?${randomParam}&bot=${encodeURIComponent(botUsername)}`;
+                    
+                    container.appendChild(iframe);
+                })
+                .catch(error => {
+                    console.error('Error loading Telegram widget:', error);
+                    const container = document.getElementById('telegram-login-container');
+                    container.innerHTML = `<div class="error">Ошибка загрузки виджета Telegram: ${error.message}</div>`;
+                });
+        }
+        
+        // Кнопка очистки результата
+        document.getElementById('clear-result').addEventListener('click', function() {
+            document.getElementById('auth-result').style.display = 'none';
+            document.getElementById('auth-data').textContent = '';
+            this.style.display = 'none';
+        });
+        
+        // Добавляем обработчик для кнопки выхода
+        document.getElementById('logout-telegram').addEventListener('click', logoutTelegram);
+        
+        // Проверяем токен при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            checkToken();
+            loadTelegramWidget();
+        });
+
+        // Функция для копирования в буфер обмена
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            element.select();
+            document.execCommand('copy');
+            
+            // Показываем уведомление
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-success position-fixed top-0 end-0 m-3';
+            notification.style.zIndex = '1050';
+            notification.textContent = 'Скопировано в буфер обмена';
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 2000);
+        }
+
+        // Функция для получения логина
+        async function getAppLogin() {
+            try {
+                const response = await fetch('/api/v1/me/app-login', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка при получении логина');
+                }
+                
+                const data = await response.json();
+                document.getElementById('appLogin').value = data.data.login;
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Не удалось получить логин');
+            }
+        }
+
+        // Функция для генерации пароля
+        async function generatePassword() {
+            try {
+                const response = await fetch('/api/v1/me/generate-password', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка при генерации пароля');
+                }
+                
+                const data = await response.json();
+                alert('Новый пароль успешно сгенерирован и отправлен в Telegram');
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Не удалось сгенерировать пароль');
+            }
+        }
+
+        // Получаем логин при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            getAppLogin();
+        });
+    </script>
+</body>
+</html> 

@@ -12,6 +12,18 @@ if ($_SERVER['REQUEST_URI'] === '/telegram-auth' || $_SERVER['REQUEST_URI'] === 
     exit;
 }
 
+// Редирект на страницу перепривязки Telegram
+if ($_SERVER['REQUEST_URI'] === '/telegram-rebind' || $_SERVER['REQUEST_URI'] === '/telegram-rebind/') {
+    header('Location: /telegram-rebind.html');
+    exit;
+}
+
+// Редирект на страницу виджета Telegram
+if ($_SERVER['REQUEST_URI'] === '/telegram-widget.html') {
+    header('Location: /telegram-widget.html');
+    exit;
+}
+
 /** Инициализируем приложение и получаем конфигурацию */
 $config = require __DIR__ . '/../bootstrap/app.php';
 
