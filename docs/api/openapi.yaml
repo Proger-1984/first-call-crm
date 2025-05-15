@@ -2062,8 +2062,258 @@ paths:
               example:
                 code: 422
                 status: error
-                message: "Не удалось сохранить локацию. Проверьте корректность данных."
+                message: "Не удалось обновить геометрические поля"
                 error: "save_failed"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/location-polygons/{id}:
+    put:
+      tags:
+        - Локации
+      summary: Обновление существующей локации
+      description: |
+        Обновляет существующую локацию пользователя.
+        
+        Если изменились координаты полигона, автоматически пересчитываются и обновляются:
+        - center_lat и center_lng (координаты центра)
+        - bounds (географические границы)
+        - PostGIS поля center_point и polygon
+        
+        Требуется аутентификация с помощью JWT токена.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID локации для обновления
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - subscription_id
+                - polygon_coordinates
+              properties:
+                name:
+                  type: string
+                  description: Название локации
+                  example: "Новое название"
+                subscription_id:
+                  type: integer
+                  description: ID подписки
+                  example: 3
+                polygon_coordinates:
+                  type: array
+                  description: Массив координат точек полигона
+                  items:
+                    type: array
+                    items:
+                      type: number
+                  example: [[55.7522, 37.6156], [55.7512, 37.6176], [55.7532, 37.6196], [55.7522, 37.6156]]
+            example:
+              name: "Новое название"
+              subscription_id: 3
+              polygon_coordinates: [[55.7522, 37.6156], [55.7512, 37.6176], [55.7532, 37.6196], [55.7522, 37.6156]]
+      responses:
+        '200':
+          description: Локация успешно обновлена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  message:
+                    type: string
+                    description: Сообщение об успешном обновлении
+                    example: "Локация успешно обновлена"
+              example:
+                code: 200
+                status: success
+                message: "Локация успешно обновлена"
+        '400':
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: error
+                message: "Отсутствует название локации"
+                error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+                invalid_token:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Invalid token"
+                    error: "invalid_token"
+        '404':
+          description: Локация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Локация не найдена"
+                error: "not_found"
+        '422':
+          description: Ошибка валидации или сохранения данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 422
+                status: error
+                message: "Не удалось обновить геометрические поля"
+                error: "save_failed"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+    
+    delete:
+      tags:
+        - Локации
+      summary: Удаление локации пользователя
+      description: |
+        Удаляет локацию пользователя по указанному ID.
+        
+        Требуется аутентификация с помощью JWT токена.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID локации для удаления
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Локация успешно удалена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  message:
+                    type: string
+                    description: Сообщение об успешном удалении
+                    example: "Локация успешно удалена"
+              example:
+                code: 200
+                status: success
+                message: "Локация успешно удалена"
+        '400':
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: error
+                message: "Не указан ID локации"
+                error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+                invalid_token:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Invalid token"
+                    error: "invalid_token"
+        '404':
+          description: Локация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Локация не найдена"
+                error: "not_found"
         '500':
           description: Внутренняя ошибка сервера
           content:
