@@ -513,4 +513,66 @@ class SubscriptionController
             return $this->respondWithError($response, $e->getMessage(), null, 500);
         }
     }
+    
+    /**
+     * Получение всей информации о тарифах для страницы тарифов
+     * Возвращает категории, локации, тарифы и их цены
+     */
+    public function getAllTariffInfo(Response $response): Response
+    {
+        try {
+            // 1. Получаем все категории
+            $categories = Category::all(['id', 'name']);
+            
+            // 2. Получаем все локации и сортируем по имени
+            $locations = Location::all(['id', 'city', 'region'])
+                ->map(function ($location) {
+                    return [
+                        'id' => $location->id,
+                        'name' => $location->getFullName()
+                    ];
+                })
+                ->sortBy('name')
+                ->values();
+                
+            // 3. Получаем все активные тарифы с описанием и сортируем по имени
+            $tariffs = $this->subscriptionService->getActiveTariffs()
+                ->map(function ($tariff) {
+                    return [
+                        'id' => $tariff->id,
+                        'name' => $tariff->name,
+                        'description' => $tariff->description,
+                    ];
+                })
+                ->sortBy('id')
+                ->values();
+            
+            // 4. Получаем связку локация-тариф-цена для всех тарифов и локаций
+            $tariffPrices = [];
+            foreach ($locations as $location) {
+                foreach ($tariffs as $tariff) {
+                    $price = $this->subscriptionService->getTariffPrice($tariff['id'], $location['id']);
+                    $tariffPrices[] = [
+                        'tariff_id' => $tariff['id'],
+                        'location_id' => $location['id'],
+                        'price' => $price
+                    ];
+                }
+            }
+            
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'data' => [
+                    'categories' => $categories,
+                    'locations' => $locations,
+                    'tariffs' => $tariffs,
+                    'tariff_prices' => $tariffPrices
+                ]
+            ], 200);
+            
+        } catch (Exception $e) {
+            return $this->respondWithError($response, $e->getMessage(), null, 500);
+        }
+    }
 } 

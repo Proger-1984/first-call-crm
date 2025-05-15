@@ -27,11 +27,11 @@ class CreateTariffsTable
          */
         Manager::table('tariffs')->insert([
             [
-                'name' => 'Demo',
+                'name' => 'Демо',
                 'code' => 'demo',
                 'duration_hours' => 3,
                 'price' => 0,
-                'description' => 'Демо-версия с ограниченным функционалом на 3 часа',
+                'description' => 'Полный доступ ко всем функциям на 3 часа',
                 'is_active' => true,
                 'created_at' => date('Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s'),
@@ -67,7 +67,7 @@ class CreateTariffsTable
                 'updated_at' => date('Y-m-d H:i:s'),
             ],
             [
-                'name' => 'Premium',
+                'name' => 'Премиум',
                 'code' => 'premium',
                 'duration_hours' => 744,
                 'price' => 5000.00,

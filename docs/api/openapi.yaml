@@ -2829,4 +2829,280 @@ paths:
                 code: 500
                 status: error
                 message: "Внутренняя ошибка сервера"
-                error: "internal_error" 
+                error: "internal_error"
+
+  /api/v1/catalog/tariff-price/{tariffId}/{locationId}:
+    get:
+      tags:
+        - Подписки
+      summary: Получение цены тарифа для локации
+      description: |
+        Возвращает цену тарифа для выбранной локации.
+        
+        Требуется аутентификация с помощью JWT токена.
+      parameters:
+        - name: tariffId
+          in: path
+          required: true
+          description: ID тарифа
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+          example: 2
+        - name: locationId
+          in: path
+          required: true
+          description: ID локации
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+          example: 1
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Цена успешно получена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      price:
+                        type: number
+                        format: float
+                        description: Цена тарифа для указанной локации
+                        example: 1000.00
+              example:
+                code: 200
+                status: success
+                data:
+                  price: 1000.00
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: error
+                message: Не указаны необходимые параметры
+                error: validation_error
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+        '404':
+          description: Цена не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: Цена не найдена
+                error: not_found
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: Внутренняя ошибка сервера
+                error: internal_error
+
+  /api/v1/catalog/tariff-info:
+    get:
+      tags:
+        - Подписки
+      summary: Получение всей информации о тарифах
+      description: |
+        Возвращает полную информацию для страницы тарифов:
+        - Список всех категорий
+        - Список всех локаций
+        - Список всех тарифов с описаниями
+        - Связку тариф-локация-цена для всех возможных комбинаций
+        
+        Требуется аутентификация с помощью JWT токена.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Информация успешно получена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      categories:
+                        type: array
+                        description: Список всех категорий
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              description: ID категории
+                              example: 1
+                            name:
+                              type: string
+                              description: Название категории
+                              example: "Аренда. Жилая"
+                      locations:
+                        type: array
+                        description: Список всех локаций
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              description: ID локации
+                              example: 1
+                            name:
+                              type: string
+                              description: Название локации
+                              example: "Москва, Московская область"
+                      tariffs:
+                        type: array
+                        description: Список всех активных тарифов
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              description: ID тарифа
+                              example: 1
+                            name:
+                              type: string
+                              description: Название тарифа
+                              example: "Demo"
+                            description:
+                              type: string
+                              description: Описание тарифа
+                              example: "Демо-версия с ограниченным функционалом на 3 часа"
+                      tariff_prices:
+                        type: array
+                        description: Связка тариф-локация-цена
+                        items:
+                          type: object
+                          properties:
+                            tariff_id:
+                              type: integer
+                              description: ID тарифа
+                              example: 1
+                            location_id:
+                              type: integer
+                              description: ID локации
+                              example: 1
+                            price:
+                              type: number
+                              format: float
+                              description: Цена тарифа для указанной локации
+                              example: 0.00
+              example:
+                code: 200
+                status: success
+                data:
+                  categories:
+                    - id: 1
+                      name: "Аренда. Жилая"
+                    - id: 2
+                      name: "Продажа. Жилая"
+                  locations:
+                    - id: 1
+                      name: "Москва, Московская область"
+                    - id: 2
+                      name: "Санкт-Петербург, Ленинградская область"
+                  tariffs:
+                    - id: 1
+                      name: "Demo"
+                      description: "Демо-версия с ограниченным функционалом на 3 часа"
+                    - id: 2
+                      name: "1 день"
+                      description: "Полный доступ ко всем функциям на 1 день"
+                  tariff_prices:
+                    - tariff_id: 1
+                      location_id: 1
+                      price: 0.00
+                    - tariff_id: 1
+                      location_id: 2
+                      price: 0.00
+                    - tariff_id: 2
+                      location_id: 1
+                      price: 1000.00
+                    - tariff_id: 2
+                      location_id: 2
+                      price: 1000.00
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: Внутренняя ошибка сервера
+                error: internal_error 

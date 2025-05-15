@@ -97,9 +97,13 @@ return function (App $app) {
             $group->put('/{id:[0-9]+}', [LocationPolygonController::class, 'updateLocationPolygon']);
             $group->delete('/{id:[0-9]+}', [LocationPolygonController::class, 'deleteLocationPolygon']);
         })->add(new AuthMiddleware($container));
-            
-        // Маршруты каталога (требуют авторизации, но доступны всем пользователям)
+
+        /** Маршруты каталога (требуют авторизации, но доступны всем пользователям)
+         * Получение всей информации о тарифах (категории, локации, тарифы и цены) - getAllTariffInfo
+         */
         $group->group('/catalog', function (RouteCollectorProxy $group) {
+            $group->get('/tariff-info', [SubscriptionController::class, 'getAllTariffInfo']);
+
             // Получение доступных тарифов
            $group->get('/tariffs', [SubscriptionController::class, 'getAvailableTariffs']);
                 
@@ -111,6 +115,7 @@ return function (App $app) {
                 
             // Получение цены тарифа для локации
            $group->get('/tariff-price/{tariffId:[0-9]+}/{locationId:[0-9]+}', [SubscriptionController::class, 'getTariffPrice']);
+
         })->add(new AuthMiddleware($container));
 
         /** Административное API для управления подписками (проверка роли admin в контроллере)
