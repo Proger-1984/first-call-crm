@@ -32,6 +32,8 @@ tags:
     description: Методы для работы с данными пользователя
   - name: Подписки
     description: Методы для управления подписками
+  - name: Локации
+    description: Методы для управления локациями и полигонами
   - name: Конфигурация
     description: Методы для получения конфигурационных данных
   - name: Администрирование
@@ -337,6 +339,123 @@ components:
           type: boolean
           description: Включен ли автоматический звонок
           example: true
+
+    LocationPolygon:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID локации
+          example: 1
+        name:
+          type: string
+          description: Название локации
+          example: "Центр города"
+        subscription_id:
+          type: integer
+          description: ID подписки, к которой относится локация
+          example: 2
+        polygon_coordinates:
+          type: array
+          description: Массив координат точек полигона
+          items:
+            type: array
+            items:
+              type: number
+          example: [[55.7522, 37.6156], [55.7512, 37.6176], [55.7532, 37.6196], [55.7522, 37.6156]]
+        center_lat:
+          type: number
+          description: Широта центра локации
+          example: 55.7522
+        center_lng:
+          type: number
+          description: Долгота центра локации
+          example: 37.6156
+        created_at:
+          type: string
+          format: date-time
+          description: Дата и время создания локации
+          example: "2023-08-15T13:45:30Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Дата и время последнего обновления локации
+          example: "2023-08-16T10:22:15Z"
+
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID подписки
+          example: 2
+        user_id:
+          type: integer
+          description: ID пользователя
+          example: 123
+        is_active:
+          type: boolean
+          description: Активна ли подписка в данный момент
+          example: true
+        start_date:
+          type: string
+          format: date-time
+          description: Дата и время начала подписки
+          example: "2023-08-10T00:00:00Z"
+        end_date:
+          type: string
+          format: date-time
+          description: Дата и время окончания подписки
+          example: "2023-09-10T00:00:00Z"
+        location:
+          type: object
+          properties:
+            id:
+              type: integer
+              description: ID локации
+              example: 1
+            name:
+              type: string
+              description: Название локации
+              example: "Москва, Московская область"
+            center_lat:
+              type: number
+              description: Широта центра локации
+              example: 55.7522
+            center_lng:
+              type: number
+              description: Долгота центра локации
+              example: 37.6156
+            bounds:
+              type: object
+              properties:
+                north:
+                  type: number
+                  description: Северная географическая граница (широта)
+                  example: 56.0221
+                south:
+                  type: number
+                  description: Южная географическая граница (широта)
+                  example: 55.4915
+                east:
+                  type: number
+                  description: Восточная географическая граница (долгота)
+                  example: 38.1774
+                west:
+                  type: number
+                  description: Западная географическая граница (долгота)
+                  example: 36.8034
+        category:
+          type: object
+          properties:
+            id:
+              type: integer
+              description: ID категории
+              example: 1
+            name:
+              type: string
+              description: Название категории
+              example: "Аренда. Жилая"
 
 paths:
   /api/v1/auth/telegram:
@@ -1339,6 +1458,144 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   /api/v1/subscriptions:
+    get:
+      tags:
+        - Подписки
+      summary: Получение списка активных подписок пользователя
+      description: |
+        Возвращает список активных подписок авторизованного пользователя.
+        
+        Для каждой подписки возвращается информация:
+        - ID подписки
+        - Информация о локации (ID, полное название с категорией, координаты центра, географические границы)
+        
+        Требуется аутентификация с помощью JWT токена.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Успешное получение списка подписок
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      subscriptions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              description: ID подписки
+                              example: 2
+                            location:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                  description: ID локации
+                                  example: 1
+                                name:
+                                  type: string
+                                  description: Название локации с категорией
+                                  example: "Москва, Московская область | Аренда. Жилая"
+                                center_lat:
+                                  type: number
+                                  description: Широта центра локации
+                                  example: 55.7522
+                                center_lng:
+                                  type: number
+                                  description: Долгота центра локации
+                                  example: 37.6156
+                                bounds:
+                                  type: object
+                                  properties:
+                                    north:
+                                      type: number
+                                      description: Северная географическая граница (широта)
+                                      example: 56.0221
+                                    south:
+                                      type: number
+                                      description: Южная географическая граница (широта)
+                                      example: 55.4915
+                                    east:
+                                      type: number
+                                      description: Восточная географическая граница (долгота)
+                                      example: 38.1774
+                                    west:
+                                      type: number
+                                      description: Западная географическая граница (долгота)
+                                      example: 36.8034
+              example:
+                code: 200
+                status: success
+                data:
+                  subscriptions:
+                    - id: 2
+                      location:
+                        id: 1
+                        name: "Москва, Московская область | Аренда. Жилая"
+                        center_lat: 55.7522
+                        center_lng: 37.6156
+                        bounds:
+                          north: 56.0221
+                          south: 55.4915
+                          east: 38.1774
+                          west: 36.8034
+                    - id: 3
+                      location:
+                        id: 1
+                        name: "Москва, Московская область | Продажа. Жилая"
+                        center_lat: 55.7522
+                        center_lng: 37.6156
+                        bounds:
+                          north: 56.0221
+                          south: 55.4915
+                          east: 38.1774
+                          west: 36.8034
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
     post:
       summary: Создание заявки на подписку
       description: |
@@ -1472,6 +1729,352 @@ paths:
                 status: error
                 message: Внутренняя ошибка сервера
                 error: internal_error
+
+  /api/v1/location-polygons/subscription/{subscription_id}:
+    get:
+      tags:
+        - Локации
+      summary: Получение локаций пользователя по ID подписки
+      description: |
+        Возвращает список локаций пользователя для указанной подписки.
+        
+        Для каждой локации возвращается информация:
+        - ID и название локации
+        - Координаты полигона локации (polygon_coordinates)
+        - Координаты центра локации (center_lat, center_lng)
+        - Географические границы локации (bounds)
+        - Дата создания
+        
+        Требуется аутентификация с помощью JWT токена.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          description: ID подписки
+          schema:
+            type: integer
+          example: 2
+        - name: subscription_id
+          in: query
+          required: false
+          description: ID подписки (дублирующий параметр для совместимости)
+          schema:
+            type: integer
+          example: 2
+      responses:
+        '200':
+          description: Успешное получение списка локаций
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      location_polygons:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              description: ID локации
+                              example: 1
+                            name:
+                              type: string
+                              description: Название локации
+                              example: "Центр города"
+                            polygon_coordinates:
+                              type: array
+                              description: Массив координат точек полигона
+                              items:
+                                type: array
+                                items:
+                                  type: number
+                              example: [[55.7522, 37.6156], [55.7512, 37.6176], [55.7532, 37.6196], [55.7522, 37.6156]]
+                            center_lat:
+                              type: number
+                              description: Широта центра локации
+                              example: 55.7522
+                            center_lng:
+                              type: number
+                              description: Долгота центра локации
+                              example: 37.6156
+                            bounds:
+                              type: object
+                              properties:
+                                north:
+                                  type: number
+                                  description: Северная географическая граница (широта)
+                                  example: 56.0221
+                                south:
+                                  type: number
+                                  description: Южная географическая граница (широта)
+                                  example: 55.4915
+                                east:
+                                  type: number
+                                  description: Восточная географическая граница (долгота)
+                                  example: 38.1774
+                                west:
+                                  type: number
+                                  description: Западная географическая граница (долгота)
+                                  example: 36.8034
+                            created_at:
+                              type: string
+                              format: date-time
+                              description: Дата и время создания локации
+                              example: "2023-08-15T13:45:30Z"
+              example:
+                code: 200
+                status: success
+                data:
+                  location_polygons:
+                    - id: 1
+                      name: "Центр города"
+                      polygon_coordinates: [[55.7522, 37.6156], [55.7512, 37.6176], [55.7532, 37.6196], [55.7522, 37.6156]]
+                      center_lat: 55.7522
+                      center_lng: 37.6156
+                      bounds:
+                        north: 56.0221
+                        south: 55.4915
+                        east: 38.1774
+                        west: 36.8034
+                      created_at: "2023-08-15T13:45:30Z"
+                    - id: 2
+                      name: "Бизнес-район"
+                      polygon_coordinates: [[55.7682, 37.5489], [55.7672, 37.5509], [55.7692, 37.5529], [55.7682, 37.5489]]
+                      center_lat: 55.7682
+                      center_lng: 37.5489
+                      bounds:
+                        north: 56.0321
+                        south: 55.5015
+                        east: 38.2774
+                        west: 36.9034
+                      created_at: "2023-08-17T09:30:45Z"
+        '400':
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: error
+                message: "Некорректный ID подписки"
+                error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+        '404':
+          description: Подписка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Подписка не найдена"
+                error: "not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/location-polygons:
+    post:
+      tags:
+        - Локации
+      summary: Создание новой локации
+      description: |
+        Создает новую локацию (полигон) для указанной подписки пользователя.
+        
+        После создания локации автоматически вычисляются и заполняются поля:
+        - center_lat и center_lng (координаты центра)
+        - bounds (географические границы)
+        - PostGIS поля center_point и polygon
+        
+        Требуется аутентификация с помощью JWT токена.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subscription_id
+                - name
+                - polygon_coordinates
+              properties:
+                subscription_id:
+                  type: integer
+                  description: ID подписки, к которой относится локация
+                  example: 2
+                name:
+                  type: string
+                  description: Название локации
+                  example: "Центр города"
+                polygon_coordinates:
+                  type: array
+                  description: Массив координат точек полигона [[lat, lng], ...]
+                  items:
+                    type: array
+                    items:
+                      type: number
+                  example: [[55.7522, 37.6156], [55.7512, 37.6176], [55.7532, 37.6196], [55.7522, 37.6156]]
+            example:
+              subscription_id: 2
+              name: "Центр города"
+              polygon_coordinates: [[55.7522, 37.6156], [55.7512, 37.6176], [55.7532, 37.6196], [55.7522, 37.6156]]
+      responses:
+        '201':
+          description: Локация успешно создана
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 201
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  message:
+                    type: string
+                    description: Сообщение о результате операции
+                    example: "Локация успешно создана"
+              example:
+                code: 201
+                status: success
+                message: "Локация успешно создана"
+        '400':
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_json:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Данные должны быть переданы в формате JSON"
+                    error: "validation_error"
+                missing_subscription_id:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Отсутствует или неверный формат subscription_id"
+                    error: "validation_error"
+                missing_name:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Отсутствует название локации"
+                    error: "validation_error"
+                missing_polygon:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Отсутствуют или неверный формат координат полигона"
+                    error: "validation_error"
+                invalid_polygon:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Полигон должен содержать минимум 3 точки"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+        '404':
+          description: Подписка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Указанная подписка не найдена"
+                error: "not_found"
+        '422':
+          description: Ошибка валидации или сохранения данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 422
+                status: error
+                message: "Не удалось сохранить локацию. Проверьте корректность данных."
+                error: "save_failed"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
 
   /api/v1/me/info:
     get:
