@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройка локаций для автозвонка</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3f37c9;
+            --success-color: #4cc9f0;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+            --border-radius: 0.5rem;
+        }
+        
+        body {
+            background-color: #f5f7fb;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .sidebar {
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            height: 275px;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .main-content {
+            margin-top: 1rem;
+        }
+        
+        .navbar {
+            background-color: white !important;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border-radius: var(--border-radius);
+        }
+        
+        .card {
+            border: none;
+            border-radius: var(--border-radius);
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            font-weight: 600;
+            padding: 1rem;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover, .btn-primary:active {
+            background-color: var(--secondary-color) !important;
+            border-color: var(--secondary-color) !important;
+        }
+        
+        #map {
+            width: 100%;
+            height: 275px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 0;
+        }
+        
+        #loading-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            display: none;
+        }
+        
+        #loading-indicator .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        
+        .location-item {
+            transition: all 0.3s ease;
+            border-radius: var(--border-radius);
+            margin-bottom: 0.75rem;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        
+        .location-item:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .location-item.active-location {
+            border-left: 4px solid var(--primary-color);
+            background-color: rgba(67, 97, 238, 0.05);
+        }
+        
+        .location-item .card-body {
+            padding: 0.75rem;
+        }
+        
+        .alert {
+            border-radius: var(--border-radius);
+        }
+        
+        .section-title {
+            font-weight: 600;
+            color: var(--dark-color);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--primary-color);
+        }
+        
+        .form-control, .form-select {
+            border-radius: var(--border-radius);
+            padding: 0.75rem 1rem;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .form-control:focus, .form-select:focus {
+            box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+            border-color: var(--primary-color);
+        }
+        
+        .btn {
+            border-radius: var(--border-radius);
+            padding: 0.5rem 1.25rem;
+        }
+        
+        .api-test-container {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        
+        #api-response {
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 0.5rem;
+            font-family: monospace;
+        }
+        
+        .locations-list-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .location-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .location-actions .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+        
+        .empty-message {
+            text-align: center;
+            padding: 2rem;
+            color: #6c757d;
+        }
+        
+        .map-container {
+            position: relative;
+        }
+        
+        .map-toolbar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            background: white;
+            padding: 5px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        
+        #location-form {
+            height: auto;
+            overflow-y: visible;
+        }
+        
+        @media (max-width: 991.98px) {
+            .sidebar {
+                height: 300px;
+                margin-bottom: 1.5rem;
+            }
+            
+            #map {
+                height: 400px;
+                margin-bottom: 1rem;
+            }
+        }
+        
+        .row-eq-height {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        
+        .row-eq-height > [class*='col-'] {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .main-content {
+            height: 100%;
+        }
+        
+        .map-container {
+            margin-bottom: 0 !important;
+        }
+        
+        #map {
+            width: 100%;
+            height: 550px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 0;
+        }
+        
+        /* Новые стили для исправления проблемы с отображением карты */
+        .flex-container {
+            display: flex;
+            flex-direction: row;
+        }
+        
+        .location-form-container {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Индикатор загрузки -->
+    <div id="loading-indicator">
+        <div class="spinner-border text-light" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+    </div>
+
+    <div class="container-fluid py-3">
+        <div class="row">
+            <div class="col-12 mb-3">
+                <!-- Навигация -->
+                <nav class="navbar navbar-expand-lg navbar-light">
+                    <div class="container-fluid">
+                        <a class="navbar-brand d-flex align-items-center" href="#">
+                            <i class="bi bi-building me-2" style="font-size: 1.5rem;"></i>
+                            <span style="font-weight: 600;">ГоргонаCRM</span>
+                        </a>
+                        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <div class="collapse navbar-collapse" id="navbarNav">
+                            <ul class="navbar-nav me-auto">
+                                <li class="nav-item">
+                                    <a class="nav-link active" href="/location-settings.html">
+                                        <i class="bi bi-map"></i> Настройка локаций
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/point-check.html">
+                                        <i class="bi bi-geo-alt"></i> Проверка точки
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="#api-test" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="api-test">
+                                        <i class="bi bi-braces"></i> Тест API
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- Секция для тестирования API (скрытая) -->
+        <div class="collapse mb-4" id="api-test">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Тестирование API</h5>
+                </div>
+                <div class="card-body">
+                    <form id="api-test-form">
+                        <div class="mb-3">
+                            <label for="jwt-token" class="form-label">JWT токен</label>
+                            <textarea class="form-control token-input" id="jwt-token" rows="3" placeholder="Вставьте JWT токен..."></textarea>
+                            <div class="form-text">Токен формата: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="api-endpoint" class="form-label">API эндпоинт</label>
+                            <div class="input-group">
+                                <span class="input-group-text">/api/v1/</span>
+                                <input type="text" class="form-control" id="api-endpoint" value="subscriptions">
+                            </div>
+                            <div class="form-text">Примеры: subscriptions, auth/check-token, me/info</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="request-method" class="form-label">Метод запроса</label>
+                            <select class="form-select" id="request-method">
+                                <option value="GET" selected>GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="request-body" class="form-label">Тело запроса (для POST/PUT)</label>
+                            <textarea class="form-control" id="request-body" rows="3" placeholder="Введите JSON данные для отправки..."></textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-send"></i> Отправить запрос
+                        </button>
+                        
+                        <button type="button" class="btn btn-secondary" id="check-token">
+                            <i class="bi bi-key"></i> Проверить токен
+                        </button>
+                        
+                        <button type="button" class="btn btn-warning ml-2" id="alt-request">
+                            <i class="bi bi-arrow-repeat"></i> Альтернативный запрос
+                        </button>
+                        
+                        <button type="button" class="btn btn-info ml-2" id="check-cors">
+                            <i class="bi bi-shield-check"></i> Проверить CORS
+                        </button>
+                        
+                        <button type="button" class="btn btn-success ml-2" id="check-auth">
+                            <i class="bi bi-person-check"></i> Проверить авторизацию
+                        </button>
+                    </form>
+                    
+                    <div class="mt-4">
+                        <h6>Ответ сервера:</h6>
+                        <div id="api-response">Нет данных</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-12">
+                <h2 class="text-center fw-bold">Настройка локаций для автозвонка</h2>
+                <p class="text-center text-muted">
+                    Создавайте и управляйте зонами охвата для автозвонка по объявлениям
+                </p>
+                
+                <!-- Уведомления -->
+                <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                <div id="success-message" class="alert alert-success" style="display: none;"></div>
+            </div>
+        </div>
+        
+        <!-- Выбор подписки (над картой) -->
+        <div class="row mb-4">
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="section-title">Выбор подписки</h5>
+                        <select id="subscription-select" class="form-select">
+                            <option value="">Загрузка подписок...</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Основной контент: карта, форма и список локаций в одном ряду -->
+        <div class="row">
+            <!-- Колонка с картой и формой добавления локации -->
+            <div class="col-lg-8">
+                <div class="flex-container">
+                    <!-- Карта (слева) -->
+                    <div class="col-lg-6">
+                        <div class="main-content">
+                            <!-- Карта -->
+                            <div class="map-container mb-4">
+                                <div id="map" style="display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Форма добавления локации (справа от карты) -->
+                    <div class="col-lg-6 location-form-container">
+                        <div id="location-form" class="card" style="display: none;">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Добавление локации</h5>
+                            </div>
+                            <div class="card-body">
+                                <form>
+                                    <p class="text-muted mb-3">
+                                        <i class="bi bi-info-circle me-2"></i> Нажимайте на карту, чтобы создать полигон (минимум 3 точки)
+                                    </p>
+                                    
+                                    <div class="mb-3">
+                                        <label for="location-name" class="form-label">Название локации</label>
+                                        <input type="text" class="form-control" id="location-name" placeholder="Например: Центр города, Набережная...">
+                                    </div>
+                                    
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn btn-primary" id="save-location">
+                                            <i class="bi bi-save me-1"></i> Сохранить локацию
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" id="clear-polygon-btn">
+                                            <i class="bi bi-eraser me-1"></i> Очистить полигон
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger" id="cancel-edit" style="display: none;">
+                                            <i class="bi bi-x-circle me-1"></i> Отмена
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Сохраненные локации (справа) -->
+            <div class="col-lg-4">
+                <div class="sidebar p-3">
+                    <h5 class="section-title">Сохраненные локации</h5>
+                    <div class="locations-list-container">
+                        <div id="locations-list">
+                            <div class="empty-message">
+                                <i class="bi bi-geo-alt" style="font-size: 2rem; display: block; margin-bottom: 1rem;"></i>
+                                Выберите подписку для просмотра локаций
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="/js/pages/location-settings.js"></script>
+    
+    <!-- API Testing Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const apiTestForm = document.getElementById('api-test-form');
+            const jwtTokenInput = document.getElementById('jwt-token');
+            const apiEndpointInput = document.getElementById('api-endpoint');
+            const requestMethodSelect = document.getElementById('request-method');
+            const requestBodyTextarea = document.getElementById('request-body');
+            const apiResponseDiv = document.getElementById('api-response');
+            const checkTokenButton = document.getElementById('check-token');
+            const altRequestButton = document.getElementById('alt-request');
+            const checkCorsButton = document.getElementById('check-cors');
+            const checkAuthButton = document.getElementById('check-auth');
+            
+            // Проверяем, есть ли сохраненный токен в localStorage
+            const savedToken = localStorage.getItem('jwt_token');
+            if (savedToken) {
+                jwtTokenInput.value = savedToken;
+            }
+            
+            // Обработчик отправки формы тестирования API
+            apiTestForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const token = jwtTokenInput.value.trim();
+                const endpoint = apiEndpointInput.value.trim();
+                const method = requestMethodSelect.value;
+                const body = requestBodyTextarea.value.trim();
+                
+                if (!token) {
+                    showApiResponse('Ошибка: Не указан JWT токен', 'error');
+                    return;
+                }
+                
+                if (!endpoint) {
+                    showApiResponse('Ошибка: Не указан API эндпоинт', 'error');
+                    return;
+                }
+                
+                // Сохраняем токен в localStorage
+                localStorage.setItem('jwt_token', token);
+                
+                // Формируем URL
+                const url = `/api/v1/${endpoint}`;
+                
+                // Формируем заголовки
+                const headers = {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                };
+                
+                // Логируем заголовки запроса в консоль для отладки
+                console.log('Request headers:', headers);
+                
+                // Формируем опции запроса
+                const options = {
+                    method: method,
+                    headers: headers,
+                    credentials: 'include' // Добавляем cookies для cross-origin запросов
+                };
+                
+                // Добавляем тело запроса для POST и PUT
+                if (method === 'POST' || method === 'PUT') {
+                    if (body) {
+                        try {
+                            // Проверяем, что JSON валидный
+                            JSON.parse(body);
+                            options.body = body;
+                        } catch (error) {
+                            showApiResponse(`Ошибка: Невалидный JSON - ${error.message}`, 'error');
+                            return;
+                        }
+                    }
+                }
+                
+                // Отображаем индикатор загрузки
+                apiResponseDiv.innerHTML = 'Загрузка...';
+                
+                // Логируем отправляемый запрос в div
+                const requestInfo = `Отправка запроса:
+URL: ${url}
+Метод: ${method}
+Заголовки:
+  Authorization: Bearer ${token.substring(0, 10)}...
+  Content-Type: ${headers['Content-Type']}
+  Accept: ${headers['Accept']}
+${body ? `Тело запроса: ${body}` : ''}`;
+
+                apiResponseDiv.innerHTML = `<div class="text-info">${requestInfo.replace(/\n/g, '<br>')}</div><hr>Загрузка...`;
+                
+                // Отправляем запрос
+                fetch(url, options)
+                    .then(response => {
+                        const contentType = response.headers.get('content-type');
+                        const isJson = contentType && contentType.includes('application/json');
+                        
+                        // Статус и заголовки для отображения
+                        const statusInfo = `Статус: ${response.status} ${response.statusText}\n`;
+                        const headersInfo = Array.from(response.headers.entries())
+                            .map(([key, value]) => `${key}: ${value}`)
+                            .join('\n');
+                        
+                        if (isJson) {
+                            return response.json().then(data => {
+                                return {
+                                    status: response.status,
+                                    headers: headersInfo,
+                                    data: data
+                                };
+                            });
+                        } else {
+                            return response.text().then(text => {
+                                return {
+                                    status: response.status,
+                                    headers: headersInfo,
+                                    data: text
+                                };
+                            });
+                        }
+                    })
+                    .then(result => {
+                        const statusClass = result.status >= 200 && result.status < 300 ? 'success' : 'error';
+                        const responseText = `Статус: ${result.status}\n\nЗаголовки:\n${result.headers}\n\nДанные:\n${typeof result.data === 'object' ? JSON.stringify(result.data, null, 2) : result.data}`;
+                        
+                        showApiResponse(responseText, statusClass);
+                    })
+                    .catch(error => {
+                        showApiResponse(`Ошибка: ${error.message}`, 'error');
+                    });
+            });
+            
+            // Обработчик кнопки проверки токена
+            checkTokenButton.addEventListener('click', function() {
+                const token = jwtTokenInput.value.trim();
+                
+                if (!token) {
+                    showApiResponse('Ошибка: Не указан JWT токен', 'error');
+                    return;
+                }
+                
+                try {
+                    // Разбираем токен (без проверки подписи)
+                    const parts = token.split('.');
+                    if (parts.length !== 3) {
+                        showApiResponse('Ошибка: Неверный формат JWT токена', 'error');
+                        return;
+                    }
+                    
+                    // Декодируем payload
+                    const payload = JSON.parse(atob(parts[1]));
+                    
+                    // Анализируем токен
+                    const now = Math.floor(Date.now() / 1000);
+                    const isExpired = payload.exp && payload.exp < now;
+                    const timeLeft = payload.exp ? payload.exp - now : null;
+                    
+                    const tokenInfo = {
+                        header: JSON.parse(atob(parts[0])),
+                        payload: payload,
+                        analysis: {
+                            isExpired: isExpired,
+                            timeLeft: timeLeft ? `${timeLeft} секунд` : 'Неизвестно'
+                        }
+                    };
+                    
+                    showApiResponse(`Информация о токене:\n${JSON.stringify(tokenInfo, null, 2)}`, isExpired ? 'error' : 'success');
+                } catch (error) {
+                    showApiResponse(`Ошибка при разборе токена: ${error.message}`, 'error');
+                }
+            });
+            
+            // Обработчик кнопки альтернативного запроса
+            altRequestButton.addEventListener('click', function() {
+                const token = jwtTokenInput.value.trim();
+                const endpoint = apiEndpointInput.value.trim();
+                const method = requestMethodSelect.value;
+                const body = requestBodyTextarea.value.trim();
+                
+                if (!token) {
+                    showApiResponse('Ошибка: Не указан JWT токен', 'error');
+                    return;
+                }
+                
+                if (!endpoint) {
+                    showApiResponse('Ошибка: Не указан API эндпоинт', 'error');
+                    return;
+                }
+                
+                // Сохраняем токен в localStorage
+                localStorage.setItem('jwt_token', token);
+                
+                // Формируем URL
+                const url = `/api/v1/${endpoint}`;
+                
+                // Логируем отправляемый запрос
+                const requestInfo = `Отправка запроса через XMLHttpRequest:
+URL: ${url}
+Метод: ${method}
+Заголовки:
+  Authorization: Bearer ${token.substring(0, 10)}...`;
+                
+                apiResponseDiv.innerHTML = `<div class="text-info">${requestInfo.replace(/\n/g, '<br>')}</div><hr>Загрузка...`;
+                
+                // Создаем XMLHttpRequest
+                const xhr = new XMLHttpRequest();
+                xhr.open(method, url, true);
+                
+                // Устанавливаем заголовки
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.setRequestHeader('Accept', 'application/json');
+                
+                // Обработчик завершения запроса
+                xhr.onload = function() {
+                    try {
+                        // Пытаемся распарсить ответ как JSON
+                        let responseData;
+                        try {
+                            responseData = JSON.parse(xhr.responseText);
+                        } catch (e) {
+                            responseData = xhr.responseText;
+                        }
+                        
+                        // Получаем все заголовки ответа
+                        const allHeaders = xhr.getAllResponseHeaders();
+                        
+                        // Формируем текст ответа
+                        const responseText = `Статус: ${xhr.status} ${xhr.statusText}\n\nЗаголовки запроса:\nAuthorization: Bearer ${token.substring(0, 10)}...\nContent-Type: application/json\nAccept: application/json\n\nЗаголовки ответа:\n${allHeaders}\n\nДанные:\n${typeof responseData === 'object' ? JSON.stringify(responseData, null, 2) : responseData}`;
+                        
+                        // Определяем класс для отображения статуса
+                        const statusClass = xhr.status >= 200 && xhr.status < 300 ? 'success' : 'error';
+                        
+                        // Отображаем ответ
+                        showApiResponse(responseText, statusClass);
+                    } catch (error) {
+                        showApiResponse(`Ошибка обработки ответа: ${error.message}`, 'error');
+                    }
+                };
+                
+                // Обработчик ошибки
+                xhr.onerror = function() {
+                    showApiResponse(`Ошибка сети при выполнении запроса`, 'error');
+                };
+                
+                // Отправляем запрос
+                if (method === 'POST' || method === 'PUT') {
+                    xhr.send(body || null);
+                } else {
+                    xhr.send();
+                }
+            });
+            
+            // Обработчик кнопки проверки CORS
+            checkCorsButton.addEventListener('click', function() {
+                const endpoint = apiEndpointInput.value.trim() || 'subscriptions';
+                const url = `/api/v1/${endpoint}`;
+                
+                // Отображаем информацию о проверке
+                apiResponseDiv.innerHTML = '<div class="text-info">Проверка CORS настроек сервера...</div>';
+                
+                // Отправляем предварительный (preflight) OPTIONS запрос
+                fetch(url, {
+                    method: 'OPTIONS',
+                    credentials: 'include'
+                })
+                .then(response => {
+                    // Получаем CORS заголовки
+                    const corsHeaders = {
+                        'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                        'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                        'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+                        'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials'),
+                        'Access-Control-Max-Age': response.headers.get('Access-Control-Max-Age')
+                    };
+                    
+                    // Очищаем undefined значения
+                    Object.keys(corsHeaders).forEach(key => 
+                        corsHeaders[key] === undefined && delete corsHeaders[key]
+                    );
+                    
+                    // Проверяем наличие CORS заголовков
+                    const hasCorsHeaders = Object.keys(corsHeaders).length > 0;
+                    
+                    // Отображаем результат проверки
+                    if (hasCorsHeaders) {
+                        showApiResponse(`CORS настройки сервера:\n${JSON.stringify(corsHeaders, null, 2)}\n\nНастройки CORS обнаружены. Сервер поддерживает кросс-доменные запросы.`, 'success');
+                    } else {
+                        showApiResponse(`CORS заголовки не обнаружены в ответе. Возможно, сервер не настроен для обработки кросс-доменных запросов.\n\nЭто может быть причиной проблем с передачей заголовков Authorization.`, 'error');
+                    }
+                })
+                .catch(error => {
+                    showApiResponse(`Ошибка при проверке CORS: ${error.message}\n\nЕсли вы видите ошибку CORS в консоли браузера, то это подтверждает проблему с CORS настройками.`, 'error');
+                });
+            });
+            
+            // Обработчик кнопки проверки авторизации
+            checkAuthButton.addEventListener('click', function() {
+                const token = jwtTokenInput.value.trim();
+                
+                if (!token) {
+                    showApiResponse('Ошибка: Не указан JWT токен', 'error');
+                    return;
+                }
+                
+                // Сохраняем токен в localStorage
+                localStorage.setItem('jwt_token', token);
+                
+                // Формируем URL для проверки авторизации
+                const url = `/api/v1/auth/check-token`;
+                
+                // Отображаем информацию о проверке
+                apiResponseDiv.innerHTML = '<div class="text-info">Проверка работы AuthMiddleware...</div>';
+                
+                // Отправляем запрос на диагностический эндпоинт
+                Promise.all([
+                    // Запрос через Fetch API
+                    fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }
+                    }).then(response => {
+                        return response.json().then(data => {
+                            return { 
+                                type: 'fetch', 
+                                status: response.status, 
+                                data: data 
+                            };
+                        }).catch(error => {
+                            return { 
+                                type: 'fetch', 
+                                error: `Ошибка парсинга JSON: ${error.message}` 
+                            };
+                        });
+                    }).catch(error => {
+                        return { 
+                            type: 'fetch', 
+                            error: `Ошибка запроса: ${error.message}` 
+                        };
+                    }),
+                    
+                    // Параллельный запрос через XMLHttpRequest
+                    new Promise((resolve) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('GET', url, true);
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        xhr.setRequestHeader('Content-Type', 'application/json');
+                        xhr.setRequestHeader('Accept', 'application/json');
+                        
+                        xhr.onload = function() {
+                            try {
+                                const data = JSON.parse(xhr.responseText);
+                                resolve({ 
+                                    type: 'xhr', 
+                                    status: xhr.status, 
+                                    data: data 
+                                });
+                            } catch (e) {
+                                resolve({ 
+                                    type: 'xhr', 
+                                    error: `Ошибка парсинга JSON: ${e.message}` 
+                                });
+                            }
+                        };
+                        
+                        xhr.onerror = function() {
+                            resolve({ 
+                                type: 'xhr', 
+                                error: 'Ошибка сети при выполнении запроса' 
+                            });
+                        };
+                        
+                        xhr.send();
+                    })
+                ])
+                .then(results => {
+                    const [fetchResult, xhrResult] = results;
+                    
+                    let resultMessage = '===== Результаты проверки авторизации =====\n\n';
+                    
+                    // Анализ результатов Fetch API
+                    resultMessage += '== Через Fetch API ==\n';
+                    if (fetchResult.error) {
+                        resultMessage += `Ошибка: ${fetchResult.error}\n\n`;
+                    } else {
+                        resultMessage += `Статус: ${fetchResult.status}\n`;
+                        resultMessage += `Данные: ${JSON.stringify(fetchResult.data, null, 2)}\n\n`;
+                    }
+                    
+                    // Анализ результатов XMLHttpRequest
+                    resultMessage += '== Через XMLHttpRequest ==\n';
+                    if (xhrResult.error) {
+                        resultMessage += `Ошибка: ${xhrResult.error}\n\n`;
+                    } else {
+                        resultMessage += `Статус: ${xhrResult.status}\n`;
+                        resultMessage += `Данные: ${JSON.stringify(xhrResult.data, null, 2)}\n\n`;
+                    }
+                    
+                    // Анализ общего результата
+                    if ((fetchResult.status === 200 || xhrResult.status === 200) && 
+                        (fetchResult.data?.data?.user_role || xhrResult.data?.data?.user_role)) {
+                        resultMessage += '== ВЫВОД ==\n';
+                        resultMessage += 'Авторизация работает успешно! 🟢\n';
+                        resultMessage += `Роль пользователя: ${fetchResult.data?.data?.user_role || xhrResult.data?.data?.user_role}\n`;
+                        resultMessage += 'Токен передается правильно и обрабатывается сервером.';
+                        
+                        showApiResponse(resultMessage, 'success');
+                    } else {
+                        resultMessage += '== ВЫВОД ==\n';
+                        resultMessage += 'Проблема с авторизацией! 🔴\n';
+                        
+                        if (fetchResult.status === 401 || xhrResult.status === 401) {
+                            resultMessage += 'Токен не принимается сервером. Возможные причины:\n';
+                            resultMessage += '- Токен недействителен или истек срок его действия\n';
+                            resultMessage += '- Токен не передается в заголовке запроса\n';
+                            resultMessage += '- Проблема с CORS настройками для заголовка Authorization\n\n';
+                            resultMessage += 'Рекомендация: Проверьте токен и его срок действия. Проверьте сетевые запросы в инструментах разработчика (F12).';
+                        } else {
+                            resultMessage += 'Неожиданная ошибка. Проверьте ответ сервера и консоль браузера.';
+                        }
+                        
+                        showApiResponse(resultMessage, 'error');
+                    }
+                });
+            });
+            
+            // Функция для отображения ответа API
+            function showApiResponse(text, type = 'info') {
+                apiResponseDiv.innerHTML = text;
+                
+                // Удаляем все возможные классы цветов
+                apiResponseDiv.classList.remove('text-success', 'text-danger', 'text-info');
+                
+                // Добавляем соответствующий класс цвета
+                if (type === 'success') {
+                    apiResponseDiv.classList.add('text-success');
+                } else if (type === 'error') {
+                    apiResponseDiv.classList.add('text-danger');
+                } else {
+                    apiResponseDiv.classList.add('text-info');
+                }
+            }
+        });
+    </script>
+</body>
+</html> 

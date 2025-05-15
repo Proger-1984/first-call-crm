@@ -40,7 +40,7 @@ services:
     tty: true
 
   postgres:
-    image: postgres:latest
+    image: postgis/postgis:15-3.4
     container_name: slim_postgres
     restart: always
     environment:
@@ -51,6 +51,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-initdb.d:/docker-entrypoint-initdb.d
     networks:
       - slim_network
 

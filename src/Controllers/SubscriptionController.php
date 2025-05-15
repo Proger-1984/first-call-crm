@@ -42,32 +42,20 @@ class SubscriptionController
         try {
             $userId = $request->getAttribute('userId');
             
-            $subscriptions = UserSubscription::with(['tariff', 'category', 'location'])
+            $subscriptions = UserSubscription::with(['category', 'location'])
                 ->where('user_id', $userId)
                 ->where('status', 'active')
                 ->get()
                 ->map(function ($subscription) {
-                    $remainingTime = $this->subscriptionService->getRemainingTime($subscription);
                     return [
                         'id' => $subscription->id,
-                        'tariff' => [
-                            'id' => $subscription->tariff->id,
-                            'name' => $subscription->tariff->name,
-                            'code' => $subscription->tariff->code,
-                        ],
-                        'category' => [
-                            'id' => $subscription->category->id,
-                            'name' => $subscription->category->name,
-                        ],
                         'location' => [
                             'id' => $subscription->location->id,
-                            'name' => $subscription->location->getFullName(),
-                        ],
-                        'price_paid' => $subscription->price_paid,
-                        'start_date' => $subscription->start_date?->format('Y-m-d H:i:s'),
-                        'end_date' => $subscription->end_date?->format('Y-m-d H:i:s'),
-                        'status' => $subscription->status,
-                        'remaining_seconds' => $remainingTime,
+                            'name' => $subscription->location->getFullName() . ' | ' . $subscription->category->name,
+                            'center_lat' => $subscription->location->center_lat,
+                            'center_lng' => $subscription->location->center_lng,
+                            'bounds' => $subscription->location->bounds
+                        ]
                     ];
                 });
             
@@ -187,6 +175,9 @@ class SubscriptionController
                         'city' => $location->city,
                         'region' => $location->region,
                         'full_name' => $location->getFullName(),
+                        'center_lat' => $location->center_lat,
+                        'center_lng' => $location->center_lng,
+                        'bounds' => $location->bounds
                     ];
                 });
             

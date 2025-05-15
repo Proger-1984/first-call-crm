@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Class Location
@@ -19,6 +20,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property int $id
  * @property string $city
  * @property string $region
+ * @property float|null $center_lat
+ * @property float|null $center_lng
+ * @property array|null $bounds
+ * @property string|null $center_point
+ * @property string|null $bounds_polygon
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * 
@@ -33,7 +39,16 @@ class Location extends Model
 
     protected $fillable = [
         'city',
-        'region'
+        'region',
+        'center_lat',
+        'center_lng',
+        'bounds'
+    ];
+    
+    protected $casts = [
+        'bounds' => 'array',
+        'center_lat' => 'float',
+        'center_lng' => 'float'
     ];
 
     /**
@@ -58,5 +73,49 @@ class Location extends Model
     public function getFullName(): string
     {
         return "{$this->city}, {$this->region}";
+    }
+    
+    /**
+     * Проверяет, находится ли точка внутри границ локации (по грубым границам)
+     * 
+     * @param float $lat Широта
+     * @param float $lng Долгота
+     * @return bool
+     */
+    public function containsPointInBounds(float $lat, float $lng): bool
+    {
+        if (!$this->bounds) {
+            return false;
+        }
+        
+        return $lat >= $this->bounds['south'] && 
+               $lat <= $this->bounds['north'] && 
+               $lng >= $this->bounds['west'] && 
+               $lng <= $this->bounds['east'];
+    }
+    
+    /**
+     * Получает расстояние от центра локации до указанной точки (в метрах)
+     * 
+     * @param float $lat Широта
+     * @param float $lng Долгота
+     * @return float|null Расстояние в метрах или null, если центр не задан
+     */
+    public function getDistanceToPoint(float $lat, float $lng): ?float
+    {
+        if (!$this->center_point) {
+            return null;
+        }
+        
+        // Вычисляем расстояние с использованием функции ST_Distance
+        $result = DB::selectOne(
+            "SELECT ST_Distance(
+                center_point::geography, 
+                ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography
+            ) AS distance",
+            [$lng, $lat] // PostGIS порядок координат (долгота, широта)
+        );
+        
+        return $result ? (float)$result->distance : null;
     }
 } 

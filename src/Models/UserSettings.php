@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $user_id
  * @property bool $log_events
  * @property bool $auto_call
+ * @property bool $auto_call_raised
  * @property bool $telegram_notifications
  * @property Carbon $created_at
  * @method static UserSettings firstOrNew(array $data)
@@ -28,12 +29,14 @@ class UserSettings extends Model
         'user_id',
         'log_events',
         'auto_call',
+        'auto_call_raised',
         'telegram_notifications'
     ];
 
     protected $casts = [
         'log_events' => 'boolean',
         'auto_call' => 'boolean',
+        'auto_call_raised' => 'boolean',
         'telegram_notifications' => 'boolean'
     ];
 

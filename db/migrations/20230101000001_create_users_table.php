@@ -28,14 +28,21 @@ class CreateUsersTable
         });
         
         // Создаем администратора
-        Manager::table('users')->insert([
-            'name' => 'Администратор',
-            'telegram_id' => 'admin',
+        Manager::table('users')->upsert([
+            'name' => 'Sergey Sokolov',
+            'telegram_id' => '726266737',
+            'telegram_username' => 'sokolovserge',
+            'telegram_photo_url' => null,
+            'telegram_auth_date' => '1747294567',
+            'telegram_hash' => '41560c73676d1e33b7ac88afe774a701f67c1d500d5c1f4de0adc35d38b0d40b',
+            'phone' => null,
+            'phone_status' => false,
             'password_hash' => password_hash('admin', PASSWORD_DEFAULT),
             'role' => 'admin',
+            'is_trial_used' => false,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s'),
-        ]);
+        ], ['telegram_id'], ['updated_at']);
     }
 
     public function down()

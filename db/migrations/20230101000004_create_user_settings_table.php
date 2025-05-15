@@ -16,6 +16,7 @@ class CreateUserSettingsTable
             $table->integer('user_id')->unique();
             $table->boolean('log_events')->default(false);
             $table->boolean('auto_call')->default(false);
+            $table->boolean('auto_call_raised')->default(false);
             $table->boolean('telegram_notifications')->default(false);
             $table->timestamps();
             

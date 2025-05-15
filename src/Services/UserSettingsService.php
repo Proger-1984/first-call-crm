@@ -29,6 +29,7 @@ class UserSettingsService
             'user_id' => $userId,
             'log_events' => false,
             'auto_call' => false,
+            'auto_call_raised' => false,
             'telegram_notifications' => false
         ]);
         $settings->save();
@@ -78,6 +79,7 @@ class UserSettingsService
             'settings' => [
                 'log_events' => $settings->log_events,
                 'auto_call' => $settings->auto_call,
+                'auto_call_raised' => $settings->auto_call_raised,
                 'telegram_notifications' => $settings->telegram_notifications,
             ],
             'sources' => $sources,
@@ -105,6 +107,10 @@ class UserSettingsService
         
         if (isset($data['settings']['auto_call'])) {
             $settings->auto_call = (bool) $data['settings']['auto_call'];
+        }
+        
+        if (isset($data['settings']['auto_call_raised'])) {
+            $settings->auto_call_raised = (bool) $data['settings']['auto_call_raised'];
         }
         
         if (isset($data['settings']['telegram_notifications'])) {
@@ -166,6 +172,20 @@ class UserSettingsService
     {
         $settings = UserSettings::firstOrNew(['user_id' => $userId]);
         $settings->auto_call = $autoCall;
+        $settings->save();
+    }
+    
+    /**
+     * Обновляет статус автозвонка на поднятые объявления
+     * 
+     * @param int $userId ID пользователя
+     * @param bool $autoCallRaised Новый статус автозвонка на поднятые объявления
+     * @return void
+     */
+    public function updateAutoCallRaised(int $userId, bool $autoCallRaised): void
+    {
+        $settings = UserSettings::firstOrNew(['user_id' => $userId]);
+        $settings->auto_call_raised = $autoCallRaised;
         $settings->save();
     }
 } 

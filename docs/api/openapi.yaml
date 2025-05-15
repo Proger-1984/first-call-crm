@@ -190,6 +190,10 @@ components:
               type: boolean
               description: Включен ли автоматический звонок
               example: false
+            auto_call_raised:
+              type: boolean
+              description: Включен ли автоматический звонок на поднятые объявления
+              example: false
             telegram_notifications:
               type: boolean
               description: Включены ли уведомления в Telegram
@@ -263,6 +267,10 @@ components:
               type: boolean
               description: Включен ли автоматический звонок
               example: true
+            auto_call_raised:
+              type: boolean
+              description: Включен ли автоматический звонок на поднятые объявления
+              example: false
             has_active_subscription:
               type: boolean
               description: Есть ли у пользователя активная подписка (демо или премиум)
@@ -329,6 +337,10 @@ components:
           type: boolean
           description: Включен ли автоматический звонок
           example: false
+        auto_call_raised:
+          type: boolean
+          description: Включен ли автоматический звонок на поднятые объявления
+          example: false
 
     AutoCallStatus:
       type: object
@@ -339,6 +351,10 @@ components:
           type: boolean
           description: Включен ли автоматический звонок
           example: true
+        auto_call_raised:
+          type: boolean
+          description: Включен ли автоматический звонок на поднятые объявления
+          example: false
 
     LocationPolygon:
       type: object
@@ -1042,6 +1058,7 @@ paths:
                   settings:
                     log_events: false
                     auto_call: true
+                    auto_call_raised: false
                     telegram_notifications: true
                   sources:
                     - id: 1
@@ -1118,6 +1135,7 @@ paths:
               settings:
                 log_events: false
                 auto_call: false
+                auto_call_raised: false
                 telegram_notifications: false
               sources:
                 - id: 1
@@ -2371,6 +2389,7 @@ paths:
                         is_trial_used: false
                         phone_status: true
                         auto_call: true
+                        auto_call_raised: false
                         has_active_subscription: true
                         subscription_status_text: "Доступ до 31.12.2024 23:59\nОсталось 30 дней"
                 without_subscription:
@@ -2386,6 +2405,7 @@ paths:
                         is_trial_used: true
                         phone_status: false
                         auto_call: false
+                        auto_call_raised: false
                         has_active_subscription: false
                         subscription_status_text: "Нет активных подписок"
         '401':
@@ -2460,6 +2480,7 @@ paths:
                 data:
                   phone_status: true
                   auto_call: false
+                  auto_call_raised: false
         '401':
           description: Не авторизован
           content:
@@ -2507,9 +2528,11 @@ paths:
       tags:
         - Пользователь
       summary: Обновление статуса автозвонка
-      description: Обновляет настройку автоматического звонка для пользователя
+      description: >
+        Обновляет настройку автоматического звонка пользователя.
+        Требует аутентификации.
       security:
-        - BearerAuth: []
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -2520,7 +2543,7 @@ paths:
               auto_call: true
       responses:
         '200':
-          description: Статус автозвонка успешно обновлен
+          description: Успешное обновление
           content:
             application/json:
               schema:
@@ -2534,56 +2557,115 @@ paths:
                     example: success
                   message:
                     type: string
-                    example: "Статус автозвонка успешно обновлен"
+                    example: Статус автозвонка успешно обновлен
         '400':
-          description: Неверный формат запроса
+          description: Ошибка валидации
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               examples:
-                missing_field:
+                missingAutoCall:
                   value:
                     code: 400
                     status: error
                     message: "Неверный формат запроса. Отсутствует обязательное поле auto_call"
-                    error: "validation_error"
-                invalid_type:
+                invalidAutoCall:
                   value:
                     code: 400
                     status: error
                     message: "Неверный формат запроса. Поле auto_call должно быть boolean"
-                    error: "validation_error"
         '401':
           description: Не авторизован
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-              examples:
-                token_not_found:
-                  value:
-                    code: 401
-                    status: error
-                    message: "Access token not found"
-                    error: "token_not_found"
-                token_expired:
-                  value:
-                    code: 401
-                    status: error
-                    message: "Access token expired"
-                    error: "token_expired"
-        '404':
-          description: Пользователь не найден
+              example:
+                code: 401
+                status: error
+                message: Unauthorized
+        '500':
+          description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                code: 404
+                code: 500
                 status: error
-                message: "Пользователь не найден"
-                error: "not_found"
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/me/auto-call-raised:
+    put:
+      tags:
+        - Пользователь
+      summary: Обновление статуса автозвонка на поднятые объявления
+      description: >
+        Обновляет настройку автоматического звонка на поднятые объявления.
+        Требует аутентификации.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - auto_call_raised
+              properties:
+                auto_call_raised:
+                  type: boolean
+                  description: Включен ли автоматический звонок на поднятые объявления
+                  example: true
+            example:
+              auto_call_raised: true
+      responses:
+        '200':
+          description: Успешное обновление
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Статус автозвонка на поднятые объявления успешно обновлен
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingAutoCallRaised:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Неверный формат запроса. Отсутствует обязательное поле auto_call_raised"
+                invalidAutoCallRaised:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Неверный формат запроса. Поле auto_call_raised должно быть boolean"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 401
+                status: error
+                message: Unauthorized
         '500':
           description: Внутренняя ошибка сервера
           content:

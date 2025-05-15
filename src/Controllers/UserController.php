@@ -212,6 +212,7 @@ class UserController
                     'is_trial_used' => $user->is_trial_used,
                     'phone_status' => $user->phone_status,
                     'auto_call' => $user->settings ? $user->settings->auto_call : false,
+                    'auto_call_raised' => $user->settings ? $user->settings->auto_call_raised : false,
                     'has_active_subscription' => $user->hasAnyActiveSubscription(),
                     'subscription_status_text' => $subscriptionStatusText
                 ]
@@ -244,7 +245,8 @@ class UserController
             // Формируем ответ
             $responseData = [
                 'phone_status' => $user->phone_status,
-                'auto_call' => $user->settings ? $user->settings->auto_call : false
+                'auto_call' => $user->settings ? $user->settings->auto_call : false,
+                'auto_call_raised' => $user->settings ? $user->settings->auto_call_raised : false
             ];
 
             return $this->respondWithData($response, [
@@ -298,6 +300,53 @@ class UserController
                 'code' => 200,
                 'status' => 'success',
                 'message' => 'Статус автозвонка успешно обновлен',
+            ], 200);
+
+        } catch (Exception $e) {
+            return $this->respondWithError($response, $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Валидация данных автозвонка на поднятые объявления
+     * 
+     * @param array $data Данные для валидации
+     * @return string|null Сообщение с ошибкой или null если валидация прошла успешно
+     */
+    private function validateAutoCallRaisedData(array $data): string|null
+    {
+        if (!isset($data['auto_call_raised'])) {
+            return 'Отсутствует обязательное поле auto_call_raised';
+        }
+
+        if (!is_bool($data['auto_call_raised'])) {
+            return 'Поле auto_call_raised должно быть boolean';
+        }
+
+        return null;
+    }
+
+    /**
+     * Обновление статуса автозвонка на поднятые объявления
+     */
+    public function updateAutoCallRaised(Request $request, Response $response): Response
+    {
+        try {
+            $userId = $request->getAttribute('userId');
+            $data = $request->getParsedBody();
+
+            $errors = $this->validateAutoCallRaisedData($data);
+            if ($errors !== null) {
+                $message = 'Неверный формат запроса. ' . $errors;
+                return $this->respondWithError($response, $message, "validation_error", 400);
+            }
+
+            $this->userSettingsService->updateAutoCallRaised($userId, $data['auto_call_raised']);
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'message' => 'Статус автозвонка на поднятые объявления успешно обновлен',
             ], 200);
 
         } catch (Exception $e) {

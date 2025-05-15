@@ -2,6 +2,7 @@
 
 use App\Controllers\AdminSubscriptionController;
 use App\Controllers\AuthController;
+use App\Controllers\LocationPolygonController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
@@ -39,7 +40,7 @@ return function (App $app) {
                 ->add(new AuthMiddleware($container));
         });
 
-        // Маршруты конфигурации
+        /** Маршруты конфигурации */
         $group->group('/config', function (RouteCollectorProxy $group) {
             $group->get('/telegram-bot-username', [TelegramAuthController::class, 'getBotUsername']);
         });
@@ -61,16 +62,17 @@ return function (App $app) {
             $group->get('/info', [UserController::class, 'getUserInfo']);
             $group->get('/status', [UserController::class, 'getUserStatus']);
             $group->put('/auto-call', [UserController::class, 'updateAutoCall']);
+            $group->put('/auto-call-raised', [UserController::class, 'updateAutoCallRaised']);
             $group->get('/app-login', [UserController::class, 'getAppLogin']);
             $group->post('/generate-password', [UserController::class, 'generatePassword']);
         })->add(new AuthMiddleware($container));
-            
-        // Маршруты для работы с подписками
-        $group->group('/subscriptions', function (RouteCollectorProxy $group) {
-            // Создание заявки на подписку
-            $group->post('', [SubscriptionController::class, 'requestSubscription']);
 
-            // Получение списка активных подписок пользователя
+        /** Маршруты для работы с подписками
+         * Создание заявки на подписку - requestSubscription
+         * Получение списка активных подписок пользователя - getUserSubscriptions
+         */
+        $group->group('/subscriptions', function (RouteCollectorProxy $group) {
+            $group->post('', [SubscriptionController::class, 'requestSubscription']);
             $group->get('', [SubscriptionController::class, 'getUserSubscriptions']);
                 
             // Получение истории подписок пользователя
@@ -82,24 +84,42 @@ return function (App $app) {
             // Отмена подписки
             $group->delete('/{id:[0-9]+}', [SubscriptionController::class, 'cancelSubscription']);
         })->add(new AuthMiddleware($container));
+
+        /** Маршруты для работы с пользовательскими локациями
+         * Получение локаций пользователя по ID подписки - getLocationPolygonsBySubscription
+         * Создание новой локации - createLocationPolygon
+         * Обновление существующей локации - updateLocationPolygon
+         * Удаление локации - deleteLocationPolygon
+         */
+        $group->group('/location-polygons', function (RouteCollectorProxy $group) {
+            $group->get('/subscription/{subscription_id:[0-9]+}', [LocationPolygonController::class, 'getLocationPolygonsBySubscription']);
+            $group->post('', [LocationPolygonController::class, 'createLocationPolygon']);
+            $group->put('/{id:[0-9]+}', [LocationPolygonController::class, 'updateLocationPolygon']);
+            $group->delete('/{id:[0-9]+}', [LocationPolygonController::class, 'deleteLocationPolygon']);
+        })->add(new AuthMiddleware($container));
             
         // Маршруты каталога (требуют авторизации, но доступны всем пользователям)
         $group->group('/catalog', function (RouteCollectorProxy $group) {
             // Получение доступных тарифов
-           // $group->get('/tariffs', [SubscriptionController::class, 'getAvailableTariffs']);
+           $group->get('/tariffs', [SubscriptionController::class, 'getAvailableTariffs']);
                 
             // Получение доступных категорий
-          //  $group->get('/categories', [SubscriptionController::class, 'getCategories']);
+           $group->get('/categories', [SubscriptionController::class, 'getCategories']);
                 
             // Получение доступных локаций
-           // $group->get('/locations', [SubscriptionController::class, 'getLocations']);
+           $group->get('/locations', [SubscriptionController::class, 'getLocations']);
                 
             // Получение цены тарифа для локации
-          //  $group->get('/tariff-price/{tariffId:[0-9]+}/{locationId:[0-9]+}', [SubscriptionController::class, 'getTariffPrice']);
+           $group->get('/tariff-price/{tariffId:[0-9]+}/{locationId:[0-9]+}', [SubscriptionController::class, 'getTariffPrice']);
         })->add(new AuthMiddleware($container));
-            
-        // Административное API для управления подписками (проверка роли admin в контроллере)
+
+        /** Административное API для управления подписками (проверка роли admin в контроллере)
+         * Активация подписок, принимает массив ID в теле запроса - activateSubscriptions
+         */
         $group->group('/admin/subscriptions', function (RouteCollectorProxy $group) use ($container) {
+            $group->post('/activate', [AdminSubscriptionController::class, 'activateSubscriptions']);
+
+
             // Получение всех подписок
           //  $group->get('', [AdminSubscriptionController::class, 'getAllSubscriptions']);
                 
@@ -115,8 +135,7 @@ return function (App $app) {
             // Создание подписки для пользователя
           //  $group->post('', [AdminSubscriptionController::class, 'createSubscription']);
                 
-            // Активация подписок - теперь принимает массив ID в теле запроса
-            $group->post('/activate', [AdminSubscriptionController::class, 'activateSubscriptions']);
+
                 
             // Продление подписки
           //  $group->post('/{id:[0-9]+}/extend', [AdminSubscriptionController::class, 'extendSubscription']);

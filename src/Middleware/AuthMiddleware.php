@@ -65,6 +65,11 @@ class AuthMiddleware implements MiddlewareInterface
             // Добавляем ID пользователя в атрибуты запроса
             $request = $request->withAttribute('userId', $decoded->user_id);
             
+            // Добавляем роль пользователя в атрибуты запроса, если она есть в токене
+            if (isset($decoded->role)) {
+                $request = $request->withAttribute('userRole', $decoded->role);
+            }
+            
             return $handler->handle($request);
         } catch (Exception) {
             return $this->respondWithError(
