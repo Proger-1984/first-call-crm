@@ -81,6 +81,9 @@ return function (App $app) {
             // Получение конкретной подписки
             $group->get('/{id:[0-9]+}', [SubscriptionController::class, 'getSubscription']);
                 
+            // Получение доступных апгрейдов для подписки
+            $group->get('/{id:[0-9]+}/upgrades', [SubscriptionController::class, 'getAvailableUpgrades']);
+                
             // Отмена подписки
             $group->delete('/{id:[0-9]+}', [SubscriptionController::class, 'cancelSubscription']);
         })->add(new AuthMiddleware($container));
@@ -119,10 +122,12 @@ return function (App $app) {
         })->add(new AuthMiddleware($container));
 
         /** Административное API для управления подписками (проверка роли admin в контроллере)
-         * Активация подписок, принимает массив ID в теле запроса - activateSubscriptions
+         * Активация подписки администратором - activateSubscription
+         * Продление подписки - extendSubscription
          */
         $group->group('/admin/subscriptions', function (RouteCollectorProxy $group) use ($container) {
-            $group->post('/activate', [AdminSubscriptionController::class, 'activateSubscriptions']);
+            $group->post('/activate', [AdminSubscriptionController::class, 'activateSubscription']);
+            $group->post('/{id:[0-9]+}/extend', [AdminSubscriptionController::class, 'extendSubscription']);
 
 
             // Получение всех подписок
@@ -141,10 +146,6 @@ return function (App $app) {
           //  $group->post('', [AdminSubscriptionController::class, 'createSubscription']);
                 
 
-                
-            // Продление подписки
-          //  $group->post('/{id:[0-9]+}/extend', [AdminSubscriptionController::class, 'extendSubscription']);
-                
             // Отмена подписки
            // $group->delete('/{id:[0-9]+}', [AdminSubscriptionController::class, 'cancelSubscription']);
         })->add(new AuthMiddleware($container));

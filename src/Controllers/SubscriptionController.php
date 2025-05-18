@@ -11,6 +11,7 @@ use App\Models\Tariff;
 use App\Models\User;
 use App\Models\UserSubscription;
 use App\Services\SubscriptionService;
+use App\Services\TelegramService;
 use App\Traits\ResponseTrait;
 use Exception;
 use Psr\Container\ContainerExceptionInterface;
@@ -22,6 +23,7 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 class SubscriptionController
 {
     use ResponseTrait;
+    private TelegramService $telegramService;
 
     private SubscriptionService $subscriptionService;
 
@@ -32,6 +34,7 @@ class SubscriptionController
     public function __construct(ContainerInterface $container)
     {
         $this->subscriptionService = $container->get(SubscriptionService::class);
+        $this->telegramService = $container->get(TelegramService::class);
     }
     
     /**
@@ -207,8 +210,8 @@ class SubscriptionController
             return 'Отсутствует или неверный формат tariff_id';
         }
         
-        if (!isset($data['category_ids']) || !is_array($data['category_ids']) || empty($data['category_ids'])) {
-            return 'Отсутствует или неверный формат category_ids. Должен быть массив с идентификаторами категорий';
+        if (!isset($data['category_id']) || !is_numeric($data['category_id'])) {
+            return 'Отсутствует или неверный формат category_id';
         }
         
         if (!isset($data['location_id']) || !is_numeric($data['location_id'])) {
@@ -245,19 +248,14 @@ class SubscriptionController
                 return $this->respondWithError($response, 'Указанная локация не найдена', 'not_found', 404);
             }
             
-            // Проверка существования всех категорий
-            $categoryIds = array_map('intval', $data['category_ids']);
-            $existingCategories = Category::whereIn('id', $categoryIds)->pluck('id')->toArray();
-            
-            // Проверяем, что все запрошенные ID категорий действительно найдены в базе
-            $missingCategoryIds = array_diff($categoryIds, $existingCategories);
-            if (!empty($missingCategoryIds)) {
-                $message = 'Неверный формат запроса. Следующие категории не существуют: ' . implode(', ', $missingCategoryIds);
-                return $this->respondWithError($response, $message, 'validation_error', 400);
+            // Проверка существования категории
+            $categoryId = (int)$data['category_id'];
+            $category = Category::find($categoryId);
+            if (!$category) {
+                return $this->respondWithError($response, 'Указанная категория не найдена', 'not_found', 404);
             }
             
             $user = User::findOrFail($userId);
-            $subscriptions = [];
             
             // Обработка демо-тарифа
             $isDemoTariff = $tariff->isDemo();
@@ -265,66 +263,67 @@ class SubscriptionController
                 return $this->respondWithError($response, 'Вы уже использовали демо-тариф ранее', 'validation_error', 400);
             }
             
-            // Если это демо-тариф, ограничиваем до одной категории
-            if ($isDemoTariff && count($categoryIds) > 1) {
-                return $this->respondWithError($response, 'Для демо-тарифа доступна только одна категория', 'validation_error', 400);
-            }
-            
-            // Создаем подписки для всех выбранных категорий
-            foreach ($categoryIds as $categoryId) {
-                // Проверяем особый случай: платный тариф и существующая демо-подписка
-                $isDemoTariffUpgrade = false;
-                if (!$isDemoTariff) { // Если это не демо-тариф (а платный)
-                    $existingDemo = UserSubscription::where('user_id', $userId)
-                        ->where('category_id', $categoryId)
-                        ->where('location_id', (int)$data['location_id'])
-                        ->where('status', 'active')
-                        ->whereHas('tariff', function($query) {
-                            $query->where('code', 'demo');
-                        })
-                        ->first();
-                    
-                    if ($existingDemo) {
-                        // Нашли активную демо-подписку - отменяем ее перед созданием платной
-                        $existingDemo->cancel('Автоматическая отмена при переходе на платный тариф');
-                        $isDemoTariffUpgrade = true;
-                    }
+            // Проверяем особый случай: платный тариф и существующая демо-подписка
+            $isDemoTariffUpgrade = false;
+            if (!$isDemoTariff) { // Если это не демо-тариф (а платный)
+                $existingDemo = UserSubscription::where('user_id', $userId)
+                    ->where('status', 'active')
+                    ->whereHas('tariff', function($query) {
+                        $query->where('code', 'demo');
+                    })
+                    ->first();
+                
+                if ($existingDemo) {
+                    // Нашли активную демо-подписку - отменяем ее перед созданием платной
+                    $existingDemo->cancel('Автоматическая отмена при переходе на платный тариф');
+                    $isDemoTariffUpgrade = true;
                 }
+            }
 
-                // Стандартная проверка наличия активной подписки (пропускаем для случая апгрейда с демо)
-                if (!$isDemoTariffUpgrade && $user->hasActiveSubscription($categoryId, (int)$data['location_id'])) {
-                    continue; // Пропускаем, если уже есть активная подписка и это не апгрейд с демо
-                }
-                
-                // Проверяем, есть ли у пользователя подписка с таким же статусом "pending"
-                if ($user->hasPendingSubscription($categoryId, (int)$data['location_id'])) {
-                    continue; // Пропускаем, если уже есть ожидающая подписка
-                }
-                
-                $subscription = $user->requestSubscription(
-                    (int)$data['tariff_id'], 
-                    $categoryId, 
-                    (int)$data['location_id']
+            // Стандартная проверка наличия активной подписки (пропускаем для случая апгрейда с демо)
+            if (!$isDemoTariffUpgrade && $user->hasActiveSubscription($categoryId, (int)$data['location_id'])) {
+                return $this->respondWithError(
+                    $response,
+                    'У вас уже есть активная подписка для этой категории и локации. Вы можете ее продлить через раздел Биллинг, или написав в поддержку.',
+                    'subscription_exists',
+                    400
                 );
-                
-                $subscriptions[] = $subscription;
             }
             
-            // Если не создано ни одной подписки
-            if (empty($subscriptions)) {
-                return $this->respondWithError($response, 'Не удалось создать подписки. Возможно, они уже существуют', 'operation_failed', 400);
+            // Проверяем, есть ли у пользователя подписка с таким же статусом "pending"
+            if ($user->hasPendingSubscription($categoryId, (int)$data['location_id'])) {
+                return $this->respondWithError(
+                    $response,
+                    'У вас уже есть ожидающая подтверждения заявка на подписку для этой категории и локации. Напишите в поддержку для ее активации.',
+                    'pending_subscription_exists',
+                    400
+                );
             }
             
-            // Устанавливаем флаг использования демо, если это демо-тариф
+            // Создаем подписку
+            $subscription = $user->requestSubscription(
+                (int)$data['tariff_id'], 
+                $categoryId, 
+                (int)$data['location_id']
+            );
+
             if ($isDemoTariff) {
+                $this->telegramService->notifyDemoSubscriptionCreated($user, $subscription);
                 $user->is_trial_used = true;
                 $user->save();
+            } else {
+                $this->telegramService->notifyPremiumSubscriptionRequested($user, $subscription);
+                $this->telegramService->notifyAdminNewSubscriptionRequest($subscription);
             }
             
             return $this->respondWithData($response, [
                 'code' => 200,
                 'status' => 'success',
-                'message' => 'Заявки на подписку успешно созданы',
+                'message' => 'Заявка на подписку успешно создана',
+                'data' => [
+                    'subscription_id' => $subscription->id,
+                    'status' => $subscription->status
+                ]
             ], 200);
             
         } catch (Exception $e) {
@@ -568,6 +567,71 @@ class SubscriptionController
                     'locations' => $locations,
                     'tariffs' => $tariffs,
                     'tariff_prices' => $tariffPrices
+                ]
+            ], 200);
+            
+        } catch (Exception $e) {
+            return $this->respondWithError($response, $e->getMessage(), null, 500);
+        }
+    }
+    
+    /**
+     * Получение доступных вариантов апгрейда для подписки
+     */
+    public function getAvailableUpgrades(Request $request, Response $response, array $args = []): Response
+    {
+        try {
+            $userId = $request->getAttribute('userId');
+            $subscriptionId = isset($args['id']) ? (int)$args['id'] : null;
+            
+            if (!$subscriptionId) {
+                return $this->respondWithError($response, 'Не указан ID подписки', 'validation_error', 400);
+            }
+            
+            $subscription = UserSubscription::with(['tariff'])
+                ->where('id', $subscriptionId)
+                ->where('user_id', $userId)
+                ->first();
+            
+            if (!$subscription) {
+                return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404);
+            }
+            
+            // Получаем текущий тариф
+            $currentTariff = $subscription->tariff;
+            
+            // Получаем доступные апгрейды
+            $availableUpgrades = $this->subscriptionService->getAvailableUpgrades($subscription)
+                ->map(function ($tariff) use ($subscription) {
+                    $price = $this->subscriptionService->getTariffPrice($tariff->id, $subscription->location_id);
+                    return [
+                        'id' => $tariff->id,
+                        'name' => $tariff->name,
+                        'code' => $tariff->code,
+                        'duration_hours' => $tariff->duration_hours,
+                        'duration_days' => $tariff->getDurationInDays(),
+                        'price' => $price,
+                        'description' => $tariff->description,
+                    ];
+                });
+            
+            // Получаем рекомендуемый апгрейд
+            $recommendedUpgrade = $this->subscriptionService->getRecommendedUpgrade($subscription);
+            $recommendedId = $recommendedUpgrade ? $recommendedUpgrade->id : null;
+            
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'data' => [
+                    'current_tariff' => [
+                        'id' => $currentTariff->id,
+                        'name' => $currentTariff->name,
+                        'code' => $currentTariff->code,
+                        'duration_hours' => $currentTariff->duration_hours,
+                        'duration_days' => $currentTariff->getDurationInDays(),
+                    ],
+                    'available_upgrades' => $availableUpgrades,
+                    'recommended_upgrade_id' => $recommendedId
                 ]
             ], 200);
             

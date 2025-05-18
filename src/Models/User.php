@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasRelationships;
 use Illuminate\Database\Eloquent\Model;
@@ -361,29 +362,24 @@ class User extends Model
     /**
      * Создает заявку на подписку (ожидающую подтверждения администратором)
      * Для демо-тарифа подписка активируется автоматически
-     * 
+     *
      * @param int $tariffId ID тарифа
      * @param int $categoryId ID категории
      * @param int $locationId ID локации
      * @return UserSubscription Созданная подписка
+     * @throws Exception
      */
     public function requestSubscription(int $tariffId, int $categoryId, int $locationId): UserSubscription
     {
         // Получаем тариф и проверяем доступность
         $tariff = Tariff::findOrFail($tariffId);
-        
-        // Проверка для демо-тарифа - доступен только если пользователь еще не использовал демо
-        if ($tariff->isDemo() && $this->is_trial_used) {
-            throw new \Exception('Вы уже использовали демо-тариф ранее');
+
+        // Если пользователь запрашивает премиум-тариф, отмечаем демо как использованное
+        if ($tariff->isPremium() && !$this->is_trial_used) {
+            $this->is_trial_used = true;
+            $this->save();
         }
-        
-        // Проверка для демо-тарифа - только одна категория и локация
-        if ($tariff->isDemo() && $this->pendingSubscriptions()->whereHas('tariff', function($query) {
-                $query->where('code', 'demo');
-            })->exists()) {
-            throw new \Exception('Для демо-тарифа доступна только одна категория и локация');
-        }
-        
+
         // Получаем стандартную цену
         $tariffPrice = TariffPrice::where('tariff_id', $tariffId)
                                  ->where('location_id', $locationId)

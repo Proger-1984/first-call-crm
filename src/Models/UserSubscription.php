@@ -218,12 +218,12 @@ class UserSubscription extends Model
      * Активация подписки администратором
      * 
      * @param int $adminId ID администратора, подтверждающего подписку
-     * @param string|null $paymentMethod Метод оплаты
+     * @param string $paymentMethod Метод оплаты
      * @param string|null $notes Примечания администратора
      * @param int|null $durationHours Продолжительность подписки в часах (если null, берется из тарифа)
      * @return bool Результат операции
      */
-    public function activate(int $adminId, string $paymentMethod = null, string $notes = null, int $durationHours = null): bool
+    public function activate(int $adminId, string $paymentMethod, string $notes = null, int $durationHours = null): bool
     {
         if ($this->status !== 'pending' && $this->status !== 'expired') {
             return false;
@@ -243,7 +243,7 @@ class UserSubscription extends Model
         
         $result = $this->save();
         
-        // Log to history
+        // Добавляем информацию в историю
         if ($result) {
             SubscriptionHistory::create([
                 'user_id' => $this->user_id,
@@ -266,7 +266,7 @@ class UserSubscription extends Model
      * 
      * @param int $adminId ID администратора, продлевающего подписку
      * @param float|null $newPrice Новая цена подписки (если null, используется прежняя цена)
-     * @param string|null $paymentMethod Метод оплаты
+     * @param string $paymentMethod Метод оплаты
      * @param string|null $notes Примечания администратора
      * @param int|null $durationHours Продолжительность продления в часах (если null, берется из тарифа)
      * @return bool Результат операции
@@ -274,7 +274,7 @@ class UserSubscription extends Model
     public function extendByAdmin(
         int $adminId, 
         float $newPrice = null, 
-        string $paymentMethod = null, 
+        string $paymentMethod, 
         string $notes = null,
         int $durationHours = null
     ): bool {
@@ -290,7 +290,7 @@ class UserSubscription extends Model
         $this->start_date = $this->start_date ?? Carbon::now(); // Если это была pending подписка
         $this->end_date = (clone $startPoint)->addHours($durationHours);
         $this->price_paid = $newPrice;
-        $this->payment_method = $paymentMethod ?? $this->payment_method;
+        $this->payment_method = $paymentMethod;
         $this->admin_notes = $notes ? ($this->admin_notes ? $this->admin_notes . "; " . $notes : $notes) : $this->admin_notes;
         $this->approved_by = $adminId;
         $this->approved_at = Carbon::now();
@@ -344,6 +344,84 @@ class UserSubscription extends Model
                 'price_paid' => $this->price_paid,
                 'action_date' => Carbon::now(),
                 'notes' => $enabled ? 'Подписка включена пользователем' : 'Подписка временно отключена пользователем'
+            ]);
+        }
+        
+        return $result;
+    }
+
+    /**
+     * Обновляет тариф подписки с сохранением категории и локации
+     * Подходит для перехода между тарифами разной длительности
+     * 
+     * @param int $newTariffId ID нового тарифа
+     * @param int $adminId ID администратора, выполняющего операцию
+     * @param float|null $newPrice Новая цена (если null, берется из тарифа или TariffPrice)
+     * @param string|null $paymentMethod Метод оплаты
+     * @param string|null $notes Примечания
+     * @return bool Результат операции
+     */
+    public function updateTariff(int $newTariffId, int $adminId, float $newPrice = null, string $paymentMethod = null, string $notes = null): bool
+    {
+        // Проверяем существование тарифа
+        $newTariff = Tariff::findOrFail($newTariffId);
+        
+        // Получаем стандартную цену для нового тарифа
+        $tariffPrice = TariffPrice::where('tariff_id', $newTariffId)
+                              ->where('location_id', $this->location_id)
+                              ->first();
+        $price = $newPrice ?? ($tariffPrice ? $tariffPrice->price : $newTariff->price);
+        
+        // Обновляем тариф и другие поля
+        $this->tariff_id = $newTariffId;
+        $this->price_paid = $price;
+        $this->payment_method = $paymentMethod ?? $this->payment_method;
+        $this->admin_notes = $notes ? ($this->admin_notes ? $this->admin_notes . "; " . $notes : $notes) : $this->admin_notes;
+        $this->approved_by = $adminId;
+        $this->approved_at = Carbon::now();
+        
+        // Для активной подписки обновляем дату окончания
+        if ($this->status === 'active') {
+            // Если подписка уже активна, рассчитываем оставшееся время и переносим на новый тариф
+            $now = Carbon::now();
+            
+            if ($this->end_date && $this->end_date->isAfter($now)) {
+                // Остаток времени от старого тарифа в часах
+                $remainingHours = $now->diffInHours($this->end_date);
+                
+                // Если остаток времени меньше часа, считаем как 1 час
+                if ($remainingHours < 1) {
+                    $remainingHours = 1;
+                }
+                
+                // Устанавливаем новую дату окончания
+                $this->end_date = $now->copy()->addHours($newTariff->duration_hours + $remainingHours);
+            } else {
+                // Если подписка уже истекла, просто устанавливаем новую длительность
+                $this->end_date = $now->copy()->addHours($newTariff->duration_hours);
+            }
+        } else if ($this->status === 'pending' || $this->status === 'expired') {
+            // Для новой или истекшей подписки активируем её
+            $this->status = 'active';
+            $this->start_date = Carbon::now();
+            $this->end_date = Carbon::now()->addHours($newTariff->duration_hours);
+            $this->is_enabled = true;
+        }
+        
+        $result = $this->save();
+        
+        // Логируем операцию в историю
+        if ($result) {
+            SubscriptionHistory::create([
+                'user_id' => $this->user_id,
+                'subscription_id' => $this->id,
+                'action' => 'tariff_changed',
+                'tariff_name' => $newTariff->name,
+                'category_name' => $this->category->name,
+                'location_name' => $this->location->getFullName(),
+                'price_paid' => $price,
+                'action_date' => Carbon::now(),
+                'notes' => "Тариф изменен админинистратором на {$newTariff->name}. " . ($notes ? "Примечание: $notes" : "")
             ]);
         }
         

@@ -308,19 +308,17 @@ components:
       type: object
       required:
         - tariff_id
-        - category_ids
+        - category_id
         - location_id
       properties:
         tariff_id:
           type: integer
           description: ID тарифа
           example: 1
-        category_ids:
-          type: array
-          description: Массив ID категорий
-          items:
-            type: integer
-          example: [1, 2]
+        category_id:
+          type: integer
+          description: ID категории (можно выбрать только одну категорию)
+          example: 1
         location_id:
           type: integer
           description: ID локации
@@ -1323,158 +1321,6 @@ paths:
                 message: "Внутренняя ошибка сервера"
                 error: "internal_error"
 
-  /api/v1/admin/subscriptions/activate:
-    post:
-      summary: Массовая активация подписок (Admin)
-      description: |
-        Активирует несколько подписок одновременно.
-        
-        Этот метод доступен только для администраторов.
-        Позволяет активировать несколько подписок за один запрос.
-        
-        В случае успешной активации всех подписок возвращается код 200.
-        Если некоторые подписки были активированы успешно, а некоторые с ошибками,
-        возвращается код 207 (Multi-Status) с детальной информацией о результатах.
-        Если ни одна подписка не была активирована, возвращается код 400.
-      tags:
-        - Администрирование
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - subscription_ids
-                - payment_method
-              properties:
-                subscription_ids:
-                  type: array
-                  description: Массив ID подписок для активации
-                  items:
-                    type: integer
-                  example: [1, 2, 3]
-                payment_method:
-                  type: string
-                  description: Метод оплаты
-                  example: "cash"
-                notes:
-                  type: string
-                  description: Дополнительные заметки
-                  example: "Оплата наличными"
-                duration_hours:
-                  type: integer
-                  description: Продолжительность подписки в часах
-                  example: 720
-      responses:
-        '200':
-          description: Все подписки успешно активированы
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    example: 200
-                  status:
-                    type: string
-                    example: success
-                  message:
-                    type: string
-                    example: Все подписки успешно активированы
-                  data:
-                    type: object
-                    properties:
-                      activated_subscriptions:
-                        type: array
-                        items:
-                          type: object
-        '207':
-          description: Некоторые подписки активированы успешно, некоторые с ошибками
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    example: 207
-                  status:
-                    type: string
-                    example: partial_success
-                  message:
-                    type: string
-                    example: Некоторые подписки активированы успешно, некоторые с ошибками
-        '400':
-          description: Неверный формат запроса или ни одна подписка не была активирована
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                validation_error:
-                  value:
-                    code: 400
-                    status: error
-                    message: Отсутствует или неверный формат subscription_ids
-                    error: validation_error
-                payment_method_missing:
-                  value:
-                    code: 400
-                    status: error
-                    message: Отсутствует обязательное поле payment_method
-                    error: validation_error
-        '401':
-          description: Токен отсутствует или недействителен
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                token_not_found:
-                  value:
-                    code: 401
-                    status: error
-                    message: "Access token not found"
-                    error: "token_not_found"
-                token_expired:
-                  value:
-                    code: 401
-                    status: error
-                    message: "Access token expired"
-                    error: "token_expired"
-        '403':
-          description: Доступ запрещен (не администратор)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                code: 403
-                status: error
-                message: У вас нет доступа к этому ресурсу
-                error: access_denied
-        '404':
-          description: Запрашиваемые подписки не найдены
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                code: 404
-                status: error
-                message: Некоторые подписки не найдены
-                error: not_found
-        '500':
-          description: Внутренняя ошибка сервера
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
   /api/v1/subscriptions:
     get:
       tags:
@@ -1619,9 +1465,9 @@ paths:
       description: |
         Создает заявку на подписку для пользователя.
         
-        Пользователь может создать несколько подписок для разных категорий одновременно.
-        Для демо-тарифа доступна только одна категория. При выборе платного тарифа
-        и наличии активной демо-подписки, демо-подписка автоматически отменяется.
+        Для каждой подписки пользователь может выбрать только одну категорию.
+        При выборе платного тарифа и наличии активной демо-подписки,
+        демо-подписка автоматически отменяется.
         
         Требуется аутентификация с помощью JWT токена.
       tags:
@@ -1635,17 +1481,11 @@ paths:
             schema:
               $ref: '#/components/schemas/SubscriptionRequest'
             examples:
-              singleCategory:
-                summary: Запрос с одной категорией
+              subscriptionRequest:
+                summary: Запрос на подписку
                 value:
                   tariff_id: 1
-                  category_ids: [1]
-                  location_id: 1
-              multipleCategories:
-                summary: Запрос с несколькими категориями
-                value:
-                  tariff_id: 2
-                  category_ids: [1, 2]
+                  category_id: 1
                   location_id: 1
       responses:
         '200':
@@ -1680,11 +1520,11 @@ paths:
                     status: error
                     message: "Неверный формат запроса. Отсутствует или неверный формат tariff_id"
                     error: "validation_error"
-                demo_limit:
+                invalid_category:
                   value:
                     code: 400
                     status: error
-                    message: "Для демо-тарифа доступна только одна категория"
+                    message: "Неверный формат запроса. Отсутствует или неверный формат category_id"
                     error: "validation_error"
                 already_used_trial:
                   value:
@@ -3105,4 +2945,503 @@ paths:
                 code: 500
                 status: error
                 message: Внутренняя ошибка сервера
-                error: internal_error 
+                error: internal_error
+
+  /api/v1/admin/subscriptions/activate:
+    post:
+      tags:
+        - Администрирование
+      summary: Активация подписки
+      description: |
+        Активирует подписку со статусом pending.
+        
+        Только для администраторов. После активации пользователь получает доступ
+        к функциям системы в соответствии с выбранным тарифом.
+        
+        Если пользователь имеет активные демо-подписки, они будут автоматически отменены.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subscription_id
+                - payment_method
+              properties:
+                subscription_id:
+                  type: integer
+                  description: ID подписки для активации
+                  example: 5
+                payment_method:
+                  type: string
+                  description: Метод оплаты
+                  example: "card"
+                notes:
+                  type: string
+                  description: Примечания к активации
+                  example: "Подтверждено по чеку #12345"
+                duration_hours:
+                  type: integer
+                  description: Продолжительность подписки в часах (если не указано, берется из тарифа)
+                  example: 720
+            example:
+              subscription_id: 5
+              payment_method: "card"
+              notes: "Подтверждено по чеку #12345"
+              duration_hours: 720
+      responses:
+        '200':
+          description: Подписка успешно активирована
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  message:
+                    type: string
+                    description: Сообщение об успешной активации
+                    example: "Подписка успешно активирована"
+                  data:
+                    type: object
+                    properties:
+                      activated_subscription:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            description: ID подписки
+                            example: 12
+                          start_date:
+                            type: string
+                            description: Дата и время начала подписки
+                            example: "2025-05-18 18:19:00"
+                          end_date:
+                            type: string
+                            description: Дата и время окончания подписки
+                            example: "2025-05-19 18:19:00"
+              example:
+                code: 200
+                status: success
+                message: "Подписка успешно активирована"
+                data:
+                  activated_subscription:
+                    id: 12
+                    start_date: "2025-05-18 18:19:00"
+                    end_date: "2025-05-19 18:19:00"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: error
+                message: "Не указан ID подписки"
+                error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 401
+                status: error
+                message: "Access token expired"
+                error: "token_expired"
+        '403':
+          description: Доступ запрещен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: error
+                message: "Недостаточно прав для выполнения операции"
+                error: "forbidden"
+        '404':
+          description: Подписка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Подписка не найдена"
+                error: "not_found"
+        '422':
+          description: Ошибка обработки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 422
+                status: error
+                message: "Невозможно активировать подписку, она уже активна"
+                error: "validation_error"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/admin/subscriptions/extend:
+    post:
+      tags:
+        - Администрирование
+      summary: Продление подписки
+      description: |
+        Продлевает активную или истекшую подписку на указанное количество дней.
+        
+        Только для администраторов. После продления дата окончания подписки 
+        увеличивается на указанное количество дней от текущей даты окончания,
+        если подписка активна. Если подписка истекла, продление считается от текущей даты.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subscription_id
+                - days
+              properties:
+                subscription_id:
+                  type: integer
+                  description: ID подписки для продления
+                  example: 5
+                days:
+                  type: integer
+                  description: Количество дней, на которое необходимо продлить подписку
+                  example: 30
+                notes:
+                  type: string
+                  description: Примечание к продлению подписки
+                  example: "Продление по запросу клиента"
+            example:
+              subscription_id: 5
+              days: 30
+              notes: "Продление по запросу клиента"
+      responses:
+        '200':
+          description: Подписка успешно продлена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  message:
+                    type: string
+                    description: Сообщение об успешном продлении
+                    example: "Подписка успешно продлена"
+                  data:
+                    type: object
+                    properties:
+                      subscription:
+                        $ref: '#/components/schemas/Subscription'
+                      old_end_date:
+                        type: string
+                        format: date-time
+                        description: Предыдущая дата окончания подписки
+                        example: "2023-11-20T12:00:00Z"
+              example:
+                code: 200
+                status: success
+                message: "Подписка успешно продлена"
+                data:
+                  subscription:
+                    id: 5
+                    user_id: 123
+                    is_active: true
+                    start_date: "2023-10-20T12:00:00Z"
+                    end_date: "2023-12-20T12:00:00Z"
+                    location:
+                      id: 1
+                      name: "Москва, Московская область"
+                      center_lat: 55.7522
+                      center_lng: 37.6156
+                      bounds:
+                        north: 56.0221
+                        south: 55.4915
+                        east: 38.1774
+                        west: 36.8034
+                    category:
+                      id: 1
+                      name: "Аренда. Жилая"
+                  old_end_date: "2023-11-20T12:00:00Z"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_subscription_id:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указан ID подписки"
+                    error: "validation_error"
+                missing_days:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указано количество дней для продления"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 401
+                status: error
+                message: "Access token expired"
+                error: "token_expired"
+        '403':
+          description: Доступ запрещен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: error
+                message: "Недостаточно прав для выполнения операции"
+                error: "forbidden"
+        '404':
+          description: Подписка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Подписка не найдена"
+                error: "not_found"
+        '422':
+          description: Ошибка обработки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 422
+                status: error
+                message: "Невозможно продлить подписку, она была отменена"
+                error: "validation_error"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/admin/subscriptions/{id}/extend:
+    post:
+      tags:
+        - Администрирование
+      summary: Продление подписки
+      description: |
+        Продлевает активную или истекшую подписку на указанное количество часов.
+        
+        Только для администраторов. После продления дата окончания подписки 
+        увеличивается на указанное количество часов от текущей даты окончания,
+        если подписка активна. Если подписка истекла, продление считается от текущей даты.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID подписки для продления
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - payment_method
+              properties:
+                payment_method:
+                  type: string
+                  description: Метод оплаты
+                  example: "card"
+                duration_hours:
+                  type: integer
+                  description: Количество часов, на которое необходимо продлить подписку (если не указано, берется из тарифа)
+                  example: 720
+                notes:
+                  type: string
+                  description: Примечание к продлению подписки
+                  example: "Продление по запросу клиента"
+                price:
+                  type: number
+                  description: Новая цена подписки (если не указано, используется прежняя цена)
+                  example: 5000
+            example:
+              payment_method: "card"
+              duration_hours: 720
+              notes: "Продление по запросу клиента"
+      responses:
+        '200':
+          description: Подписка успешно продлена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: HTTP код ответа
+                    example: 200
+                  status:
+                    type: string
+                    description: Статус ответа
+                    example: success
+                  message:
+                    type: string
+                    description: Сообщение об успешном продлении
+                    example: "Подписка успешно продлена"
+                  data:
+                    type: object
+                    properties:
+                      subscription:
+                        $ref: '#/components/schemas/Subscription'
+                      old_end_date:
+                        type: string
+                        format: date-time
+                        description: Предыдущая дата окончания подписки
+                        example: "2023-11-20T12:00:00Z"
+              example:
+                code: 200
+                status: success
+                message: "Подписка успешно продлена"
+                data:
+                  subscription:
+                    id: 5
+                    user_id: 123
+                    is_active: true
+                    start_date: "2023-10-20T12:00:00Z"
+                    end_date: "2023-12-20T12:00:00Z"
+                    location:
+                      id: 1
+                      name: "Москва, Московская область"
+                      center_lat: 55.7522
+                      center_lng: 37.6156
+                      bounds:
+                        north: 56.0221
+                        south: 55.4915
+                        east: 38.1774
+                        west: 36.8034
+                    category:
+                      id: 1
+                      name: "Аренда. Жилая"
+                  old_end_date: "2023-11-20T12:00:00Z"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: error
+                message: "Не указан ID подписки"
+                error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 401
+                status: error
+                message: "Access token expired"
+                error: "token_expired"
+        '403':
+          description: Доступ запрещен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: error
+                message: "Недостаточно прав для выполнения операции"
+                error: "forbidden"
+        '404':
+          description: Подписка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Подписка не найдена"
+                error: "not_found"
+        '422':
+          description: Ошибка обработки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 422
+                status: error
+                message: "Невозможно продлить подписку, она была отменена"
+                error: "validation_error"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error" 

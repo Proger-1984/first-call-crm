@@ -4,16 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Models\UserSubscription;
 use App\Models\Tariff;
-use App\Models\Category;
-use App\Models\Location;
 use App\Models\TariffPrice;
 use Carbon\Carbon;
 use Psr\Container\ContainerInterface;
-use Illuminate\Database\Capsule\Manager;
-use RuntimeException;
+use Illuminate\Database\Eloquent\Collection;
 
 class SubscriptionService
 {
@@ -22,63 +18,6 @@ class SubscriptionService
     public function __construct(ContainerInterface $container)
     {
         $this->container = $container;
-    }
-
-    /**
-     * Создает демо-подписку для нового пользователя
-     * 
-     * @param User $user Пользователь
-     * @param int|null $categoryId ID категории (если null, будет использована первая доступная)
-     * @param int|null $locationId ID локации (если null, будет использована первая доступная)
-     * @return UserSubscription Созданная подписка
-     * @throws RuntimeException Если не найден демо-тариф, категория или локация
-     */
-    public function createDemoSubscription(User $user, ?int $categoryId = null, ?int $locationId = null): UserSubscription
-    {
-        // Получаем демо-тариф
-        $demoTariff = Tariff::where('code', 'demo')->where('is_active', true)->first();
-        if (!$demoTariff) {
-            throw new RuntimeException('Демо-тариф не найден');
-        }
-        
-        // Если категория не указана, берем первую доступную
-        if ($categoryId === null) {
-            $category = Category::first();
-            if (!$category) {
-                throw new RuntimeException('Категории не найдены');
-            }
-            $categoryId = $category->id;
-        }
-        
-        // Если локация не указана, берем первую доступную
-        if ($locationId === null) {
-            $location = Location::first();
-            if (!$location) {
-                throw new RuntimeException('Локации не найдены');
-            }
-            $locationId = $location->id;
-        }
-        
-        // Проверяем, что пользователь еще не использовал демо-тариф
-        if ($user->hasUsedTrial()) {
-            throw new RuntimeException('Пользователь уже использовал демо-тариф');
-        }
-        
-        // Создаем демо-подписку
-        return $user->requestSubscription($demoTariff->id, $categoryId, $locationId);
-    }
-    
-    /**
-     * Проверяет, есть ли у пользователя активная подписка для указанной категории и локации
-     * 
-     * @param User $user Пользователь
-     * @param int $categoryId ID категории
-     * @param int $locationId ID локации
-     * @return bool Результат проверки
-     */
-    public function checkAccess(User $user, int $categoryId, int $locationId): bool
-    {
-        return $user->hasActiveSubscription($categoryId, $locationId);
     }
     
     /**
@@ -124,13 +63,13 @@ class SubscriptionService
     /**
      * Получает список подписок, ожидающих подтверждения администратором
      * 
-     * @return \Illuminate\Database\Eloquent\Collection Список подписок
+     * @return Collection Список подписок
      */
-    public function getPendingSubscriptions()
+    public function getPendingSubscriptions(): Collection
     {
         return UserSubscription::with(['user', 'tariff', 'category', 'location'])
             ->where('status', 'pending')
-            ->orderBy('created_at', 'asc')
+            ->orderBy('created_at')
             ->get();
     }
     
@@ -138,9 +77,9 @@ class SubscriptionService
      * Получает список подписок, срок действия которых скоро истечет
      * 
      * @param int $daysThreshold Порог в днях
-     * @return \Illuminate\Database\Eloquent\Collection Список подписок
+     * @return Collection Список подписок
      */
-    public function getSoonExpiringSubscriptions(int $daysThreshold = 3)
+    public function getSoonExpiringSubscriptions(int $daysThreshold = 3): Collection
     {
         $thresholdDate = Carbon::now()->addDays($daysThreshold);
         
@@ -148,16 +87,16 @@ class SubscriptionService
             ->where('status', 'active')
             ->where('end_date', '>', Carbon::now())
             ->where('end_date', '<', $thresholdDate)
-            ->orderBy('end_date', 'asc')
+            ->orderBy('end_date')
             ->get();
     }
     
     /**
      * Получает все активные тарифы
      * 
-     * @return \Illuminate\Database\Eloquent\Collection Список тарифов
+     * @return Collection Список тарифов
      */
-    public function getActiveTariffs()
+    public function getActiveTariffs(): Collection
     {
         return Tariff::where('is_active', true)->get();
     }
@@ -182,5 +121,74 @@ class SubscriptionService
         // Если цена для локации не найдена, берем стандартную цену из тарифа
         $tariff = Tariff::find($tariffId);
         return $tariff ? (float)$tariff->price : null;
+    }
+
+    /**
+     * Получает рекомендуемый тариф для апгрейда текущей подписки
+     * 
+     * @param UserSubscription $subscription Текущая подписка
+     * @return Tariff|null Рекомендуемый тариф или null, если нет подходящих рекомендаций
+     */
+    public function getRecommendedUpgrade(UserSubscription $subscription): ?Tariff
+    {
+        $currentTariff = $subscription->tariff;
+        
+        // Для демо-тарифа рекомендуем Премиум 1
+        if ($currentTariff->isDemo()) {
+            return Tariff::where('code', 'premium_1')
+                    ->where('is_active', true)
+                    ->first();
+        }
+        
+        // Для премиум-тарифа рекомендуем следующий уровень
+        if ($currentTariff->isPremium()) {
+            $currentDuration = $currentTariff->getPremiumDuration();
+            $nextLevels = [
+                1 => 7,
+                7 => 30
+            ];
+            
+            if (isset($nextLevels[$currentDuration])) {
+                return Tariff::where('code', 'premium_' . $nextLevels[$currentDuration])
+                        ->where('is_active', true)
+                        ->first();
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Получает список доступных апгрейдов для подписки
+     * 
+     * @param UserSubscription $subscription Текущая подписка
+     * @return Collection Коллекция доступных тарифов для апгрейда
+     */
+    public function getAvailableUpgrades(UserSubscription $subscription): Collection
+    {
+        $currentTariff = $subscription->tariff;
+        
+        // Для демо-тарифа предлагаем все премиум-тарифы
+        if ($currentTariff->isDemo()) {
+            return Tariff::where('is_active', true)
+                    ->where('code', 'like', 'premium_%')
+                    ->orderBy('duration_hours')
+                    ->get();
+        }
+        
+        // Для премиум-тарифа предлагаем тарифы с большей длительностью
+        if ($currentTariff->isPremium()) {
+            $currentDuration = $currentTariff->getPremiumDuration();
+            
+            return Tariff::where('is_active', true)
+                    ->where('code', 'like', 'premium_%')
+                    ->get()
+                    ->filter(function ($tariff) use ($currentDuration) {
+                        return $tariff->getPremiumDuration() > $currentDuration;
+                    })
+                    ->values();
+        }
+        
+        return collect();
     }
 } 

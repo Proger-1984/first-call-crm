@@ -65,11 +65,31 @@ class Tariff extends Model
     }
 
     /**
-     * Проверяет, является ли тариф премиум
+     * Проверяет, является ли тариф премиум (любой длительности)
      */
     public function isPremium(): bool
     {
-        return $this->code === 'premium';
+        return str_starts_with($this->code, 'premium_');
+    }
+
+    /**
+     * Получает длительность премиум-тарифа в днях
+     */
+    public function getPremiumDuration(): ?int
+    {
+        if (!$this->isPremium()) {
+            return null;
+        }
+        
+        return (int)str_replace('premium_', '', $this->code);
+    }
+
+    /**
+     * Получает базовый тип тарифа (demo или premium)
+     */
+    public function getBaseType(): string
+    {
+        return $this->isDemo() ? 'demo' : 'premium';
     }
 
     /**
@@ -78,5 +98,21 @@ class Tariff extends Model
     public function getExpirationDate(): Carbon
     {
         return Carbon::now()->addHours($this->duration_hours);
+    }
+
+    /**
+     * Получает длительность тарифа в днях
+     */
+    public function getDurationInDays(): float
+    {
+        return $this->duration_hours / 24.0;
+    }
+
+    /**
+     * Проверяет, является ли тариф премиум определенной длительности
+     */
+    public function isPremiumOfDuration(int $days): bool
+    {
+        return $this->isPremium() && $this->code === "premium_{$days}";
     }
 } 
