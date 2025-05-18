@@ -61,19 +61,6 @@ class SubscriptionService
     }
     
     /**
-     * Получает список подписок, ожидающих подтверждения администратором
-     * 
-     * @return Collection Список подписок
-     */
-    public function getPendingSubscriptions(): Collection
-    {
-        return UserSubscription::with(['user', 'tariff', 'category', 'location'])
-            ->where('status', 'pending')
-            ->orderBy('created_at')
-            ->get();
-    }
-    
-    /**
      * Получает список подписок, срок действия которых скоро истечет
      * 
      * @param int $daysThreshold Порог в днях
@@ -156,39 +143,5 @@ class SubscriptionService
         }
         
         return null;
-    }
-    
-    /**
-     * Получает список доступных апгрейдов для подписки
-     * 
-     * @param UserSubscription $subscription Текущая подписка
-     * @return Collection Коллекция доступных тарифов для апгрейда
-     */
-    public function getAvailableUpgrades(UserSubscription $subscription): Collection
-    {
-        $currentTariff = $subscription->tariff;
-        
-        // Для демо-тарифа предлагаем все премиум-тарифы
-        if ($currentTariff->isDemo()) {
-            return Tariff::where('is_active', true)
-                    ->where('code', 'like', 'premium_%')
-                    ->orderBy('duration_hours')
-                    ->get();
-        }
-        
-        // Для премиум-тарифа предлагаем тарифы с большей длительностью
-        if ($currentTariff->isPremium()) {
-            $currentDuration = $currentTariff->getPremiumDuration();
-            
-            return Tariff::where('is_active', true)
-                    ->where('code', 'like', 'premium_%')
-                    ->get()
-                    ->filter(function ($tariff) use ($currentDuration) {
-                        return $tariff->getPremiumDuration() > $currentDuration;
-                    })
-                    ->values();
-        }
-        
-        return collect();
     }
 } 

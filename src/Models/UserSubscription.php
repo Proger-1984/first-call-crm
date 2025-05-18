@@ -190,25 +190,24 @@ class UserSubscription extends Model
     public function cancel(string $reason = null): bool
     {
         if ($this->status === 'active' || $this->status === 'pending') {
+            // Сначала создаем запись в истории перед изменением статуса
+            $history = SubscriptionHistory::create([
+                'user_id' => $this->user_id,
+                'subscription_id' => $this->id,
+                'action' => 'cancelled',
+                'tariff_name' => $this->tariff->name,
+                'category_name' => $this->category->name,
+                'location_name' => $this->location->getFullName(),
+                'price_paid' => $this->price_paid,
+                'action_date' => Carbon::now(),
+                'notes' => $reason ?? 'Подписка отменена пользователем или администратором'
+            ]);
+            
+            // Затем меняем статус и сохраняем
             $this->status = 'cancelled';
             $result = $this->save();
             
-            // Log to history
-            if ($result) {
-                SubscriptionHistory::create([
-                    'user_id' => $this->user_id,
-                    'subscription_id' => $this->id,
-                    'action' => 'cancelled',
-                    'tariff_name' => $this->tariff->name,
-                    'category_name' => $this->category->name,
-                    'location_name' => $this->location->getFullName(),
-                    'price_paid' => $this->price_paid,
-                    'action_date' => Carbon::now(),
-                    'notes' => $reason ?? 'Подписка отменена пользователем или администратором'
-                ]);
-            }
-            
-            return $result;
+            return $result && $history !== null;
         }
         
         return false;

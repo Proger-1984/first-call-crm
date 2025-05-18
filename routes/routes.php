@@ -9,8 +9,6 @@ use App\Controllers\UserController;
 use App\Middleware\AuthMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
-use Psr\Http\Message\ServerRequestInterface as Request;
-use Psr\Http\Message\ResponseInterface as Response;
 
 return function (App $app) {
     // Получаем контейнер для передачи в AuthMiddleware
@@ -70,22 +68,12 @@ return function (App $app) {
         /** Маршруты для работы с подписками
          * Создание заявки на подписку - requestSubscription
          * Получение списка активных подписок пользователя - getUserSubscriptions
+         * Создание заявки на продление подписки - createExtendRequest
          */
         $group->group('/subscriptions', function (RouteCollectorProxy $group) {
             $group->post('', [SubscriptionController::class, 'requestSubscription']);
             $group->get('', [SubscriptionController::class, 'getUserSubscriptions']);
-                
-            // Получение истории подписок пользователя
-            $group->get('/history', [SubscriptionController::class, 'getSubscriptionHistory']);
-                
-            // Получение конкретной подписки
-            $group->get('/{id:[0-9]+}', [SubscriptionController::class, 'getSubscription']);
-                
-            // Получение доступных апгрейдов для подписки
-            $group->get('/{id:[0-9]+}/upgrades', [SubscriptionController::class, 'getAvailableUpgrades']);
-                
-            // Отмена подписки
-            $group->delete('/{id:[0-9]+}', [SubscriptionController::class, 'cancelSubscription']);
+            $group->post('/extend-request', [SubscriptionController::class, 'createExtendRequest']);
         })->add(new AuthMiddleware($container));
 
         /** Маршруты для работы с пользовательскими локациями
@@ -124,30 +112,12 @@ return function (App $app) {
         /** Административное API для управления подписками (проверка роли admin в контроллере)
          * Активация подписки администратором - activateSubscription
          * Продление подписки - extendSubscription
+         * Отмена подписки - cancelSubscription
          */
         $group->group('/admin/subscriptions', function (RouteCollectorProxy $group) use ($container) {
             $group->post('/activate', [AdminSubscriptionController::class, 'activateSubscription']);
-            $group->post('/{id:[0-9]+}/extend', [AdminSubscriptionController::class, 'extendSubscription']);
-
-
-            // Получение всех подписок
-          //  $group->get('', [AdminSubscriptionController::class, 'getAllSubscriptions']);
-                
-            // Получение всех ожидающих подтверждения подписок
-          //  $group->get('/pending', [AdminSubscriptionController::class, 'getPendingSubscriptions']);
-                
-            // Получение всей истории подписок
-          //  $group->get('/history', [AdminSubscriptionController::class, 'getAllSubscriptionHistory']);
-                
-            // Получение подписок конкретного пользователя
-           // $group->get('/user/{userId:[0-9]+}', [AdminSubscriptionController::class, 'getUserSubscriptions']);
-                
-            // Создание подписки для пользователя
-          //  $group->post('', [AdminSubscriptionController::class, 'createSubscription']);
-                
-
-            // Отмена подписки
-           // $group->delete('/{id:[0-9]+}', [AdminSubscriptionController::class, 'cancelSubscription']);
+            $group->post('/extend', [AdminSubscriptionController::class, 'extendSubscription']);
+            $group->post('/cancel', [AdminSubscriptionController::class, 'cancelSubscription']);
         })->add(new AuthMiddleware($container));
 
     });

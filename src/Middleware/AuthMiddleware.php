@@ -89,7 +89,7 @@ class AuthMiddleware implements MiddlewareInterface
             return null;
         }
         
-        if (strpos($authHeader, 'Bearer ') === 0) {
+        if (str_starts_with($authHeader, 'Bearer ')) {
             return substr($authHeader, 7);
         }
         

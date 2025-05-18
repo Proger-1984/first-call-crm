@@ -19,6 +19,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use Carbon\Carbon;
 
 class SubscriptionController
 {
@@ -74,45 +75,7 @@ class SubscriptionController
             return $this->respondWithError($response, $e->getMessage(), null, 500);
         }
     }
-    
-    /**
-     * Получение истории подписок пользователя
-     */
-    public function getSubscriptionHistory(Request $request, Response $response): Response
-    {
-        try {
-            $userId = $request->getAttribute('userId');
-            
-            $history = SubscriptionHistory::where('user_id', $userId)
-                ->orderBy('action_date', 'desc')
-                ->get()
-                ->map(function ($record) {
-                    return [
-                        'id' => $record->id,
-                        'subscription_id' => $record->subscription_id,
-                        'action' => $record->action,
-                        'tariff_name' => $record->tariff_name,
-                        'category_name' => $record->category_name,
-                        'location_name' => $record->location_name,
-                        'price_paid' => $record->price_paid,
-                        'action_date' => $record->action_date->format('Y-m-d H:i:s'),
-                        'notes' => $record->notes,
-                    ];
-                });
-            
-            return $this->respondWithData($response, [
-                'code' => 200,
-                'status' => 'success',
-                'data' => [
-                    'history' => $history,
-                ]
-            ], 200);
-            
-        } catch (Exception $e) {
-            return $this->respondWithError($response, $e->getMessage(), null, 500);
-        }
-    }
-    
+
     /**
      * Получение доступных тарифов
      */
@@ -332,66 +295,6 @@ class SubscriptionController
     }
     
     /**
-     * Получение конкретной подписки
-     */
-    public function getSubscription(Request $request, Response $response, array $args = []): Response
-    {
-        try {
-            $userId = $request->getAttribute('userId');
-            $subscriptionId = isset($args['id']) ? (int)$args['id'] : null;
-            
-            if (!$subscriptionId) {
-                return $this->respondWithError($response, 'Не указан ID подписки', 'validation_error', 400);
-            }
-            
-            $subscription = UserSubscription::with(['tariff', 'category', 'location'])
-                ->where('id', $subscriptionId)
-                ->where('user_id', $userId)
-                ->first();
-            
-            if (!$subscription) {
-                return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404);
-            }
-            
-            $remainingTime = $this->subscriptionService->getRemainingTime($subscription);
-            
-            $subscriptionData = [
-                'id' => $subscription->id,
-                'tariff' => [
-                    'id' => $subscription->tariff->id,
-                    'name' => $subscription->tariff->name,
-                    'code' => $subscription->tariff->code,
-                ],
-                'category' => [
-                    'id' => $subscription->category->id,
-                    'name' => $subscription->category->name,
-                ],
-                'location' => [
-                    'id' => $subscription->location->id,
-                    'name' => $subscription->location->getFullName(),
-                ],
-                'price_paid' => $subscription->price_paid,
-                'start_date' => $subscription->start_date?->format('Y-m-d H:i:s'),
-                'end_date' => $subscription->end_date?->format('Y-m-d H:i:s'),
-                'status' => $subscription->status,
-                'payment_method' => $subscription->payment_method,
-                'remaining_seconds' => $remainingTime,
-            ];
-            
-            return $this->respondWithData($response, [
-                'code' => 200,
-                'status' => 'success',
-                'data' => [
-                    'subscription' => $subscriptionData,
-                ]
-            ], 200);
-            
-        } catch (Exception $e) {
-            return $this->respondWithError($response, $e->getMessage(), null, 500);
-        }
-    }
-    
-    /**
      * Получение цены тарифа для локации
      */
     public function getTariffPrice(Request $request, Response $response, array $args = []): Response
@@ -422,48 +325,7 @@ class SubscriptionController
             return $this->respondWithError($response, $e->getMessage(), null, 500);
         }
     }
-    
-    /**
-     * Отмена подписки
-     */
-    public function cancelSubscription(Request $request, Response $response, array $args = []): Response
-    {
-        try {
-            $userId = $request->getAttribute('userId');
-            $subscriptionId = isset($args['id']) ? (int)$args['id'] : null;
-            
-            if (!$subscriptionId) {
-                return $this->respondWithError($response, 'Не указан ID подписки', 'validation_error', 400);
-            }
-            
-            $subscription = UserSubscription::where('id', $subscriptionId)
-                ->where('user_id', $userId)
-                ->first();
-            
-            if (!$subscription) {
-                return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404);
-            }
-            
-            $data = $request->getParsedBody();
-            $reason = $data['reason'] ?? 'Отменено пользователем';
-            
-            $result = $subscription->cancel($reason);
-            
-            if (!$result) {
-                return $this->respondWithError($response, 'Не удалось отменить подписку', 'operation_failed', 400);
-            }
-            
-            return $this->respondWithData($response, [
-                'code' => 200,
-                'status' => 'success',
-                'message' => 'Подписка успешно отменена',
-            ], 200);
-            
-        } catch (Exception $e) {
-            return $this->respondWithError($response, $e->getMessage(), null, 500);
-        }
-    }
-    
+
     /**
      * Временное включение/отключение подписки пользователем
      */
@@ -574,69 +436,83 @@ class SubscriptionController
             return $this->respondWithError($response, $e->getMessage(), null, 500);
         }
     }
-    
+
     /**
-     * Получение доступных вариантов апгрейда для подписки
+     * Создание заявки на продление подписки
      */
-    public function getAvailableUpgrades(Request $request, Response $response, array $args = []): Response
+    public function createExtendRequest(Request $request, Response $response): Response
     {
         try {
             $userId = $request->getAttribute('userId');
-            $subscriptionId = isset($args['id']) ? (int)$args['id'] : null;
+            $data = $request->getParsedBody();
             
-            if (!$subscriptionId) {
-                return $this->respondWithError($response, 'Не указан ID подписки', 'validation_error', 400);
+            // Проверяем наличие обязательных полей
+            if (!isset($data['subscription_id']) || !is_numeric($data['subscription_id'])) {
+                return $this->respondWithError($response, 'Необходимо указать ID подписки для продления', 'validation_error', 400, null);
             }
             
-            $subscription = UserSubscription::with(['tariff'])
-                ->where('id', $subscriptionId)
+            if (!isset($data['tariff_id']) || !is_numeric($data['tariff_id'])) {
+                return $this->respondWithError($response, 'Необходимо указать тариф для продления', 'validation_error', 400, null);
+            }
+            
+            $subscriptionId = (int)$data['subscription_id'];
+            
+            // Проверяем наличие подписки и право пользователя на неё
+            $subscription = UserSubscription::where('id', $subscriptionId)
                 ->where('user_id', $userId)
                 ->first();
-            
+                
             if (!$subscription) {
-                return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404);
+                return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404, null);
             }
             
-            // Получаем текущий тариф
-            $currentTariff = $subscription->tariff;
+            // Проверяем существование тарифа
+            $tariff = Tariff::find($data['tariff_id']);
+            if (!$tariff || !$tariff->is_active) {
+                return $this->respondWithError($response, 'Указанный тариф не найден или неактивен', 'validation_error', 400, null);
+            }
             
-            // Получаем доступные апгрейды
-            $availableUpgrades = $this->subscriptionService->getAvailableUpgrades($subscription)
-                ->map(function ($tariff) use ($subscription) {
-                    $price = $this->subscriptionService->getTariffPrice($tariff->id, $subscription->location_id);
-                    return [
-                        'id' => $tariff->id,
-                        'name' => $tariff->name,
-                        'code' => $tariff->code,
-                        'duration_hours' => $tariff->duration_hours,
-                        'duration_days' => $tariff->getDurationInDays(),
-                        'price' => $price,
-                        'description' => $tariff->description,
-                    ];
-                });
+            // Отправка уведомления администратору через Telegram
+            $user = User::find($userId);
+            $this->telegramService->notifyAdminsAboutExtendRequest(
+                $user, 
+                $subscription, 
+                $tariff, 
+                $data['notes'] ?? null
+            );
+
+            // Отправка уведомления пользователю через Telegram
+            $this->telegramService->notifyExtendSubscriptionRequested(
+                $user,
+                $subscription,
+                $tariff,
+                $data['notes'] ?? null
+            );
             
-            // Получаем рекомендуемый апгрейд
-            $recommendedUpgrade = $this->subscriptionService->getRecommendedUpgrade($subscription);
-            $recommendedId = $recommendedUpgrade ? $recommendedUpgrade->id : null;
+            // Добавляем запись в историю подписок - опционально, для отслеживания
+            SubscriptionHistory::create([
+                'user_id' => $userId,
+                'subscription_id' => $subscriptionId,
+                'action' => 'extend_requested',
+                'tariff_name' => $tariff->name,
+                'category_name' => $subscription->category->name,
+                'location_name' => $subscription->location->getFullName(),
+                'price_paid' => 0,
+                'action_date' => Carbon::now(),
+                'notes' => $data['notes'] ?? 'Запрос на продление подписки'
+            ]);
             
             return $this->respondWithData($response, [
                 'code' => 200,
                 'status' => 'success',
+                'message' => 'Заявка на продление подписки успешно отправлена администратору',
                 'data' => [
-                    'current_tariff' => [
-                        'id' => $currentTariff->id,
-                        'name' => $currentTariff->name,
-                        'code' => $currentTariff->code,
-                        'duration_hours' => $currentTariff->duration_hours,
-                        'duration_days' => $currentTariff->getDurationInDays(),
-                    ],
-                    'available_upgrades' => $availableUpgrades,
-                    'recommended_upgrade_id' => $recommendedId
+                    'subscription_id' => $subscriptionId
                 ]
             ], 200);
             
         } catch (Exception $e) {
-            return $this->respondWithError($response, $e->getMessage(), null, 500);
+            return $this->respondWithError($response, $e->getMessage(), 'internal_error', 500, null);
         }
     }
 } 
