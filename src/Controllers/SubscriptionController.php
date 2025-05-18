@@ -75,90 +75,6 @@ class SubscriptionController
             return $this->respondWithError($response, $e->getMessage(), null, 500);
         }
     }
-
-    /**
-     * Получение доступных тарифов
-     */
-    public function getAvailableTariffs(Request $request, Response $response): Response
-    {
-        try {
-            $tariffs = $this->subscriptionService->getActiveTariffs()
-                ->map(function ($tariff) {
-                    return [
-                        'id' => $tariff->id,
-                        'name' => $tariff->name,
-                        'code' => $tariff->code,
-                        'duration_hours' => $tariff->duration_hours,
-                        'price' => $tariff->price,
-                        'description' => $tariff->description,
-                    ];
-                });
-            
-            return $this->respondWithData($response, [
-                'code' => 200,
-                'status' => 'success',
-                'data' => [
-                    'tariffs' => $tariffs,
-                ]
-            ], 200);
-            
-        } catch (Exception $e) {
-            return $this->respondWithError($response, $e->getMessage(), null, 500);
-        }
-    }
-    
-    /**
-     * Получение списка доступных категорий
-     */
-    public function getCategories(Request $request, Response $response): Response
-    {
-        try {
-            $categories = Category::all(['id', 'name']);
-            
-            return $this->respondWithData($response, [
-                'code' => 200,
-                'status' => 'success',
-                'data' => [
-                    'categories' => $categories,
-                ]
-            ], 200);
-            
-        } catch (Exception $e) {
-            return $this->respondWithError($response, $e->getMessage(), null, 500);
-        }
-    }
-    
-    /**
-     * Получение списка доступных локаций
-     */
-    public function getLocations(Request $request, Response $response): Response
-    {
-        try {
-            $locations = Location::all()
-                ->map(function ($location) {
-                    return [
-                        'id' => $location->id,
-                        'city' => $location->city,
-                        'region' => $location->region,
-                        'full_name' => $location->getFullName(),
-                        'center_lat' => $location->center_lat,
-                        'center_lng' => $location->center_lng,
-                        'bounds' => $location->bounds
-                    ];
-                });
-            
-            return $this->respondWithData($response, [
-                'code' => 200,
-                'status' => 'success',
-                'data' => [
-                    'locations' => $locations,
-                ]
-            ], 200);
-            
-        } catch (Exception $e) {
-            return $this->respondWithError($response, $e->getMessage(), null, 500);
-        }
-    }
     
     /**
      * Валидация данных для создания подписки
@@ -295,87 +211,6 @@ class SubscriptionController
     }
     
     /**
-     * Получение цены тарифа для локации
-     */
-    public function getTariffPrice(Request $request, Response $response, array $args = []): Response
-    {
-        try {
-            $tariffId = isset($args['tariffId']) ? (int)$args['tariffId'] : null;
-            $locationId = isset($args['locationId']) ? (int)$args['locationId'] : null;
-            
-            if (!$tariffId || !$locationId) {
-                return $this->respondWithError($response, 'Не указаны необходимые параметры', 'validation_error', 400);
-            }
-            
-            $price = $this->subscriptionService->getTariffPrice($tariffId, $locationId);
-            
-            if ($price === null) {
-                return $this->respondWithError($response, 'Цена не найдена', 'not_found', 404);
-            }
-            
-            return $this->respondWithData($response, [
-                'code' => 200,
-                'status' => 'success',
-                'data' => [
-                    'price' => $price,
-                ]
-            ], 200);
-            
-        } catch (Exception $e) {
-            return $this->respondWithError($response, $e->getMessage(), null, 500);
-        }
-    }
-
-    /**
-     * Временное включение/отключение подписки пользователем
-     */
-    public function toggleSubscription(Request $request, Response $response, array $args = []): Response
-    {
-        try {
-            $userId = $request->getAttribute('userId');
-            $subscriptionId = isset($args['id']) ? (int)$args['id'] : null;
-            
-            if (!$subscriptionId) {
-                return $this->respondWithError($response, 'Не указан ID подписки', 'validation_error', 400);
-            }
-            
-            $subscription = UserSubscription::where('id', $subscriptionId)
-                ->where('user_id', $userId)
-                ->first();
-            
-            if (!$subscription) {
-                return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404);
-            }
-            
-            if ($subscription->status !== 'active') {
-                return $this->respondWithError($response, 'Только активные подписки могут быть включены/отключены', 'invalid_status', 400);
-            }
-            
-            $data = $request->getParsedBody();
-            $isEnabled = isset($data['is_enabled']) ? (bool)$data['is_enabled'] : !$subscription->is_enabled;
-            
-            $result = $subscription->toggleEnabled($isEnabled);
-            
-            if (!$result) {
-                return $this->respondWithError($response, 'Не удалось изменить статус подписки', 'operation_failed', 400);
-            }
-            
-            return $this->respondWithData($response, [
-                'code' => 200,
-                'status' => 'success',
-                'message' => $isEnabled ? 'Подписка успешно включена' : 'Подписка успешно отключена',
-                'data' => [
-                    'subscription_id' => $subscription->id,
-                    'is_enabled' => $isEnabled
-                ]
-            ], 200);
-            
-        } catch (Exception $e) {
-            return $this->respondWithError($response, $e->getMessage(), null, 500);
-        }
-    }
-    
-    /**
      * Получение всей информации о тарифах для страницы тарифов
      * Возвращает категории, локации, тарифы и их цены
      */
@@ -448,11 +283,11 @@ class SubscriptionController
             
             // Проверяем наличие обязательных полей
             if (!isset($data['subscription_id']) || !is_numeric($data['subscription_id'])) {
-                return $this->respondWithError($response, 'Необходимо указать ID подписки для продления', 'validation_error', 400, null);
+                return $this->respondWithError($response, 'Необходимо указать ID подписки для продления', 'validation_error', 400);
             }
             
             if (!isset($data['tariff_id']) || !is_numeric($data['tariff_id'])) {
-                return $this->respondWithError($response, 'Необходимо указать тариф для продления', 'validation_error', 400, null);
+                return $this->respondWithError($response, 'Необходимо указать тариф для продления', 'validation_error', 400);
             }
             
             $subscriptionId = (int)$data['subscription_id'];
@@ -463,13 +298,13 @@ class SubscriptionController
                 ->first();
                 
             if (!$subscription) {
-                return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404, null);
+                return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404);
             }
             
             // Проверяем существование тарифа
             $tariff = Tariff::find($data['tariff_id']);
             if (!$tariff || !$tariff->is_active) {
-                return $this->respondWithError($response, 'Указанный тариф не найден или неактивен', 'validation_error', 400, null);
+                return $this->respondWithError($response, 'Указанный тариф не найден или неактивен', 'validation_error', 400);
             }
             
             // Отправка уведомления администратору через Telegram
@@ -485,8 +320,7 @@ class SubscriptionController
             $this->telegramService->notifyExtendSubscriptionRequested(
                 $user,
                 $subscription,
-                $tariff,
-                $data['notes'] ?? null
+                $tariff
             );
             
             // Добавляем запись в историю подписок - опционально, для отслеживания
@@ -512,7 +346,7 @@ class SubscriptionController
             ], 200);
             
         } catch (Exception $e) {
-            return $this->respondWithError($response, $e->getMessage(), 'internal_error', 500, null);
+            return $this->respondWithError($response, $e->getMessage(), 'internal_error', 500);
         }
     }
 } 

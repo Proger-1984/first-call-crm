@@ -6,8 +6,6 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\UserSubscription;
-use App\Services\SubscriptionService;
-use Carbon\Carbon;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -68,14 +66,21 @@ class TelegramService
         return $result !== false;
     }
 
-    // 1. Уведомление о активации демо-подписки
+    /**
+     * Отправляет сообщение пользователю через Telegram
+     * Уведомление о активации демо-подписки
+     *
+     * @param User $user
+     * @param UserSubscription $subscription
+     * @return bool Успешность отправки
+     */
     public function notifyDemoSubscriptionCreated(User $user, UserSubscription $subscription): bool
     {
         $endDate = $subscription->end_date->format('d.m.Y H:i');
         $message = "🎯 <b>Демо-подписка активирована!</b>\n\n" .
             "Ваша демо-подписка на категорию <b>{$subscription->category->name}</b> " .
             "для локации <b>{$subscription->location->getFullName()}</b> успешно активирована.\n\n" .
-            "⏱ Доступ открыт до: <b>{$endDate}</b>\n\n" .
+            "⏱ Доступ открыт до: <b>$endDate</b>\n\n" .
             "После окончания демо-периода вы сможете оформить премиум-подписку для продолжения работы.\n\n" .
             "Благодарим за выбор нашего сервиса! Если у вас возникнут вопросы, " .
             "обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
@@ -83,21 +88,35 @@ class TelegramService
         return $this->sendMessage($user->telegram_id, $message);
     }
 
-    // 2. Уведомление о активации премиум-подписки
+    /**
+     * Отправляет сообщение пользователю через Telegram
+     * Уведомление о активации премиум-подписки
+     *
+     * @param User $user
+     * @param UserSubscription $subscription
+     * @return bool Успешность отправки
+     */
     public function notifyPremiumSubscriptionActivated(User $user, UserSubscription $subscription): bool
     {
         $endDate = $subscription->end_date->format('d.m.Y H:i');
         $message = "🚀 <b>Подписка успешно активирована!</b>\n\n" .
             "Ваша подписка <b>{$subscription->tariff->name}</b> на категорию <b>{$subscription->category->name}</b> " .
             "для локации <b>{$subscription->location->getFullName()}</b> успешно активирована.\n\n" .
-            "⏱ Доступ открыт до: <b>{$endDate}</b>\n\n" .
+            "⏱ Доступ открыт до: <b>$endDate</b>\n\n" .
             "Благодарим за выбор нашего сервиса! Если у вас возникнут вопросы, " .
             "обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
 
         return $this->sendMessage($user->telegram_id, $message);
     }
 
-    // 3. Уведомление о создании заявки на платную подписку
+    /**
+     * Отправляет сообщение пользователю через Telegram
+     * Уведомление о создании заявки на платную подписку
+     *
+     * @param User $user
+     * @param UserSubscription $subscription
+     * @return bool Успешность отправки
+     */
     public function notifyPremiumSubscriptionRequested(User $user, UserSubscription $subscription): bool
     {
         $message = "📝 <b>Заявка на подписку создана</b>\n\n" .
@@ -107,9 +126,9 @@ class TelegramService
             "1️⃣ Оплатить по реквизитам:\n" .
             "• Карта Сбербанк: <code>2202203203273984</code>\n" .
             "• Получатель: Александр А.\n" .
-            "• Сумма к оплате: <b>{$subscription->price_paid} ₽</b>\n\n" .
+            "• Сумма к оплате: <b>$subscription->price_paid ₽</b>\n\n" .
             "2️⃣ Прислать скриншот чека в <a href='https://t.me/firstcall_support'>службу поддержки</a>\n" .
-            "3️⃣ Обязательно укажите ID заявки: <code>{$subscription->id}</code>\n\n" .
+            "3️⃣ Обязательно укажите ID заявки: <code>$subscription->id</code>\n\n" .
 
             "После подтверждения оплаты подписка будет активирована, и вы получите уведомление.\n\n" .
             "По всем вопросам обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
@@ -117,61 +136,86 @@ class TelegramService
         return $this->sendMessage($user->telegram_id, $message);
     }
 
-    // 3. Уведомление о скором истечении подписки
-    public function notifySubscriptionExpiringSoon(User $user, UserSubscription $subscription): bool
+    /**
+     * Отправляет сообщение пользователю через Telegram
+     * Уведомление о создании заявки на продление подписки
+     *
+     * @param User $user
+     * @param UserSubscription $subscription
+     * @param Tariff $tariff
+     * @return bool Успешность отправки
+     */
+    public function notifyExtendSubscriptionRequested(User $user, UserSubscription $subscription, Tariff $tariff): bool
     {
-        $endDate = $subscription->end_date->format('d.m.Y H:i');
-        $remainingTime = Carbon::now()->diffForHumans($subscription->end_date, ['parts' => 2]);
-        
-        $message = "⚠️ <b>Срок действия подписки истекает!</b>\n\n" .
-            "Ваша подписка <b>{$subscription->tariff->name}</b> на категорию <b>{$subscription->category->name}</b> " .
-            "для локации <b>{$subscription->location->getFullName()}</b> истекает <b>{$endDate}</b> ({$remainingTime}).\n\n" .
-            "Для сохранения доступа к сервису рекомендуем своевременно продлить подписку в " .
-            "<a href='https://realtor.first-call.ru'>личном кабинете</a>.";
+        $tariffName = $tariff->name;
+        $categoryName = $subscription->category->name;
+        $locationName = $subscription->location->getFullName();
+        $price = $this->subscriptionService->getTariffPrice($tariff->id, $subscription->location_id);
 
-        return $this->sendMessage($user->telegram_id, $message);
-    }
-
-    // 4. Уведомление об истечении подписки
-    public function notifySubscriptionExpired(User $user, UserSubscription $subscription): bool
-    {
-        $message = "🔒 <b>Подписка закончилась</b>\n\n" .
-            "Ваша подписка <b>{$subscription->tariff->name}</b> на категорию <b>{$subscription->category->name}</b> " .
-            "для локации <b>{$subscription->location->getFullName()}</b> закончилась.\n\n" .
-            "Для возобновления доступа продлите подписку в " .
-            "<a href='https://realtor.first-call.ru'>личном кабинете</a> или свяжитесь с " .
-            "<a href='https://t.me/firstcall_support'>службой поддержки</a>.";
-
-        return $this->sendMessage($user->telegram_id, $message);
-    }
-
-    // 6. Уведомление об отмене подписки
-    public function notifySubscriptionCancelled(User $user, UserSubscription $subscription, string $reason): bool
-    {
-        $message = "❌ <b>Подписка отменена</b>\n\n" .
-            "Ваша подписка <b>{$subscription->tariff->name}</b> на категорию <b>{$subscription->category->name}</b> " .
-            "для локации <b>{$subscription->location->getFullName()}</b> была отменена.\n\n" .
-            "Причина: <i>{$reason}</i>\n\n" .
+        $message = "📝 <b>Заявка на продление подписки создана</b>\n\n" .
+            "Ваша заявка на продление подписки <b>$tariffName</b> для категории <b>$categoryName</b> " .
+            "и локации <b>$locationName</b> успешно создана и ожидает подтверждения.\n\n" .
+            "💳 <b>ДЛЯ АКТИВАЦИИ НЕОБХОДИМО:</b>\n" .
+            "1️⃣ Оплатить по реквизитам:\n" .
+            "• Карта Сбербанк: <code>2202203203273984</code>\n" .
+            "• Получатель: Александр А.\n" .
+            "• Сумма к оплате: <b>$price ₽</b>\n\n" .
+            "2️⃣ Прислать скриншот чека в <a href='https://t.me/firstcall_support'>службу поддержки</a>\n" .
+            "3️⃣ Обязательно укажите ID подписки: <code>$subscription->id</code>\n\n" .
+            "После подтверждения оплаты подписка будет продлена, и вы получите уведомление.\n\n" .
             "По всем вопросам обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
 
         return $this->sendMessage($user->telegram_id, $message);
     }
 
-    // 7. Уведомление о продлении подписки
+    /**
+     * Отправляет сообщение пользователю через Telegram
+     * Уведомление о продлении подписки
+     *
+     * @param User $user
+     * @param UserSubscription $subscription
+     * @return bool Успешность отправки
+     */
     public function notifySubscriptionExtended(User $user, UserSubscription $subscription): bool
     {
         $endDate = $subscription->end_date->format('d.m.Y H:i');
         $message = "🔄 <b>Подписка успешно продлена!</b>\n\n" .
             "Ваша подписка <b>{$subscription->tariff->name}</b> на категорию <b>{$subscription->category->name}</b> " .
             "для локации <b>{$subscription->location->getFullName()}</b> успешно продлена.\n\n" .
-            "⏱ Доступ продлен до: <b>{$endDate}</b>\n\n" .
+            "⏱ Доступ продлен до: <b>$endDate</b>\n\n" .
             "Благодарим за использование нашего сервиса! Если у вас возникнут вопросы, " .
             "обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
 
         return $this->sendMessage($user->telegram_id, $message);
     }
 
-    // 8. Уведомление администратору о новой заявке на подписку
+    /**
+     * Отправляет сообщение пользователю через Telegram
+     * Уведомление об отмене подписки
+     *
+     * @param User $user
+     * @param UserSubscription $subscription
+     * @param string $reason
+     * @return bool Успешность отправки
+     */
+    public function notifySubscriptionCancelled(User $user, UserSubscription $subscription, string $reason): bool
+    {
+        $message = "❌ <b>Подписка отменена</b>\n\n" .
+            "Ваша подписка <b>{$subscription->tariff->name}</b> на категорию <b>{$subscription->category->name}</b> " .
+            "для локации <b>{$subscription->location->getFullName()}</b> была отменена.\n\n" .
+            "Причина: <i>$reason</i>\n\n" .
+            "По всем вопросам обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
+
+        return $this->sendMessage($user->telegram_id, $message);
+    }
+
+    /**
+     * Отправляет сообщение пользователю через Telegram
+     * Уведомление администратору о новой заявке на подписку
+     *
+     * @param UserSubscription $subscription
+     * @return bool Успешность отправки
+     */
     public function notifyAdminNewSubscriptionRequest(UserSubscription $subscription): bool
     {
         $userName = $subscription->user->name;
@@ -182,18 +226,27 @@ class TelegramService
         $tariff = $subscription->tariff->name;
         $price = $subscription->price_paid;
         
-        $message = "🆕 <b>Новая заявка на подписку #{$subId}</b>\n\n" .
-            "👤 Пользователь: <b>{$userName}</b> (ID: {$userId})\n" .
-            "🏷 Тариф: <b>{$tariff}</b>\n" .
-            "📋 Категория: <b>{$category}</b>\n" .
-            "📍 Локация: <b>{$location}</b>\n" .
-            "💰 Сумма: <b>{$price} руб.</b>\n\n" .
+        $message = "🆕 <b>Новая заявка на подписку #$subId</b>\n\n" .
+            "👤 Пользователь: <b>$userName</b> (ID: $userId)\n" .
+            "🏷 Тариф: <b>$tariff</b>\n" .
+            "📋 Категория: <b>$category</b>\n" .
+            "📍 Локация: <b>$location</b>\n" .
+            "💰 Сумма: <b>$price руб.</b>\n\n" .
             "Для обработки заявки перейдите в <a href='https://realtor.first-call.ru/subscriptions/pending'>панель администратора</a>.";
             
         return $this->sendMessage($this->adminChatId, $message);
     }
 
-    // 9. Уведомление администратору о запросе на продление подписки
+    /**
+     * Отправляет сообщение пользователю через Telegram
+     * Уведомление администратору о запросе на продление подписки
+     *
+     * @param User $user
+     * @param UserSubscription $subscription
+     * @param $tariff
+     * @param string|null $notes
+     * @return bool Успешность отправки
+     */
     public function notifyAdminsAboutExtendRequest(User $user, UserSubscription $subscription, $tariff, ?string $notes = null): bool
     {
         $userName = $user->name;
@@ -205,16 +258,16 @@ class TelegramService
         $newTariff = $tariff->name;
         $price = $this->subscriptionService->getTariffPrice($tariff->id, $subscription->location_id);
         
-        $message = "🔄 <b>Запрос на продление подписки #{$subId}</b>\n\n" .
-            "👤 Пользователь: <b>{$userName}</b> (ID: {$userId})\n" .
-            "🏷 Текущий тариф: <b>{$currentTariff}</b>\n" .
-            "🏷 Новый тариф: <b>{$newTariff}</b>\n" .
-            "📋 Категория: <b>{$category}</b>\n" .
-            "📍 Локация: <b>{$location}</b>\n" .
-            "💰 Сумма: <b>{$price} руб.</b>\n";
+        $message = "🔄 <b>Запрос на продление подписки #$subId</b>\n\n" .
+            "👤 Пользователь: <b>$userName</b> (ID: $userId)\n" .
+            "🏷 Текущий тариф: <b>$currentTariff</b>\n" .
+            "🏷 Новый тариф: <b>$newTariff</b>\n" .
+            "📋 Категория: <b>$category</b>\n" .
+            "📍 Локация: <b>$location</b>\n" .
+            "💰 Сумма: <b>$price руб.</b>\n";
             
         if ($notes) {
-            $message .= "📝 Комментарий: <i>{$notes}</i>\n";
+            $message .= "📝 Комментарий: <i>$notes</i>\n";
         }
         
         $message .= "\nДля обработки заявки перейдите в <a href='https://realtor.first-call.ru/subscriptions/pending'>панель администратора</a>.";
@@ -223,7 +276,8 @@ class TelegramService
     }
 
     /**
-     * Отправляет уведомление о регистрации с логином и паролем от приложения
+     * Отправляет уведомление о регистрации через Telegram
+     * с логином и паролем от приложения
      * 
      * @param string $chatId ID чата пользователя
      * @param string $username Имя пользователя
@@ -298,29 +352,5 @@ class TelegramService
         } catch (Exception) {
             return false;
         }
-    }
-
-    // Уведомление о создании заявки на продление подписки
-    public function notifyExtendSubscriptionRequested(User $user, UserSubscription $subscription, Tariff $tariff, ?string $notes = null): bool
-    {
-        $tariffName = $tariff->name;
-        $categoryName = $subscription->category->name;
-        $locationName = $subscription->location->getFullName();
-        $price = $this->subscriptionService->getTariffPrice($tariff->id, $subscription->location_id);
-
-        $message = "📝 <b>Заявка на продление подписки создана</b>\n\n" .
-            "Ваша заявка на продление подписки <b>{$tariffName}</b> для категории <b>{$categoryName}</b> " .
-            "и локации <b>{$locationName}</b> успешно создана и ожидает подтверждения.\n\n" .
-            "💳 <b>ДЛЯ АКТИВАЦИИ НЕОБХОДИМО:</b>\n" .
-            "1️⃣ Оплатить по реквизитам:\n" .
-            "• Карта Сбербанк: <code>2202203203273984</code>\n" .
-            "• Получатель: Александр А.\n" .
-            "• Сумма к оплате: <b>{$price} ₽</b>\n\n" .
-            "2️⃣ Прислать скриншот чека в <a href='https://t.me/firstcall_support'>службу поддержки</a>\n" .
-            "3️⃣ Обязательно укажите ID подписки: <code>{$subscription->id}</code>\n\n" .
-            "После подтверждения оплаты подписка будет продлена, и вы получите уведомление.\n\n" .
-            "По всем вопросам обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
-
-        return $this->sendMessage($user->telegram_id, $message);
     }
 } 

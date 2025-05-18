@@ -94,19 +94,6 @@ return function (App $app) {
          */
         $group->group('/catalog', function (RouteCollectorProxy $group) {
             $group->get('/tariff-info', [SubscriptionController::class, 'getAllTariffInfo']);
-
-            // Получение доступных тарифов
-           $group->get('/tariffs', [SubscriptionController::class, 'getAvailableTariffs']);
-                
-            // Получение доступных категорий
-           $group->get('/categories', [SubscriptionController::class, 'getCategories']);
-                
-            // Получение доступных локаций
-           $group->get('/locations', [SubscriptionController::class, 'getLocations']);
-                
-            // Получение цены тарифа для локации
-           $group->get('/tariff-price/{tariffId:[0-9]+}/{locationId:[0-9]+}', [SubscriptionController::class, 'getTariffPrice']);
-
         })->add(new AuthMiddleware($container));
 
         /** Административное API для управления подписками (проверка роли admin в контроллере)
@@ -120,14 +107,5 @@ return function (App $app) {
             $group->post('/cancel', [AdminSubscriptionController::class, 'cancelSubscription']);
         })->add(new AuthMiddleware($container));
 
-    });
-    
-    // Тест API
-    $app->get('/', function ($request, $response) {
-        $response->getBody()->write(json_encode([
-            'status' => 'success',
-            'message' => 'API is working!'
-        ]));
-        return $response->withHeader('Content-Type', 'application/json');
     });
 }; 
