@@ -56,7 +56,7 @@ class UserLocationPolygon extends Model
     ];
 
     /**
-     * Get the user that owns the location polygon
+     * Получить пользователя, которому принадлежит полигон локации
      */
     public function user(): BelongsTo
     {
@@ -64,7 +64,7 @@ class UserLocationPolygon extends Model
     }
 
     /**
-     * Get the subscription that owns the location polygon
+     * Получить подписку, к которой относится полигон локации
      */
     public function subscription(): BelongsTo
     {

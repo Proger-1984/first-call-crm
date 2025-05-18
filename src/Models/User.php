@@ -206,7 +206,9 @@ class User extends Model
     }
 
     /**
-     * Включает источник для пользователя
+     * Включить конкретный источник для пользователя
+     * @param int $sourceId ID источника
+     * @return bool Результат операции
      */
     public function enableSource(int $sourceId): bool
     {
@@ -219,7 +221,9 @@ class User extends Model
     }
 
     /**
-     * Отключает источник для пользователя
+     * Отключить конкретный источник для пользователя
+     * @param int $sourceId ID источника
+     * @return bool Результат операции
      */
     public function disableSource(int $sourceId): bool
     {
@@ -230,7 +234,8 @@ class User extends Model
     }
 
     /**
-     * Включает несколько источников
+     * Включить несколько источников для пользователя
+     * @param array $sourceIds Массив ID источников
      */
     public function enableSources(array $sourceIds): void
     {
@@ -240,7 +245,8 @@ class User extends Model
     }
 
     /**
-     * Отключает несколько источников
+     * Отключить несколько источников для пользователя
+     * @param array $sourceIds Массив ID источников
      */
     public function disableSources(array $sourceIds): void
     {
@@ -250,7 +256,9 @@ class User extends Model
     }
 
     /**
-     * Проверяет пароль пользователя
+     * Проверить пароль пользователя
+     * @param string $password Пароль для проверки
+     * @return bool Результат проверки
      */
     public function verifyPassword(string $password): bool
     {
@@ -258,7 +266,8 @@ class User extends Model
     }
 
     /**
-     * Хеширует пароль перед сохранением
+     * Установить хеш пароля при его изменении
+     * @param string|null $password Новый пароль
      */
     public function setPasswordHashAttribute(?string $password): void
     {
@@ -268,17 +277,22 @@ class User extends Model
             $this->attributes['password_hash'] = null;
         }
     }
-    
+
     /**
-     * Создает или обновляет рефреш-токен для указанного типа устройства
+     * Создать или обновить refresh токен для пользователя
+     * @param string $token Токен обновления
+     * @param string $deviceType Тип устройства
+     * @param int $expiresInSeconds Время действия в секундах
+     * @return RefreshToken Созданный токен
      */
     public function createOrUpdateRefreshToken(string $token, string $deviceType, int $expiresInSeconds): RefreshToken
     {
         return RefreshToken::createOrUpdateToken($this->id, $token, $deviceType, $expiresInSeconds);
     }
-    
+
     /**
-     * Удаляет все рефреш-токены пользователя
+     * Удалить все refresh токены пользователя
+     * @return bool Результат операции
      */
     public function removeAllRefreshTokens(): bool
     {
@@ -287,6 +301,9 @@ class User extends Model
 
     /**
      * Проверяет, есть ли у пользователя активная подписка для указанной категории и локации
+     * @param int $categoryId ID категории
+     * @param int $locationId ID локации
+     * @return bool Наличие активной подписки
      */
     public function hasActiveSubscription(int $categoryId, int $locationId): bool
     {
@@ -295,7 +312,7 @@ class User extends Model
                     ->where('location_id', $locationId)
                     ->exists();
     }
-    
+
     /**
      * Проверяет, есть ли у пользователя хотя бы одна активная подписка
      */
@@ -303,7 +320,7 @@ class User extends Model
     {
         return $this->activeSubscriptions()->exists();
     }
-    
+
     /**
      * Проверяет, есть ли у пользователя активная демо-подписка
      */

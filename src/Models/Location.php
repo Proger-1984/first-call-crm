@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Class Location
@@ -52,7 +51,7 @@ class Location extends Model
     ];
 
     /**
-     * Get the tariff prices for this location
+     * Получить цены тарифов для этой локации
      */
     public function tariffPrices(): HasMany
     {
@@ -60,7 +59,7 @@ class Location extends Model
     }
 
     /**
-     * Get the user subscriptions for this location
+     * Получить подписки пользователей для этой локации
      */
     public function userSubscriptions(): HasMany
     {
@@ -68,54 +67,10 @@ class Location extends Model
     }
     
     /**
-     * Get the full location name (city, region)
+     * Получить полное название локации (город, регион)
      */
     public function getFullName(): string
     {
-        return "{$this->city}, {$this->region}";
-    }
-    
-    /**
-     * Проверяет, находится ли точка внутри границ локации (по грубым границам)
-     * 
-     * @param float $lat Широта
-     * @param float $lng Долгота
-     * @return bool
-     */
-    public function containsPointInBounds(float $lat, float $lng): bool
-    {
-        if (!$this->bounds) {
-            return false;
-        }
-        
-        return $lat >= $this->bounds['south'] && 
-               $lat <= $this->bounds['north'] && 
-               $lng >= $this->bounds['west'] && 
-               $lng <= $this->bounds['east'];
-    }
-    
-    /**
-     * Получает расстояние от центра локации до указанной точки (в метрах)
-     * 
-     * @param float $lat Широта
-     * @param float $lng Долгота
-     * @return float|null Расстояние в метрах или null, если центр не задан
-     */
-    public function getDistanceToPoint(float $lat, float $lng): ?float
-    {
-        if (!$this->center_point) {
-            return null;
-        }
-        
-        // Вычисляем расстояние с использованием функции ST_Distance
-        $result = DB::selectOne(
-            "SELECT ST_Distance(
-                center_point::geography, 
-                ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography
-            ) AS distance",
-            [$lng, $lat] // PostGIS порядок координат (долгота, широта)
-        );
-        
-        return $result ? (float)$result->distance : null;
+        return "$this->city, $this->region";
     }
 } 

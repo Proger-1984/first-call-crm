@@ -71,22 +71,4 @@ class RefreshToken extends Model
             ['token' => $token, 'expires_at' => $expiresAt]
         );
     }
-
-    /**
-     * Найти действительный токен по его значению
-     */
-    public static function findValidToken(string $token): ?self
-    {
-        return self::where('token', $token)
-                   ->where('expires_at', '>', Carbon::now())
-                   ->first();
-    }
-    
-    /**
-     * Удалить токен
-     */
-    public static function removeToken(string $token): bool
-    {
-        return (bool) self::where('token', $token)->delete();
-    }
 } 

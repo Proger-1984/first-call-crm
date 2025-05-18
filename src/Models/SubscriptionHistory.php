@@ -54,7 +54,7 @@ class SubscriptionHistory extends Model
     ];
 
     /**
-     * Get the user that owns this history record
+     * Получить пользователя, которому принадлежит эта запись истории
      */
     public function user(): BelongsTo
     {
@@ -62,7 +62,7 @@ class SubscriptionHistory extends Model
     }
 
     /**
-     * Get the subscription that owns this history record
+     * Получить подписку, к которой относится эта запись истории
      */
     public function subscription(): BelongsTo
     {

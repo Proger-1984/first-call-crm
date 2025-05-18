@@ -41,7 +41,7 @@ class TariffPrice extends Model
     ];
 
     /**
-     * Get the tariff that owns the price
+     * Получить тариф, которому принадлежит цена
      */
     public function tariff(): BelongsTo
     {
@@ -49,7 +49,7 @@ class TariffPrice extends Model
     }
 
     /**
-     * Get the location that owns the price
+     * Получить локацию, к которой относится цена
      */
     public function location(): BelongsTo
     {

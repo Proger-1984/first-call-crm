@@ -72,7 +72,7 @@ class UserSubscription extends Model
     ];
 
     /**
-     * Get the user that owns the subscription
+     * Получить пользователя, которому принадлежит подписка
      */
     public function user(): BelongsTo
     {
@@ -80,7 +80,7 @@ class UserSubscription extends Model
     }
 
     /**
-     * Get the tariff for this subscription
+     * Получить тариф для этой подписки
      */
     public function tariff(): BelongsTo
     {
@@ -88,7 +88,7 @@ class UserSubscription extends Model
     }
 
     /**
-     * Get the category for this subscription
+     * Получить категорию для этой подписки
      */
     public function category(): BelongsTo
     {
@@ -96,7 +96,7 @@ class UserSubscription extends Model
     }
 
     /**
-     * Get the location for this subscription
+     * Получить локацию для этой подписки
      */
     public function location(): BelongsTo
     {
@@ -104,7 +104,7 @@ class UserSubscription extends Model
     }
 
     /**
-     * Get the admin who approved this subscription
+     * Получить администратора, который подтвердил эту подписку
      */
     public function approver(): BelongsTo
     {
@@ -112,7 +112,7 @@ class UserSubscription extends Model
     }
 
     /**
-     * Get the history records for this subscription
+     * Получить записи истории для этой подписки
      */
     public function history(): HasMany
     {
@@ -120,7 +120,7 @@ class UserSubscription extends Model
     }
 
     /**
-     * Check if the subscription is pending approval
+     * Проверить, ожидает ли подписка подтверждения
      */
     public function isPending(): bool
     {
@@ -128,7 +128,7 @@ class UserSubscription extends Model
     }
 
     /**
-     * Check if the subscription is active
+     * Проверить, активна ли подписка
      */
     public function isActive(): bool
     {
@@ -139,15 +139,7 @@ class UserSubscription extends Model
     }
 
     /**
-     * Check if the subscription is active and enabled
-     */
-    public function isActiveAndEnabled(): bool
-    {
-        return $this->isActive() && $this->is_enabled;
-    }
-
-    /**
-     * Check if the subscription is expired
+     * Проверить, истекла ли подписка
      */
     public function isExpired(): bool
     {
@@ -155,37 +147,7 @@ class UserSubscription extends Model
     }
 
     /**
-     * Mark the subscription as expired
-     */
-    public function markAsExpired(): bool
-    {
-        if ($this->status !== 'expired') {
-            $this->status = 'expired';
-            $result = $this->save();
-            
-            // Log to history
-            if ($result) {
-                SubscriptionHistory::create([
-                    'user_id' => $this->user_id,
-                    'subscription_id' => $this->id,
-                    'action' => 'expired',
-                    'tariff_name' => $this->tariff->name,
-                    'category_name' => $this->category->name,
-                    'location_name' => $this->location->getFullName(),
-                    'price_paid' => $this->price_paid,
-                    'action_date' => Carbon::now(),
-                    'notes' => 'Подписка истекла автоматически'
-                ]);
-            }
-            
-            return $result;
-        }
-        
-        return false;
-    }
-
-    /**
-     * Cancel the subscription
+     * Отменить подписку
      */
     public function cancel(string $reason = null): bool
     {
@@ -271,9 +233,9 @@ class UserSubscription extends Model
      * @return bool Результат операции
      */
     public function extendByAdmin(
-        int $adminId, 
-        float $newPrice = null, 
-        string $paymentMethod, 
+        int $adminId,
+        string $paymentMethod,
+        float $newPrice = null,
         string $notes = null,
         int $durationHours = null
     ): bool {
@@ -308,119 +270,6 @@ class UserSubscription extends Model
                 'price_paid' => $newPrice,
                 'action_date' => Carbon::now(),
                 'notes' => "Подписка продлена администратором. " . ($notes ? "Примечание: $notes" : "")
-            ]);
-        }
-        
-        return $result;
-    }
-
-    /**
-     * Временно включает или отключает подписку
-     * 
-     * @param bool $enabled Статус включения (true - включить, false - отключить)
-     * @return bool Результат операции
-     */
-    public function toggleEnabled(bool $enabled): bool
-    {
-        if ($this->status !== 'active') {
-            return false;
-        }
-        
-        $previousState = $this->is_enabled;
-        $this->is_enabled = $enabled;
-        $result = $this->save();
-        
-        // Логируем изменение в историю
-        if ($result && $previousState !== $enabled) {
-            $action = $enabled ? 'enabled' : 'disabled';
-            SubscriptionHistory::create([
-                'user_id' => $this->user_id,
-                'subscription_id' => $this->id,
-                'action' => $action,
-                'tariff_name' => $this->tariff->name,
-                'category_name' => $this->category->name,
-                'location_name' => $this->location->getFullName(),
-                'price_paid' => $this->price_paid,
-                'action_date' => Carbon::now(),
-                'notes' => $enabled ? 'Подписка включена пользователем' : 'Подписка временно отключена пользователем'
-            ]);
-        }
-        
-        return $result;
-    }
-
-    /**
-     * Обновляет тариф подписки с сохранением категории и локации
-     * Подходит для перехода между тарифами разной длительности
-     * 
-     * @param int $newTariffId ID нового тарифа
-     * @param int $adminId ID администратора, выполняющего операцию
-     * @param float|null $newPrice Новая цена (если null, берется из тарифа или TariffPrice)
-     * @param string|null $paymentMethod Метод оплаты
-     * @param string|null $notes Примечания
-     * @return bool Результат операции
-     */
-    public function updateTariff(int $newTariffId, int $adminId, float $newPrice = null, string $paymentMethod = null, string $notes = null): bool
-    {
-        // Проверяем существование тарифа
-        $newTariff = Tariff::findOrFail($newTariffId);
-        
-        // Получаем стандартную цену для нового тарифа
-        $tariffPrice = TariffPrice::where('tariff_id', $newTariffId)
-                              ->where('location_id', $this->location_id)
-                              ->first();
-        $price = $newPrice ?? ($tariffPrice ? $tariffPrice->price : $newTariff->price);
-        
-        // Обновляем тариф и другие поля
-        $this->tariff_id = $newTariffId;
-        $this->price_paid = $price;
-        $this->payment_method = $paymentMethod ?? $this->payment_method;
-        $this->admin_notes = $notes ? ($this->admin_notes ? $this->admin_notes . "; " . $notes : $notes) : $this->admin_notes;
-        $this->approved_by = $adminId;
-        $this->approved_at = Carbon::now();
-        
-        // Для активной подписки обновляем дату окончания
-        if ($this->status === 'active') {
-            // Если подписка уже активна, рассчитываем оставшееся время и переносим на новый тариф
-            $now = Carbon::now();
-            
-            if ($this->end_date && $this->end_date->isAfter($now)) {
-                // Остаток времени от старого тарифа в часах
-                $remainingHours = $now->diffInHours($this->end_date);
-                
-                // Если остаток времени меньше часа, считаем как 1 час
-                if ($remainingHours < 1) {
-                    $remainingHours = 1;
-                }
-                
-                // Устанавливаем новую дату окончания
-                $this->end_date = $now->copy()->addHours($newTariff->duration_hours + $remainingHours);
-            } else {
-                // Если подписка уже истекла, просто устанавливаем новую длительность
-                $this->end_date = $now->copy()->addHours($newTariff->duration_hours);
-            }
-        } else if ($this->status === 'pending' || $this->status === 'expired') {
-            // Для новой или истекшей подписки активируем её
-            $this->status = 'active';
-            $this->start_date = Carbon::now();
-            $this->end_date = Carbon::now()->addHours($newTariff->duration_hours);
-            $this->is_enabled = true;
-        }
-        
-        $result = $this->save();
-        
-        // Логируем операцию в историю
-        if ($result) {
-            SubscriptionHistory::create([
-                'user_id' => $this->user_id,
-                'subscription_id' => $this->id,
-                'action' => 'tariff_changed',
-                'tariff_name' => $newTariff->name,
-                'category_name' => $this->category->name,
-                'location_name' => $this->location->getFullName(),
-                'price_paid' => $price,
-                'action_date' => Carbon::now(),
-                'notes' => "Тариф изменен админинистратором на {$newTariff->name}. " . ($notes ? "Примечание: $notes" : "")
             ]);
         }
         

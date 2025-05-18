@@ -232,7 +232,7 @@ class AdminSubscriptionController
             $durationHours = isset($data['duration_hours']) ? (int)$data['duration_hours'] : null;
             
             // Вызываем метод продления подписки
-            $result = $subscription->extendByAdmin($adminId, $newPrice, $paymentMethod, $notes, $durationHours);
+            $result = $subscription->extendByAdmin($adminId, $paymentMethod, $newPrice, $notes, $durationHours);
             
             if (!$result) {
                 return $this->respondWithError($response, 'Не удалось продлить подписку', 'operation_failed', 400);
