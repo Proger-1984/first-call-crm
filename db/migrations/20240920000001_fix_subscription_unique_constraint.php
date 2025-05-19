@@ -28,12 +28,21 @@ class FixSubscriptionUniqueConstraint
                 DROP CONSTRAINT IF EXISTS unique_active_subscription;
             ");
             
-            // 2. Создаем новый условный индекс только для активных и ожидающих подписок
-            Manager::connection()->statement("
-                CREATE UNIQUE INDEX unique_subscription 
-                ON user_subscriptions (user_id, category_id, location_id) 
-                WHERE status IN ('active', 'pending');
+            // 2. Проверяем существование индекса перед его созданием
+            $indexExists = Manager::connection()->select("
+                SELECT 1
+                FROM pg_indexes
+                WHERE indexname = 'unique_subscription'
             ");
+            
+            if (empty($indexExists)) {
+                // Создаем новый условный индекс только для активных и ожидающих подписок
+                Manager::connection()->statement("
+                    CREATE UNIQUE INDEX unique_subscription 
+                    ON user_subscriptions (user_id, category_id, location_id) 
+                    WHERE status IN ('active', 'pending');
+                ");
+            }
         }
     }
 
@@ -53,30 +62,5 @@ class FixSubscriptionUniqueConstraint
                 UNIQUE (user_id, category_id, location_id, status);
             ");
         }
-    }
-}
-
-class AddUniqueSubscriptionIndex
-{
-    public function up()
-    {
-        // Эта миграция выполняется независимо от создания таблицы
-        Manager::connection()->statement("
-            ALTER TABLE user_subscriptions 
-            DROP CONSTRAINT IF EXISTS unique_active_subscription;
-        ");
-        
-        Manager::connection()->statement("
-            CREATE UNIQUE INDEX unique_subscription 
-            ON user_subscriptions (user_id, category_id, location_id) 
-            WHERE status IN ('active', 'pending');
-        ");
-    }
-
-    public function down()
-    {
-        Manager::connection()->statement("
-            DROP INDEX IF EXISTS unique_subscription;
-        ");
     }
 } 
