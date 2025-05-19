@@ -301,7 +301,7 @@ class SubscriptionController
                 return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404);
             }
 
-            if ($subscription->status != 'active1') {
+            if ($subscription->status != 'active') {
                 return $this->respondWithError($response, 'Продлить можно только активную подписку', 'validation_error', 400);
             }
             
