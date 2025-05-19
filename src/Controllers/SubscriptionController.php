@@ -300,6 +300,10 @@ class SubscriptionController
             if (!$subscription) {
                 return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404);
             }
+
+            if ($subscription->status != 'active1') {
+                return $this->respondWithError($response, 'Продлить можно только активную подписку', 'validation_error', 400);
+            }
             
             // Проверяем существование тарифа
             $tariff = Tariff::find($data['tariff_id']);
