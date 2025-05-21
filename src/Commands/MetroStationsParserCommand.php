@@ -46,6 +46,7 @@ class MetroStationsParserCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $cmd = '/usr/bin/supervisorctl stop parse-metro-stations';
         $this->logger->info("Запуск парсинга станций метро",
             ['date' => date('Y-m-d H:i:s')], 'parse-metro-stations');
         
@@ -98,7 +99,9 @@ class MetroStationsParserCommand extends Command
             }
 
             $this->logger->info("Парсинг станций метро успешно завершен", [], 'parse-metro-stations');
-            return Command::SUCCESS;
+
+            exec($cmd);
+            return 0;
         } catch (Exception $e) {
             $this->logger->error("Ошибка при выполнении скрипта", [
                 'error' => $e->getMessage(),
