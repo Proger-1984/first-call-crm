@@ -58,9 +58,6 @@ class MetroStationsParserCommand extends Command
                     continue;
                 }
 
-                $this->logger->info("Парсинг станций метро для города: $location->city",
-                    ['locationId' => $location->city], 'parse-metro-stations');
-
                 $response = $this->client->request('GET', 'https://api.hh.ru/metro/' . $id, [
                     'timeout' => 5,
                     'connect_timeout' => 5,
@@ -144,18 +141,12 @@ class MetroStationsParserCommand extends Command
             ->exists();
 
         if ($exists) {
-            $this->logger->warning("Станция {$values['name']} уже существует в базе, пропускаем", [
-                'locationId' => $values['location_id'],
-            ], 'parse-metro-stations');
             return;
         }
 
         try {
             Manager::table('metro_stations')->insert($values);
-            
-            $this->logger->info("Станция {$values['name']} успешно добавлена в базу", [
-                'locationId' => $values['location_id'],
-            ], 'parse-metro-stations');
+
         } catch (Exception $e) {
             $this->logger->error("Ошибка при сохранении станции {$values['name']}", [
                 'locationId' => $values['location_id'],

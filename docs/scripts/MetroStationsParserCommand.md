@@ -19,6 +19,13 @@
 php bin/console parse-metro-stations
 ```
 
+## Запуск по расписанию
+Скрипт запускается автоматически каждую ночь в 3:00 через cron. Запись в crontab выглядит следующим образом:
+
+```bash
+0 3 * * * /usr/bin/supervisorctl start parse-metro-stations
+```
+
 ## Таблицы в базе данных
 Скрипт работает с двумя таблицами:
 - `locations` - таблица с локациями (городами)
@@ -53,4 +60,4 @@ php bin/console parse-metro-stations
 - Предупреждения о существующих станциях
 - Ошибки при выполнении скрипта
 
-Файлы логов сохраняются с тегом 'parse-metro-stations'. 
+Файлы логов сохраняются с тегом 'parse-metro-stations'.
