@@ -100,6 +100,7 @@ class MetroStationsParserCommand extends Command
 
             $this->logger->info("Парсинг станций метро успешно завершен", [], 'parse-metro-stations');
 
+            sleep(3);
             exec($cmd);
             return 0;
         } catch (Exception $e) {
