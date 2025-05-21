@@ -6,6 +6,7 @@ use App\Controllers\LocationPolygonController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
+use App\Controllers\BillingController;
 use App\Middleware\AuthMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
@@ -105,6 +106,22 @@ return function (App $app) {
             $group->post('/activate', [AdminSubscriptionController::class, 'activateSubscription']);
             $group->post('/extend', [AdminSubscriptionController::class, 'extendSubscription']);
             $group->post('/cancel', [AdminSubscriptionController::class, 'cancelSubscription']);
+        })->add(new AuthMiddleware($container));
+
+        /** Маршруты для биллинг-панели
+         * Для администраторов получение информации по всем подпискам - getCurrentSubscriptions
+         * Для пользователей получение информации о собственных подписках - getUserSubscriptions
+         * Для администраторов получение истории по подпискам - getSubscriptionHistory
+         */
+        $group->group('/billing', function (RouteCollectorProxy $group) use ($container) {
+            // Общие маршруты для всех пользователей
+            $group->post('/user-subscriptions', [BillingController::class, 'getUserSubscriptions']);
+            
+            // Маршруты только для администраторов
+            $group->group('/admin', function (RouteCollectorProxy $group) {
+                $group->post('/current-subscriptions', [BillingController::class, 'getCurrentSubscriptions']);
+                $group->post('/subscription-history', [BillingController::class, 'getSubscriptionHistory']);
+            });
         })->add(new AuthMiddleware($container));
 
     });
