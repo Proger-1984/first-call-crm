@@ -6,6 +6,9 @@ declare(strict_types=1);
 require __DIR__ . '/../vendor/autoload.php';
 
 use App\Commands\MetroStationsParserCommand;
+use App\Commands\NotifySubscriptionExpiringCommand;
+use App\Commands\NotifySubscriptionExpiredCommand;
+use App\Commands\UpdateExpiredSubscriptionsCommand;
 use Symfony\Component\Console\Application;
 
 try {
@@ -19,8 +22,11 @@ try {
     // Создаем приложение консоли
     $cli = new Application('Console');
     
-    // Добавляем нашу команду для парсинга станций метро
+    // Добавляем команды
     $cli->add(new MetroStationsParserCommand($container));
+    $cli->add(new NotifySubscriptionExpiringCommand($container));
+    $cli->add(new NotifySubscriptionExpiredCommand($container));
+    $cli->add(new UpdateExpiredSubscriptionsCommand($container));
     
     $cli->run();
 
