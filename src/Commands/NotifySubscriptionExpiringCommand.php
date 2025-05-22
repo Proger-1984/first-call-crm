@@ -8,7 +8,7 @@ use App\Services\LogService;
 use App\Services\TelegramService;
 use Carbon\Carbon;
 use Exception;
-use Illuminate\Database\Capsule\Manager;
+use GuzzleHttp\Exception\GuzzleException;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Symfony\Component\Console\Command\Command;
@@ -40,8 +40,12 @@ class NotifySubscriptionExpiringCommand extends Command
             ->setDescription('Уведомляет пользователей о скором окончании подписки');
     }
 
+    /**
+     * @throws GuzzleException
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $cmd = '/usr/bin/supervisorctl stop notify-subscription-expiring';
         $this->logger->info("Запуск уведомления пользователей о скором окончании подписки",
             ['date' => date('Y-m-d H:i:s')], 'subscription-expiring');
         
@@ -55,18 +59,26 @@ class NotifySubscriptionExpiringCommand extends Command
             $this->notifyDemoSubscriptionsExpiringInMinutes(15); // 15 минут
 
             $this->logger->info("Уведомление о скором окончании подписок завершено", [], 'subscription-expiring');
-            return Command::SUCCESS;
+
+            sleep(3);
+            exec($cmd);
+            return 0;
+
         } catch (Exception $e) {
             $this->logger->error("Ошибка при выполнении скрипта", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ], 'subscription-expiring');
-            return Command::FAILURE;
+
+            sleep(3);
+            exec($cmd);
+            return 0;
         }
     }
-    
+
     /**
      * Уведомляет пользователей о подписках, истекающих через указанное количество дней
+     * @throws GuzzleException
      */
     private function notifySubscriptionsExpiringInDays(int $days): void
     {
@@ -75,8 +87,12 @@ class NotifySubscriptionExpiringCommand extends Command
         $endDate = Carbon::now()->addDays($days)->endOfDay();
         
         // Находим активные подписки, которые истекают в этом интервале
+        // Исключаем пользователей, у которых заблокирован бот
         $expiringSubscriptions = UserSubscription::where('status', 'active')
             ->whereBetween('end_date', [$startDate, $endDate])
+            ->whereHas('user', function($query) {
+                $query->where('telegram_bot_blocked', false);
+            })
             ->get();
         
         $this->logger->info("Найдено подписок, истекающих через $days дней: " . count($expiringSubscriptions), [], 'subscription-expiring');
@@ -95,27 +111,24 @@ class NotifySubscriptionExpiringCommand extends Command
                 // Подгружаем связанные данные
                 $subscription->load(['category', 'location', 'tariff']);
                 
-                // Формируем текст уведомления
-                $endDate = $subscription->end_date->format('d.m.Y H:i');
-                $daysText = $this->getDaysText($days);
-                
-                $message = "⚠️ <b>Скоро закончится срок действия подписки</b>\n\n" .
-                    "Ваша подписка <b>{$subscription->tariff->name}</b> на категорию <b>{$subscription->category->name}</b> " .
-                    "для локации <b>{$subscription->location->getFullName()}</b> истекает через $daysText.\n\n" .
-                    "⏱ Дата окончания: <b>$endDate</b>\n\n" .
-                    "Для продления подписки перейдите в раздел «Подписки» в приложении или обратитесь в " .
-                    "<a href='https://t.me/firstcall_support'>службу поддержки</a>.";
-                
-                $result = $this->telegramService->sendMessage($user->telegram_id, $message);
+                // Отправляем уведомление о скором окончании подписки
+                $result = $this->telegramService->notifySubscriptionExpiring($user, $subscription, $days);
                 
                 if ($result) {
                     $this->logger->info("Уведомление отправлено пользователю", 
                         ['user_id' => $user->id, 'subscription_id' => $subscription->id, 'days' => $days], 
                         'subscription-expiring');
                 } else {
-                    $this->logger->warning("Не удалось отправить уведомление пользователю", 
-                        ['user_id' => $user->id, 'subscription_id' => $subscription->id, 'days' => $days], 
-                        'subscription-expiring');
+                    // Проверяем, заблокирован ли бот после попытки отправки
+                    if ($user->telegram_bot_blocked) {
+                        $this->logger->warning("Не удалось отправить уведомление пользователю - бот заблокирован", 
+                            ['user_id' => $user->id, 'subscription_id' => $subscription->id, 'days' => $days], 
+                            'subscription-expiring');
+                    } else {
+                        $this->logger->warning("Не удалось отправить уведомление пользователю", 
+                            ['user_id' => $user->id, 'subscription_id' => $subscription->id, 'days' => $days], 
+                            'subscription-expiring');
+                    }
                 }
             } catch (Exception $e) {
                 $this->logger->error("Ошибка при отправке уведомления", [
@@ -125,44 +138,10 @@ class NotifySubscriptionExpiringCommand extends Command
             }
         }
     }
-    
-    /**
-     * Возвращает текстовое представление дней
-     */
-    private function getDaysText(int $days): string
-    {
-        if ($days === 1) {
-            return '1 день';
-        } elseif ($days > 1 && $days < 5) {
-            return "$days дня";
-        } else {
-            return "$days дней";
-        }
-    }
-    
-    /**
-     * Возвращает текстовое представление минут
-     */
-    private function getMinutesText(int $minutes): string
-    {
-        if ($minutes == 60) {
-            return '1 час';
-        } elseif ($minutes == 30) {
-            return '30 минут';
-        } elseif ($minutes == 15) {
-            return '15 минут';
-        } elseif ($minutes % 10 == 1 && $minutes % 100 != 11) {
-            return "$minutes минуту";
-        } elseif (($minutes % 10 >= 2 && $minutes % 10 <= 4) && 
-                 !($minutes % 100 >= 12 && $minutes % 100 <= 14)) {
-            return "$minutes минуты";
-        } else {
-            return "$minutes минут";
-        }
-    }
-    
+
     /**
      * Уведомляет пользователей о демо-подписках, истекающих через указанное количество минут
+     * @throws GuzzleException
      */
     private function notifyDemoSubscriptionsExpiringInMinutes(int $minutes): void
     {
@@ -173,10 +152,14 @@ class NotifySubscriptionExpiringCommand extends Command
         
         // Находим активные демо-подписки, которые истекают в этом интервале
         // Демо тариф имеет код 'demo'
+        // Исключаем пользователей, у которых заблокирован бот
         $expiringSubscriptions = UserSubscription::where('status', 'active')
             ->whereBetween('end_date', [$targetStartTime, $targetEndTime])
             ->whereHas('tariff', function($query) {
                 $query->where('code', 'demo');
+            })
+            ->whereHas('user', function($query) {
+                $query->where('telegram_bot_blocked', false);
             })
             ->with(['tariff', 'category', 'location'])
             ->get();
@@ -195,27 +178,24 @@ class NotifySubscriptionExpiringCommand extends Command
                     continue;
                 }
                 
-                // Формируем текст уведомления для демо-подписки
-                $endDate = $subscription->end_date->format('d.m.Y H:i');
-                $minutesText = $this->getMinutesText($minutes);
-                
-                $message = "⏳ <b>Скоро закончится срок действия демо-подписки</b>\n\n" .
-                    "Ваша демо-подписка на категорию <b>{$subscription->category->name}</b> " .
-                    "для локации <b>{$subscription->location->getFullName()}</b> истекает через $minutesText.\n\n" .
-                    "⏱ Дата окончания: <b>$endDate</b>\n\n" .
-                    "Для получения полного доступа оформите платную подписку в разделе «Подписки» приложения или обратитесь в " .
-                    "<a href='https://t.me/firstcall_support'>службу поддержки</a>.";
-                
-                $result = $this->telegramService->sendMessage($user->telegram_id, $message);
+                // Отправляем уведомление о скором окончании демо-подписки
+                $result = $this->telegramService->notifyDemoSubscriptionExpiring($user, $subscription, $minutes);
                 
                 if ($result) {
                     $this->logger->info("Уведомление о скором окончании демо-подписки отправлено пользователю", 
                         ['user_id' => $user->id, 'subscription_id' => $subscription->id, 'minutes' => $minutes], 
                         'subscription-expiring');
                 } else {
-                    $this->logger->warning("Не удалось отправить уведомление о скором окончании демо-подписки", 
-                        ['user_id' => $user->id, 'subscription_id' => $subscription->id, 'minutes' => $minutes], 
-                        'subscription-expiring');
+                    // Проверяем, заблокирован ли бот после попытки отправки
+                    if ($user->telegram_bot_blocked) {
+                        $this->logger->warning("Не удалось отправить уведомление о скором окончании демо-подписки - бот заблокирован", 
+                            ['user_id' => $user->id, 'subscription_id' => $subscription->id, 'minutes' => $minutes], 
+                            'subscription-expiring');
+                    } else {
+                        $this->logger->warning("Не удалось отправить уведомление о скором окончании демо-подписки", 
+                            ['user_id' => $user->id, 'subscription_id' => $subscription->id, 'minutes' => $minutes], 
+                            'subscription-expiring');
+                    }
                 }
             } catch (Exception $e) {
                 $this->logger->error("Ошибка при отправке уведомления о скором окончании демо-подписки", [

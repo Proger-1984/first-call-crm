@@ -8,6 +8,7 @@ use App\Services\LogService;
 use App\Services\TelegramService;
 use Carbon\Carbon;
 use Exception;
+use GuzzleHttp\Exception\GuzzleException;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Symfony\Component\Console\Command\Command;
@@ -39,8 +40,12 @@ class NotifySubscriptionExpiredCommand extends Command
             ->setDescription('Уведомляет пользователей о завершении срока действия подписки');
     }
 
+    /**
+     * @throws GuzzleException
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $cmd = '/usr/bin/supervisorctl stop notify-subscription-expired';
         $this->logger->info("Запуск уведомления пользователей о завершении подписки",
             ['date' => date('Y-m-d H:i:s')], 'subscription-expired');
         
@@ -50,11 +55,17 @@ class NotifySubscriptionExpiredCommand extends Command
             $startDate = $now->copy()->subDay();
             
             // Находим активные подписки, которые истекли в указанном интервале
+            // Исключаем пользователей, у которых заблокирован бот
             $expiredSubscriptions = UserSubscription::where('status', 'active')
                 ->whereBetween('end_date', [$startDate, $now])
+                ->whereHas('user', function($query) {
+                    $query->where('telegram_bot_blocked', false);
+                })
                 ->get();
             
-            $this->logger->info("Найдено истекших подписок: " . count($expiredSubscriptions), [], 'subscription-expired');
+            $this->logger->info("Найдено истекших подписок: " . count($expiredSubscriptions),
+                ['end_date_from' => $startDate, 'end_date_to' => $now],
+                'subscription-expired');
             
             foreach ($expiredSubscriptions as $subscription) {
                 try {
@@ -70,26 +81,24 @@ class NotifySubscriptionExpiredCommand extends Command
                     // Подгружаем связанные данные
                     $subscription->load(['category', 'location', 'tariff']);
                     
-                    // Формируем текст уведомления
-                    $endDate = $subscription->end_date->format('d.m.Y H:i');
-                    
-                    $message = "❌ <b>Срок действия подписки истек</b>\n\n" .
-                        "Ваша подписка <b>{$subscription->tariff->name}</b> на категорию <b>{$subscription->category->name}</b> " .
-                        "для локации <b>{$subscription->location->getFullName()}</b> закончилась.\n\n" .
-                        "⏱ Дата окончания: <b>$endDate</b>\n\n" .
-                        "Для продления доступа перейдите в раздел «Подписки» в приложении или обратитесь в " .
-                        "<a href='https://t.me/firstcall_support'>службу поддержки</a>.";
-                    
-                    $result = $this->telegramService->sendMessage($user->telegram_id, $message);
+                    // Отправляем уведомление об истечении подписки
+                    $result = $this->telegramService->notifySubscriptionExpired($user, $subscription);
                     
                     if ($result) {
                         $this->logger->info("Уведомление об истечении подписки отправлено пользователю", 
                             ['user_id' => $user->id, 'subscription_id' => $subscription->id], 
                             'subscription-expired');
                     } else {
-                        $this->logger->warning("Не удалось отправить уведомление об истечении подписки пользователю", 
-                            ['user_id' => $user->id, 'subscription_id' => $subscription->id], 
-                            'subscription-expired');
+                        // Проверяем, заблокирован ли бот после попытки отправки
+                        if ($user->telegram_bot_blocked) {
+                            $this->logger->warning("Не удалось отправить уведомление об истечении подписки - бот заблокирован", 
+                                ['user_id' => $user->id, 'subscription_id' => $subscription->id], 
+                                'subscription-expired');
+                        } else {
+                            $this->logger->warning("Не удалось отправить уведомление об истечении подписки пользователю", 
+                                ['user_id' => $user->id, 'subscription_id' => $subscription->id, 'error' => $result],
+                                'subscription-expired');
+                        }
                     }
                 } catch (Exception $e) {
                     $this->logger->error("Ошибка при отправке уведомления об истечении подписки", [
@@ -100,13 +109,19 @@ class NotifySubscriptionExpiredCommand extends Command
             }
 
             $this->logger->info("Уведомление о завершении подписок завершено", [], 'subscription-expired');
-            return Command::SUCCESS;
+
+            sleep(3);
+            exec($cmd);
+            return 0;
         } catch (Exception $e) {
             $this->logger->error("Ошибка при выполнении скрипта уведомления об истечении подписок", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ], 'subscription-expired');
-            return Command::FAILURE;
+
+            sleep(3);
+            exec($cmd);
+            return 0;
         }
     }
 } 

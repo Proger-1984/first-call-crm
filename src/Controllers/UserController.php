@@ -377,6 +377,7 @@ class UserController
 
     /**
      * Генерация нового пароля для приложения
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function generatePassword(Request $request, Response $response): Response
     {
@@ -392,11 +393,7 @@ class UserController
             $this->userService->updateUserPassword($userId, $newPassword);
 
             // Отправляем уведомление через Telegram
-            $this->telegramService->sendPasswordNotification(
-                $user->getTelegramId(),
-                (string)$user->getId(),
-                $newPassword
-            );
+            $this->telegramService->sendPasswordNotification($user, $newPassword);
 
             return $this->respondWithData($response, [
                 'code' => 200,

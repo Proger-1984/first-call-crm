@@ -108,7 +108,10 @@ class MetroStationsParserCommand extends Command
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ], 'parse-metro-stations');
-            return Command::FAILURE;
+
+            sleep(3);
+            exec($cmd);
+            return 0;
         }
     }
     

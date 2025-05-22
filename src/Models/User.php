@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property string $password_hash
  * @property bool $is_trial_used
  * @property bool $phone_status
+ * @property bool $telegram_bot_blocked
  * @property string $role
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -63,6 +64,7 @@ class User extends Model
         'telegram_hash',
         'password_hash',
         'is_trial_used',
+        'telegram_bot_blocked',
         'role'
     ];
 

@@ -114,6 +114,7 @@ class TelegramAuthService extends BaseAuthService
         $user->telegram_photo_url = $auth_data['photo_url'] ?? null;
         $user->telegram_auth_date = $auth_data['auth_date'];
         $user->telegram_hash = $auth_data['hash'];
+        $user->telegram_bot_blocked = false;
         $user->save();
 
         // Создаем настройки для нового пользователя
@@ -152,6 +153,7 @@ class TelegramAuthService extends BaseAuthService
      * @param int $userId ID пользователя
      * @param array $telegramData Данные от Telegram
      * @return array Результат операции с детальной информацией
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function rebindTelegramAccount(int $userId, array $telegramData): array
     {
@@ -188,6 +190,7 @@ class TelegramAuthService extends BaseAuthService
             $user->telegram_photo_url = $telegramData['photo_url'] ?? null;
             $user->telegram_auth_date = $telegramData['auth_date'];
             $user->telegram_hash = $telegramData['hash'];
+            $user->telegram_bot_blocked = false;
 
             if (!$user->save()) {
                 return [

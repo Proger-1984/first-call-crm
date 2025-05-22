@@ -6,11 +6,15 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\UserSubscription;
+use GuzzleHttp\Exception\GuzzleException;
+use JetBrains\PhpStorm\ArrayShape;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use Exception;
 use App\Models\Tariff;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 
 class TelegramService
 {
@@ -18,6 +22,7 @@ class TelegramService
     private string $apiUrl = 'https://api.telegram.org/bot';
     private string $adminChatId;
     private SubscriptionService $subscriptionService;
+    private Client $httpClient;
 
     /**
      * @throws ContainerExceptionInterface
@@ -29,6 +34,79 @@ class TelegramService
         $this->botToken = $config['telegram']['bot_token'] ?? '';
         $this->adminChatId = $config['telegram']['admin_chat_id'] ?? '';
         $this->subscriptionService = $container->get(SubscriptionService::class);
+        $this->httpClient = new Client(['timeout' => 10.0]);
+    }
+
+    /**
+     * Отправляет запрос к методу sendMessage Telegram API
+     * 
+     * @param array $params Параметры запроса
+     * @return array Результат запроса и флаги успеха/блокировки
+     * @throws GuzzleException
+     */
+    private function callSendMessageApi(array $params): array 
+    {
+        if (empty($this->botToken)) {
+            return [
+                'success' => false, 
+                'error' => 'Bot token is empty',
+                'blocked' => false,
+                'data' => null
+            ];
+        }
+
+        $url = $this->apiUrl . $this->botToken . '/sendMessage';
+        
+        try {
+            $response = $this->httpClient->post($url, [
+                'form_params' => $params,
+                'http_errors' => false
+            ]);
+            
+            $statusCode = $response->getStatusCode();
+            $responseBody = json_decode($response->getBody()->getContents(), true);
+            
+            // Проверяем на блокировку бота (403 Forbidden)
+            $isBlocked = $statusCode === 403;
+            
+            if ($statusCode !== 200 || !isset($responseBody['ok']) || $responseBody['ok'] !== true) {
+                $error = $responseBody['description'] ?? "HTTP Error: $statusCode";
+                
+                return [
+                    'success' => false,
+                    'error' => $error,
+                    'blocked' => $isBlocked,
+                    'data' => $responseBody
+                ];
+            }
+            
+            return [
+                'success' => true,
+                'error' => null,
+                'blocked' => false,
+                'data' => $responseBody['result'] ?? null
+            ];
+        } catch (RequestException $e) {
+            $response = $e->getResponse();
+            $isBlocked = $response && $response->getStatusCode() === 403;
+            $errorMessage = $e->getMessage();
+            
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+                'blocked' => $isBlocked,
+                'data' => null
+            ];
+        } catch (Exception $e) {
+            $errorMessage = $e->getMessage();
+            
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+                'blocked' => false,
+                'data' => null
+            ];
+        }
     }
 
     /**
@@ -36,34 +114,25 @@ class TelegramService
      * 
      * @param string $chatId ID чата пользователя
      * @param string $message Текст сообщения
-     * @return bool Успешность отправки
+     * @return array Результат отправки: ['success' => bool, 'error' => ?string, 'blocked' => bool]
+     * @throws GuzzleException
      */
-    public function sendMessage(string $chatId, string $message): bool
+    #[ArrayShape(['success' => "mixed", 'error' => "mixed", 'blocked' => "mixed"])]
+    public function sendMessage(string $chatId, string $message): array
     {
-        if (empty($this->botToken)) {
-            return false;
-        }
-
-        $url = $this->apiUrl . $this->botToken . '/sendMessage';
-        
-        $data = [
+        $params = [
             'chat_id' => $chatId,
             'text' => $message,
             'parse_mode' => 'HTML'
         ];
-
-        $options = [
-            'http' => [
-                'header' => "Content-type: application/x-www-form-urlencoded\r\n",
-                'method' => 'POST',
-                'content' => http_build_query($data)
-            ]
+        
+        $result = $this->callSendMessageApi($params);
+        
+        return [
+            'success' => $result['success'],
+            'error' => $result['error'],
+            'blocked' => $result['blocked']
         ];
-
-        $context = stream_context_create($options);
-        $result = file_get_contents($url, false, $context);
-
-        return $result !== false;
     }
 
     /**
@@ -73,6 +142,7 @@ class TelegramService
      * @param User $user
      * @param UserSubscription $subscription
      * @return bool Успешность отправки
+     * @throws GuzzleException
      */
     public function notifyDemoSubscriptionCreated(User $user, UserSubscription $subscription): bool
     {
@@ -85,7 +155,16 @@ class TelegramService
             "Благодарим за выбор нашего сервиса! Если у вас возникнут вопросы, " .
             "обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
 
-        return $this->sendMessage($user->telegram_id, $message);
+        $result = $this->sendMessage($user->telegram_id, $message);
+        
+        // Обновляем статус блокировки бота
+        if ($result['success'] && $user->telegram_bot_blocked) {
+            $this->updateBotBlockedStatus($user, false);
+        } else if ($result['blocked']) {
+            $this->updateBotBlockedStatus($user, true);
+        }
+        
+        return $result['success'];
     }
 
     /**
@@ -95,6 +174,7 @@ class TelegramService
      * @param User $user
      * @param UserSubscription $subscription
      * @return bool Успешность отправки
+     * @throws GuzzleException
      */
     public function notifyPremiumSubscriptionActivated(User $user, UserSubscription $subscription): bool
     {
@@ -106,7 +186,16 @@ class TelegramService
             "Благодарим за выбор нашего сервиса! Если у вас возникнут вопросы, " .
             "обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
 
-        return $this->sendMessage($user->telegram_id, $message);
+        $result = $this->sendMessage($user->telegram_id, $message);
+        
+        // Обновляем статус блокировки бота
+        if ($result['success'] && $user->telegram_bot_blocked) {
+            $this->updateBotBlockedStatus($user, false);
+        } else if ($result['blocked']) {
+            $this->updateBotBlockedStatus($user, true);
+        }
+        
+        return $result['success'];
     }
 
     /**
@@ -116,6 +205,7 @@ class TelegramService
      * @param User $user
      * @param UserSubscription $subscription
      * @return bool Успешность отправки
+     * @throws GuzzleException
      */
     public function notifyPremiumSubscriptionRequested(User $user, UserSubscription $subscription): bool
     {
@@ -133,7 +223,16 @@ class TelegramService
             "После подтверждения оплаты подписка будет активирована, и вы получите уведомление.\n\n" .
             "По всем вопросам обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
 
-        return $this->sendMessage($user->telegram_id, $message);
+        $result = $this->sendMessage($user->telegram_id, $message);
+        
+        // Обновляем статус блокировки бота
+        if ($result['success'] && $user->telegram_bot_blocked) {
+            $this->updateBotBlockedStatus($user, false);
+        } else if ($result['blocked']) {
+            $this->updateBotBlockedStatus($user, true);
+        }
+        
+        return $result['success'];
     }
 
     /**
@@ -144,6 +243,7 @@ class TelegramService
      * @param UserSubscription $subscription
      * @param Tariff $tariff
      * @return bool Успешность отправки
+     * @throws GuzzleException
      */
     public function notifyExtendSubscriptionRequested(User $user, UserSubscription $subscription, Tariff $tariff): bool
     {
@@ -165,7 +265,16 @@ class TelegramService
             "После подтверждения оплаты подписка будет продлена, и вы получите уведомление.\n\n" .
             "По всем вопросам обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
 
-        return $this->sendMessage($user->telegram_id, $message);
+        $result = $this->sendMessage($user->telegram_id, $message);
+        
+        // Обновляем статус блокировки бота
+        if ($result['success'] && $user->telegram_bot_blocked) {
+            $this->updateBotBlockedStatus($user, false);
+        } else if ($result['blocked']) {
+            $this->updateBotBlockedStatus($user, true);
+        }
+        
+        return $result['success'];
     }
 
     /**
@@ -175,6 +284,7 @@ class TelegramService
      * @param User $user
      * @param UserSubscription $subscription
      * @return bool Успешность отправки
+     * @throws GuzzleException
      */
     public function notifySubscriptionExtended(User $user, UserSubscription $subscription): bool
     {
@@ -186,7 +296,16 @@ class TelegramService
             "Благодарим за использование нашего сервиса! Если у вас возникнут вопросы, " .
             "обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
 
-        return $this->sendMessage($user->telegram_id, $message);
+        $result = $this->sendMessage($user->telegram_id, $message);
+        
+        // Обновляем статус блокировки бота
+        if ($result['success'] && $user->telegram_bot_blocked) {
+            $this->updateBotBlockedStatus($user, false);
+        } else if ($result['blocked']) {
+            $this->updateBotBlockedStatus($user, true);
+        }
+        
+        return $result['success'];
     }
 
     /**
@@ -197,6 +316,7 @@ class TelegramService
      * @param UserSubscription $subscription
      * @param string $reason
      * @return bool Успешность отправки
+     * @throws GuzzleException
      */
     public function notifySubscriptionCancelled(User $user, UserSubscription $subscription, string $reason): bool
     {
@@ -206,7 +326,16 @@ class TelegramService
             "Причина: <i>$reason</i>\n\n" .
             "По всем вопросам обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
 
-        return $this->sendMessage($user->telegram_id, $message);
+        $result = $this->sendMessage($user->telegram_id, $message);
+        
+        // Обновляем статус блокировки бота
+        if ($result['success'] && $user->telegram_bot_blocked) {
+            $this->updateBotBlockedStatus($user, false);
+        } else if ($result['blocked']) {
+            $this->updateBotBlockedStatus($user, true);
+        }
+        
+        return $result['success'];
     }
 
     /**
@@ -215,6 +344,7 @@ class TelegramService
      *
      * @param UserSubscription $subscription
      * @return bool Успешность отправки
+     * @throws GuzzleException
      */
     public function notifyAdminNewSubscriptionRequest(UserSubscription $subscription): bool
     {
@@ -234,7 +364,8 @@ class TelegramService
             "💰 Сумма: <b>$price руб.</b>\n\n" .
             "Для обработки заявки перейдите в <a href='https://realtor.first-call.ru/subscriptions/pending'>панель администратора</a>.";
             
-        return $this->sendMessage($this->adminChatId, $message);
+        $result = $this->sendMessage($this->adminChatId, $message);
+        return $result['success'];
     }
 
     /**
@@ -246,6 +377,7 @@ class TelegramService
      * @param $tariff
      * @param string|null $notes
      * @return bool Успешность отправки
+     * @throws GuzzleException
      */
     public function notifyAdminsAboutExtendRequest(User $user, UserSubscription $subscription, $tariff, ?string $notes = null): bool
     {
@@ -272,17 +404,20 @@ class TelegramService
         
         $message .= "\nДля обработки заявки перейдите в <a href='https://realtor.first-call.ru/subscriptions/pending'>панель администратора</a>.";
             
-        return $this->sendMessage($this->adminChatId, $message);
+        $result = $this->sendMessage($this->adminChatId, $message);
+        return $result['success'];
     }
 
     /**
      * Отправляет уведомление о регистрации через Telegram
      * с логином и паролем от приложения
-     * 
+     *
      * @param string $chatId ID чата пользователя
+     * @param string $login Логин пользователя
      * @param string $username Имя пользователя
      * @param string $password Сгенерированный пароль
      * @return bool Успешность отправки
+     * @throws GuzzleException
      */
     public function sendRegistrationNotification(string $chatId, string $login, string $username, string $password): bool
     {
@@ -302,7 +437,48 @@ class TelegramService
                 "• <a href=\"https://realtor.first-call.ru\">Инструкции по работа с сервисом</a>\n\n" .
                 "⚠️<i>Сохраните данные для входа через приложение в надежном месте. В случае утери пароля вы можете сгенерировать новый в личном кабинете.</i>";
 
-            return $this->sendMessage($chatId, $message);
+            $result = $this->sendMessage($chatId, $message);
+            
+            // Проверка на блокировку не нужна, т.к. пользователь только регистрируется
+            
+            return $result['success'];
+        } catch (Exception) {
+            return false;
+        }
+    }
+
+    /**
+     * Отправляет сообщение с новым паролем для приложения
+     * 
+     * @param User $user Пользователь
+     * @param string $newPassword Новый пароль
+     * @return bool Успешность отправки
+     * @throws GuzzleException
+     */
+    public function sendPasswordNotification(User $user, string $newPassword): bool
+    {
+        try {
+            $message = "🔐 <b>Новый пароль для приложения First Call</b>\n\n" .
+                "Ваш новый пароль был успешно сгенерирован:\n\n" .
+                "👤 <b>Логин:</b> <code>" . $user->id . "</code>\n" .
+                "🔑 <b>Пароль:</b> <code>" . $newPassword . "</code>\n\n" .
+                "📱 <b>Как использовать:</b>\n" .
+                "• Используйте эти данные для входа в мобильное приложение\n" .
+                "• Храните пароль в надежном месте\n" .
+                "• Никому не сообщайте эти данные\n\n" .
+                "❓ Если вы не запрашивали новый пароль или у вас возникли вопросы, обратитесь в " .
+                "<a href='https://t.me/firstcall_support'>службу поддержки</a>.";
+
+            $result = $this->sendMessage($user->telegram_id, $message);
+            
+            // Обновляем статус блокировки бота
+            if ($result['success'] && $user->telegram_bot_blocked) {
+                $this->updateBotBlockedStatus($user, false);
+            } else if ($result['blocked']) {
+                $this->updateBotBlockedStatus($user, true);
+            }
+            
+            return $result['success'];
         } catch (Exception) {
             return false;
         }
@@ -316,41 +492,192 @@ class TelegramService
      * @param string $userName Имя пользователя
      * @param string|null $oldTelegramId Старый Telegram ID пользователя
      * @return bool Успешность отправки
+     * @throws GuzzleException
      */
     public function sendRebindNotification(string $telegramId, string $userId, string $userName, ?string $oldTelegramId): bool
     {
         try {
-            $message = "🔄 *Перепривязка Telegram аккаунта*\n\n";
-            $message .= "👤 Пользователь: `$userName`\n";
-            $message .= "🆔 ID в системе: `$userId`\n";
-            $message .= "📱 Новый Telegram ID: `$telegramId`\n";
+            $message = "🔄 <b>Перепривязка Telegram аккаунта</b>\n\n" .
+                "Ваш Telegram аккаунт успешно привязан к учетной записи First Call!\n\n" .
+                "👤 <b>Пользователь:</b> " . htmlspecialchars($userName) . "\n" .
+                "🆔 <b>ID в системе:</b> <code>" . htmlspecialchars($userId) . "</code>\n" .
+                "📱 <b>Новый Telegram ID:</b> <code>" . htmlspecialchars($telegramId) . "</code>\n";
             
             if ($oldTelegramId) {
-                $message .= "📱 Старый Telegram ID: `$oldTelegramId`\n";
+                $message .= "📱 <b>Старый Telegram ID:</b> <code>" . htmlspecialchars($oldTelegramId) . "</code>\n";
             }
             
-            $message .= "\n⏰ Время: " . date('Y-m-d H:i:s');
+            $message .= "\n⏰ <b>Время:</b> " . date('Y-m-d H:i:s') . "\n\n" .
+                "✅ <b>Что это значит:</b>\n" .
+                "• Теперь вы будете получать уведомления на этот аккаунт\n" .
+                "• Предыдущий аккаунт Telegram больше не привязан к системе\n" .
+                "• Доступ к функциям First Call через этот аккаунт подтвержден\n\n" .
+                "❓ Если вы не выполняли перепривязку или у вас возникли вопросы, обратитесь в " .
+                "<a href='https://t.me/firstcall_support'>службу поддержки</a>.";
 
-            return $this->sendMessage($telegramId, $message);
+            $result = $this->sendMessage($telegramId, $message);
+            
+            // Проверка на блокировку не нужна, т.к. это новый привязанный телеграм
+            
+            return $result['success'];
         } catch (Exception) {
             return false;
         }
     }
 
     /**
-     * Отправляет уведомление с новым паролем для приложения
+     * Обновляет статус блокировки бота пользователем
+     * 
+     * @param User $user Пользователь
+     * @param bool $isBlocked Статус блокировки
+     * @return void
      */
-    public function sendPasswordNotification(string $telegramId, string $userId, string $newPassword): bool
+    private function updateBotBlockedStatus(User $user, bool $isBlocked): void
     {
-        try {
-            $message = "🔑 *Новый пароль для приложения*\n\n";
-            $message .= "Ваш логин: `$userId`\n";
-            $message .= "Новый пароль: `$newPassword`\n\n";
-            $message .= "Используйте эти данные для входа в мобильное приложение.";
+        // Обновляем статус только если он изменился
+        if ($user->telegram_bot_blocked !== $isBlocked) {
+            $user->telegram_bot_blocked = $isBlocked;
+            $user->save();
+        }
+    }
 
-            return $this->sendMessage($telegramId, $message);
-        } catch (Exception) {
-            return false;
+    /**
+     * Отправляет уведомление о скором окончании подписки
+     * 
+     * @param User $user Пользователь
+     * @param UserSubscription $subscription Подписка
+     * @param int $days Количество дней до окончания
+     * @return bool Успешность отправки
+     * @throws GuzzleException
+     */
+    public function notifySubscriptionExpiring(User $user, UserSubscription $subscription, int $days): bool
+    {
+        // Формируем текст склонения дней
+        $daysText = $this->getDaysText($days);
+        
+        // Формируем дату окончания
+        $endDate = $subscription->end_date->format('d.m.Y H:i');
+        
+        $message = "⚠️ <b>Скоро закончится срок действия подписки</b>\n\n" .
+            "Ваша подписка <b>{$subscription->tariff->name}</b> на категорию <b>{$subscription->category->name}</b> " .
+            "для локации <b>{$subscription->location->getFullName()}</b> истекает через $daysText.\n\n" .
+            "⏱ Дата окончания: <b>$endDate</b>\n\n" .
+            "Для продления подписки перейдите в раздел «Подписки» в приложении или обратитесь в " .
+            "<a href='https://t.me/firstcall_support'>службу поддержки</a>.";
+        
+        $result = $this->sendMessage($user->telegram_id, $message);
+        
+        // Обновляем статус блокировки бота пользователем
+        if ($result['success'] && $user->telegram_bot_blocked) {
+            $this->updateBotBlockedStatus($user, false);
+        } else if ($result['blocked']) {
+            $this->updateBotBlockedStatus($user, true);
+        }
+        
+        return $result['success'];
+    }
+    
+    /**
+     * Отправляет уведомление о скором окончании демо-подписки
+     * 
+     * @param User $user Пользователь
+     * @param UserSubscription $subscription Демо-подписка
+     * @param int $minutes Количество минут до окончания
+     * @return bool Успешность отправки
+     * @throws GuzzleException
+     */
+    public function notifyDemoSubscriptionExpiring(User $user, UserSubscription $subscription, int $minutes): bool
+    {
+        // Формируем текст склонения минут
+        $minutesText = $this->getMinutesText($minutes);
+        
+        // Формируем дату окончания
+        $endDate = $subscription->end_date->format('d.m.Y H:i');
+        
+        $message = "⏳ <b>Скоро закончится срок действия демо-подписки</b>\n\n" .
+            "Ваша демо-подписка на категорию <b>{$subscription->category->name}</b> " .
+            "для локации <b>{$subscription->location->getFullName()}</b> истекает через $minutesText.\n\n" .
+            "⏱ Дата окончания: <b>$endDate</b>\n\n" .
+            "Для получения полного доступа оформите платную подписку в разделе «Подписки» приложения или обратитесь в " .
+            "<a href='https://t.me/firstcall_support'>службу поддержки</a>.";
+        
+        $result = $this->sendMessage($user->telegram_id, $message);
+        
+        // Обновляем статус блокировки бота пользователем
+        if ($result['success'] && $user->telegram_bot_blocked) {
+            $this->updateBotBlockedStatus($user, false);
+        } else if ($result['blocked']) {
+            $this->updateBotBlockedStatus($user, true);
+        }
+        
+        return $result['success'];
+    }
+    
+    /**
+     * Отправляет уведомление об истечении срока действия подписки
+     * 
+     * @param User $user Пользователь
+     * @param UserSubscription $subscription Подписка
+     * @return bool Успешность отправки
+     * @throws GuzzleException
+     */
+    public function notifySubscriptionExpired(User $user, UserSubscription $subscription): bool
+    {
+        // Формируем дату окончания
+        $endDate = $subscription->end_date->format('d.m.Y H:i');
+        
+        $message = "❌ <b>Срок действия подписки истек</b>\n\n" .
+            "Ваша подписка <b>{$subscription->tariff->name}</b> на категорию <b>{$subscription->category->name}</b> " .
+            "для локации <b>{$subscription->location->getFullName()}</b> закончилась.\n\n" .
+            "⏱ Дата окончания: <b>$endDate</b>\n\n" .
+            "Оформите премиум-подписку для продолжения работы, для этого перейдите в раздел «Подписки».\n\n" .
+            "Благодарим за выбор нашего сервиса! Если у вас возникнут вопросы, " .
+            "обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
+        
+        $result = $this->sendMessage($user->telegram_id, $message);
+        
+        // Обновляем статус блокировки бота пользователем
+        if ($result['success'] && $user->telegram_bot_blocked) {
+            $this->updateBotBlockedStatus($user, false);
+        } else if ($result['blocked']) {
+            $this->updateBotBlockedStatus($user, true);
+        }
+        
+        return $result['success'];
+    }
+    
+    /**
+     * Возвращает текстовое представление дней
+     */
+    private function getDaysText(int $days): string
+    {
+        if ($days === 1) {
+            return '1 день';
+        } elseif ($days > 1 && $days < 5) {
+            return "$days дня";
+        } else {
+            return "$days дней";
+        }
+    }
+    
+    /**
+     * Возвращает текстовое представление минут
+     */
+    private function getMinutesText(int $minutes): string
+    {
+        if ($minutes == 60) {
+            return '1 час';
+        } elseif ($minutes == 30) {
+            return '30 минут';
+        } elseif ($minutes == 15) {
+            return '15 минут';
+        } elseif ($minutes % 10 == 1 && $minutes % 100 != 11) {
+            return "$minutes минуту";
+        } elseif (($minutes % 10 >= 2 && $minutes % 10 <= 4) && 
+                 !($minutes % 100 >= 12 && $minutes % 100 <= 14)) {
+            return "$minutes минуты";
+        } else {
+            return "$minutes минут";
         }
     }
 } 
