@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Traits\ResponseTrait;
 use App\Services\UserSettingsService;
 use Exception;
+use GuzzleHttp\Exception\GuzzleException;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -377,7 +378,7 @@ class UserController
 
     /**
      * Генерация нового пароля для приложения
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function generatePassword(Request $request, Response $response): Response
     {
