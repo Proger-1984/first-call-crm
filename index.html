@@ -1,0 +1,3219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Система</title>
+    <style>
+        :root {
+            --primary: #4a6cf7;
+            --primary-light: #eef2ff;
+            --secondary: #f9fafb;
+            --text: #384766;
+            --text-light: #6c7a93;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: #e5e7eb;
+            --white: #ffffff;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: var(--text);
+            display: flex;
+        }
+        
+        /* Сайдбар */
+        .sidebar {
+            width: 250px;
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+            height: 100vh;
+            position: fixed;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            top: 70px;
+        }
+        
+        .menu {
+            padding: 20px 0;
+            flex-grow: 1;
+        }
+        
+        .menu-item {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+        
+        .menu-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border-left-color: var(--primary);
+        }
+        
+        .menu-item.active {
+            background-color: rgba(74, 108, 247, 0.2);
+            color: #ffffff;
+            border-left-color: var(--primary);
+        }
+        
+        .menu-item i {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+            color: inherit;
+        }
+        
+        .menu-item a {
+            color: inherit;
+            text-decoration: none;
+        }
+        
+        /* Основной контент */
+        .main-content {
+            flex: 1;
+            margin-left: 0;
+            width: 100%;
+            margin-top: 70px;
+        }
+        
+        /* Верхняя панель */
+        .header {
+            background-color: var(--white);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 15;
+            height: 70px;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .header-logo {
+            height: 35px;
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .header-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background-color: var(--white);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .header-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .header-btn.primary {
+            background-color: var(--primary);
+            color: var(--white);
+            border-color: var(--primary);
+        }
+        
+        .header-btn.primary:hover {
+            opacity: 0.9;
+        }
+        
+        .access-info {
+            text-align: right;
+            padding: 0 10px;
+            border-right: 1px solid var(--border);
+        }
+        
+        .access-date {
+            font-weight: 500;
+            color: var(--text);
+        }
+        
+        .access-remaining {
+            font-size: 13px;
+            color: var(--text-light);
+        }
+        
+        .header-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text);
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .header-icon:hover {
+            background-color: var(--secondary);
+            color: var(--primary);
+        }
+        
+        .connection-indicator {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--success);
+            bottom: 3px;
+            right: 3px;
+            border: 2px solid var(--white);
+        }
+        
+        .connection-indicator.offline {
+            background-color: var(--danger);
+        }
+        
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .connection-indicator.connecting {
+            animation: blink 1.5s infinite;
+        }
+        
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-weight: 600;
+            overflow: hidden;
+        }
+        
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* Контейнер для контента */
+        .container {
+            padding: 30px;
+            margin-left: 250px;
+        }
+        
+        /* Статистические карточки */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stats-card {
+            background-color: var(--white);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .stats-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stats-card-icon {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: var(--text-light);
+            opacity: 0.15;
+            font-size: 32px;
+        }
+        
+        .stats-title {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-bottom: 10px;
+        }
+        
+        .stats-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .stats-trend {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .stats-trend.up {
+            color: var(--success);
+        }
+        
+        .stats-trend.down {
+            color: var(--danger);
+        }
+        
+        .stats-card.primary .stats-value {
+            color: var(--primary);
+        }
+        
+        .stats-card.success .stats-value {
+            color: var(--success);
+        }
+        
+        .stats-card.warning .stats-value {
+            color: var(--warning);
+        }
+        
+        .stats-card.danger .stats-value {
+            color: var(--danger);
+        }
+        
+        /* Карточка фильтра */
+        .card {
+            background-color: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+            overflow: visible;
+        }
+        
+        .card-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .card-body {
+            padding: 20px;
+            max-height: 1000px;
+            overflow: visible;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+        }
+        
+        .card-body.collapsed {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+            overflow: hidden;
+        }
+        
+        .filter-form {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            align-items: start;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 0;
+        }
+        
+        .form-group.wide {
+            grid-column: span 2;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+            width: 100%;
+        }
+        
+        .form-row .form-control {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .form-label {
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .form-control {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+        
+        /* Датапикер */
+        .date-input {
+            position: relative;
+        }
+        
+        .date-input input {
+            cursor: pointer;
+        }
+        
+        /* Мультиселект */
+        .multiselect {
+            position: relative;
+            min-width: 0;
+            width: 100%;
+            z-index: 1;
+        }
+        
+        .multiselect-toggle {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--white);
+            transition: all 0.2s;
+            width: 100%;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .multiselect-toggle:hover {
+            border-color: var(--primary);
+        }
+        
+        .multiselect-toggle span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+            margin-right: 8px;
+        }
+        
+        .multiselect-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-top: 5px;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 1001;
+            display: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .multiselect-dropdown.show {
+            display: block;
+        }
+        
+        .multiselect-search {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background-color: var(--white);
+            z-index: 1;
+        }
+        
+        .multiselect-search input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        
+        .multiselect-search input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .multiselect-option {
+            padding: 10px 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .multiselect-option:hover {
+            background-color: var(--secondary);
+        }
+        
+        .multiselect-option.hidden {
+            display: none;
+        }
+        
+        .multiselect-option input[type="checkbox"] {
+            margin: 0;
+        }
+        
+        .multiselect-selected {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        
+        .multiselect-tag {
+            background-color: var(--primary-light);
+            color: var(--primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .multiselect-tag i {
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            grid-column: span 4;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        
+        /* Таблица */
+        .table-container {
+            background-color: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+        
+        .table-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .table-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .table-wrapper {
+            position: relative;
+            overflow-x: auto;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            position: sticky;
+            top: 0;
+            background-color: var(--secondary);
+            z-index: 2;
+        }
+        
+        th, td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        th {
+            font-weight: 600;
+            color: var(--text-light);
+            background-color: var(--secondary);
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        
+        th.sortable:hover {
+            background-color: #f0f0f0;
+        }
+        
+        th.sortable i {
+            font-size: 14px;
+            margin-left: 5px;
+            opacity: 0.5;
+        }
+        
+        th.sorted-asc i,
+        th.sorted-desc i {
+            opacity: 1;
+            color: var(--primary);
+        }
+        
+        tr:hover {
+            background-color: var(--secondary);
+        }
+        
+        /* Фиксированный столбец статуса */
+        .status-column {
+            position: sticky;
+            right: 0;
+            background-color: var(--white);
+            box-shadow: -2px 0 5px rgba(0, 0, 0, 0.05);
+            z-index: 1;
+            min-width: 180px;
+        }
+        
+        thead .status-column {
+            background-color: var(--secondary);
+            z-index: 3;
+        }
+        
+        tr:hover .status-column {
+            background-color: var(--secondary);
+        }
+        
+        /* Столбец дубликатов */
+        .duplicates-column {
+            min-width: 80px;
+        }
+        
+        .duplicates-list {
+            display: flex;
+            gap: 3px;
+            flex-wrap: wrap;
+        }
+        
+        .duplicate-source {
+            cursor: pointer;
+            transition: transform 0.2s;
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 11px;
+        }
+        
+        .duplicate-source:hover {
+            transform: scale(1.2);
+        }
+        
+        .duplicate-source.avito {
+            background-color: #97CF26;
+            color: white;
+        }
+        
+        .duplicate-source.cian {
+            background-color: #0468FF;
+            color: white;
+        }
+        
+        .duplicate-source.yandex {
+            background-color: #FFCC00;
+            color: #333;
+        }
+        
+        .duplicate-source.youla {
+            background-color: #8F32D7;
+            color: white;
+        }
+        
+        .no-duplicates {
+            color: var(--text-light);
+            font-size: 12px;
+            font-style: italic;
+        }
+        
+        /* Статус индикатор для телефона */
+        .phone-status-indicator {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            top: 8px;
+            right: 8px;
+            border: 1px solid var(--white);
+            display: none;
+        }
+        
+        .phone-status-indicator.busy {
+            background-color: var(--danger);
+            display: block;
+        }
+        
+        .phone-status-indicator.ready {
+            background-color: var(--success);
+            display: block;
+        }
+        
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-block;
+        }
+        
+        .badge-success {
+            background-color: #ecfdf5;
+            color: var(--success);
+        }
+        
+        .badge-warning {
+            background-color: #fffbeb;
+            color: var(--warning);
+        }
+        
+        .badge-danger {
+            background-color: #fef2f2;
+            color: var(--danger);
+        }
+        
+        .badge-info {
+            background-color: #e0f2fe;
+            color: #0284c7;
+        }
+        
+        .badge-secondary {
+            background-color: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        /* Иконки источников */
+        .source-icon {
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        
+        .source-icon.avito {
+            background-color: #97CF26;
+            color: white;
+        }
+        
+        .source-icon.cian {
+            background-color: #0468FF;
+            color: white;
+        }
+        
+        .source-icon.yandex {
+            background-color: #FFCC00;
+            color: #333;
+        }
+        
+        .source-icon.youla {
+            background-color: #8F32D7;
+            color: white;
+        }
+        
+        /* Иконки в заголовке объявления */
+        .ad-title-container {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        
+        .ad-title-icons {
+            display: flex;
+            gap: 5px;
+            margin-top: 2px;
+        }
+        
+        .ad-title-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary-light);
+            color: var(--primary);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            position: relative;
+        }
+        
+        .ad-title-icon:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        /* Тултипы */
+        .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            margin-bottom: 5px;
+        }
+        
+        .ad-title-icon:hover .tooltip {
+            opacity: 1;
+        }
+        
+        .ad-title {
+            font-weight: 500;
+            flex: 1;
+            color: var(--text);
+        }
+        
+        .ad-params {
+            color: var(--text-light);
+            font-size: 13px;
+            margin-top: 5px;
+        }
+        
+        /* Метро */
+        .metro-stations {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            margin-top: 5px;
+        }
+        
+        .metro-station {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+        }
+        
+        .metro-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .metro-dot.red {
+            background-color: #E44D36;
+        }
+        
+        .metro-dot.green {
+            background-color: #4CAF50;
+        }
+        
+        .metro-dot.blue {
+            background-color: #2196F3;
+        }
+        
+        .metro-dot.orange {
+            background-color: #FF9800;
+        }
+        
+        .metro-dot.purple {
+            background-color: #9C27B0;
+        }
+        
+        .metro-time {
+            color: var(--text-light);
+            font-size: 12px;
+        }
+        
+        /* Контактная информация */
+        .contact-info {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 140px;
+        }
+        
+        .contact-phone {
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        
+        .contact-name {
+            font-size: 13px;
+            color: var(--text-light);
+            white-space: nowrap;
+        }
+        
+        .no-phone {
+            color: var(--text-light);
+            font-style: italic;
+            font-size: 13px;
+        }
+        
+        .paid-number {
+            color: var(--warning);
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        /* Статус объявления с иконкой */
+        .ad-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .call-action-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary-light);
+            color: var(--primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .call-action-btn:hover {
+            background-color: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        /* Пагинация */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .page-item {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .page-item.active {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .page-item:not(.active):hover {
+            background-color: var(--secondary);
+        }
+        
+        .per-page-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-light);
+            font-size: 14px;
+        }
+        
+        .results-info {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+        
+        /* Выпадающие меню */
+        .dropdown {
+            position: relative;
+        }
+        
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background-color: var(--white);
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            padding: 8px 0;
+            min-width: 180px;
+            z-index: 100;
+            display: none;
+            margin-top: 5px;
+        }
+        
+        .dropdown-menu.show {
+            display: block;
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .dropdown-item {
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text);
+            text-decoration: none;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+        
+        .dropdown-item:hover {
+            background-color: var(--secondary);
+        }
+        
+        .dropdown-item i {
+            color: var(--text-light);
+        }
+        
+        .dropdown-divider {
+            height: 1px;
+            background-color: var(--border);
+            margin: 8px 0;
+        }
+        
+        /* Модальное окно */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background-color: var(--white);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .modal-close:hover {
+            background-color: var(--secondary);
+        }
+        
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        /* Настройка столбцов */
+        .column-settings {
+            list-style: none;
+        }
+        
+        .column-item {
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: move;
+            background-color: var(--white);
+            transition: all 0.2s;
+        }
+        
+        .column-item:hover {
+            background-color: var(--secondary);
+        }
+        
+        .column-item.dragging {
+            opacity: 0.5;
+        }
+        
+        .column-item input[type="checkbox"] {
+            margin: 0;
+        }
+        
+        .column-name {
+            flex: 1;
+        }
+        
+        .drag-handle {
+            color: var(--text-light);
+        }
+        
+        /* Значки для меню и кнопок */
+        .material-icons {
+            font-size: 20px;
+        }
+        
+        /* Group date fields */
+        .date-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        /* Fixed column settings button alignment */
+        .btn-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            vertical-align: middle;
+        }
+        
+        .btn-icon i {
+            margin-right: 8px;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Обработчик для кнопки сворачивания фильтра
+            const filterToggleBtn = document.getElementById('filter-toggle-btn');
+            const filterBody = document.getElementById('filter-body');
+            const filterIcon = document.getElementById('filter-icon');
+            
+            // Функция для сворачивания/разворачивания фильтра
+            filterToggleBtn.addEventListener('click', function() {
+                filterBody.classList.toggle('collapsed');
+                
+                if (filterBody.classList.contains('collapsed')) {
+                    // Сворачиваем
+                    filterToggleBtn.querySelector('span').textContent = 'Развернуть';
+                    filterIcon.textContent = 'expand_less';
+                } else {
+                    // Разворачиваем
+                    filterToggleBtn.querySelector('span').textContent = 'Свернуть';
+                    filterIcon.textContent = 'expand_more';
+                }
+            });
+            
+            // Имитация состояния соединения с приложением
+            const connectionIndicator = document.getElementById('connection-indicator');
+            let connectionState = 'online'; // online, offline, connecting
+            
+            function updateConnectionState() {
+                // Случайное изменение состояния для демонстрации
+                const random = Math.random();
+                
+                if (random < 0.4) {
+                    connectionState = 'online';
+                    connectionIndicator.className = 'connection-indicator';
+                } else if (random < 0.7) {
+                    connectionState = 'connecting';
+                    connectionIndicator.className = 'connection-indicator connecting';
+                } else {
+                    connectionState = 'offline';
+                    connectionIndicator.className = 'connection-indicator offline';
+                }
+                
+                // Следующее обновление через 2-5 секунд
+                setTimeout(updateConnectionState, 2000 + Math.random() * 3000);
+            }
+            
+            // Запускаем имитацию соединения
+            updateConnectionState();
+            
+            // Функция для установки статуса телефона
+            window.setPhoneStatus = function(status) {
+                const indicator = document.getElementById('phone-status-indicator');
+                indicator.className = 'phone-status-indicator';
+                
+                if (status === 'busy') {
+                    indicator.classList.add('busy');
+                } else if (status === 'ready') {
+                    indicator.classList.add('ready');
+                }
+                
+                // Закрываем выпадающее меню
+                document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                    menu.classList.remove('show');
+                });
+            };
+            
+            // Обработка выпадающих меню
+            const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+            
+            dropdownToggles.forEach(toggle => {
+                toggle.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Останавливаем всплытие события
+                    
+                    // Закрываем все другие открытые меню
+                    document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                        if(menu !== this.nextElementSibling) {
+                            menu.classList.remove('show');
+                        }
+                    });
+                    
+                    // Переключаем текущее меню
+                    const dropdownMenu = this.nextElementSibling;
+                    dropdownMenu.classList.toggle('show');
+                });
+            });
+            
+            // Закрываем меню при клике вне его
+            document.addEventListener('click', function(e) {
+                document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                    menu.classList.remove('show');
+                });
+                
+                // Закрываем мультиселекты
+                document.querySelectorAll('.multiselect-dropdown.show').forEach(dropdown => {
+                    dropdown.classList.remove('show');
+                });
+            });
+            
+            // Мультиселекты
+            const multiselects = document.querySelectorAll('.multiselect');
+            
+            multiselects.forEach((multiselect, index) => {
+                const toggle = multiselect.querySelector('.multiselect-toggle');
+                const dropdown = multiselect.querySelector('.multiselect-dropdown');
+                const checkboxes = multiselect.querySelectorAll('input[type="checkbox"]');
+                const selectedContainer = multiselect.querySelector('.multiselect-selected');
+                const searchInput = multiselect.querySelector('.multiselect-search input');
+                
+                if (!toggle || !dropdown) {
+                    return;
+                }
+                
+                toggle.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    
+                    // Закрываем все другие мультиселекты
+                    document.querySelectorAll('.multiselect-dropdown.show').forEach(otherDropdown => {
+                        if (otherDropdown !== dropdown) {
+                            otherDropdown.classList.remove('show');
+                        }
+                    });
+                    
+                    dropdown.classList.toggle('show');
+                    
+                    if (dropdown.classList.contains('show') && searchInput) {
+                        setTimeout(() => searchInput.focus(), 100);
+                    }
+                });
+                
+                checkboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', function() {
+                        updateMultiselectDisplay(multiselect);
+                    });
+                });
+                
+                // Поиск в мультиселекте
+                if (searchInput) {
+                    searchInput.addEventListener('input', function() {
+                        const searchTerm = this.value.toLowerCase();
+                        const options = multiselect.querySelectorAll('.multiselect-option');
+                        
+                        options.forEach(option => {
+                            const text = option.textContent.toLowerCase();
+                            if (text.includes(searchTerm)) {
+                                option.classList.remove('hidden');
+                            } else {
+                                option.classList.add('hidden');
+                            }
+                        });
+                    });
+                }
+                
+                dropdown.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                });
+            });
+            
+            function updateMultiselectDisplay(multiselect) {
+                const selectedContainer = multiselect.querySelector('.multiselect-selected');
+                const checkboxes = multiselect.querySelectorAll('input[type="checkbox"]:checked');
+                const toggle = multiselect.querySelector('.multiselect-toggle span');
+                
+                selectedContainer.innerHTML = '';
+                
+                if (checkboxes.length === 0) {
+                    toggle.textContent = 'Выберите...';
+                } else {
+                    toggle.textContent = `Выбрано: ${checkboxes.length}`;
+                    
+                    checkboxes.forEach(checkbox => {
+                        const tag = document.createElement('div');
+                        tag.className = 'multiselect-tag';
+                        tag.innerHTML = `
+                            ${checkbox.parentElement.textContent.trim()}
+                            <i class="material-icons" style="font-size: 14px;">close</i>
+                        `;
+                        
+                        tag.querySelector('i').addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            checkbox.checked = false;
+                            updateMultiselectDisplay(multiselect);
+                        });
+                        
+                        selectedContainer.appendChild(tag);
+                    });
+                }
+            }
+            
+            // Датапикер
+            const dateInputs = document.querySelectorAll('.date-input input');
+            dateInputs.forEach(input => {
+                input.addEventListener('focus', function() {
+                    this.type = 'date';
+                });
+                
+                input.addEventListener('blur', function() {
+                    if (!this.value) {
+                        this.type = 'text';
+                    }
+                });
+                
+                input.addEventListener('change', function() {
+                    if (this.value) {
+                        const date = new Date(this.value);
+                        const formattedDate = date.toLocaleDateString('ru-RU');
+                        this.type = 'text';
+                        this.value = formattedDate;
+                    }
+                });
+            });
+            
+            // Сортировка таблицы
+            const sortableHeaders = document.querySelectorAll('th.sortable');
+            let currentSort = { column: null, direction: 'asc' };
+            
+            sortableHeaders.forEach(header => {
+                header.addEventListener('click', function() {
+                    const column = this.dataset.column;
+                    
+                    if (currentSort.column === column) {
+                        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.column = column;
+                        currentSort.direction = 'asc';
+                    }
+                    
+                    // Обновляем визуальное состояние
+                    sortableHeaders.forEach(h => {
+                        h.classList.remove('sorted-asc', 'sorted-desc');
+                        const icon = h.querySelector('i');
+                        if (icon) {
+                            icon.textContent = 'unfold_more';
+                        }
+                    });
+                    
+                    this.classList.add(`sorted-${currentSort.direction}`);
+                    const icon = this.querySelector('i');
+                    if (icon) {
+                        icon.textContent = currentSort.direction === 'asc' ? 'arrow_upward' : 'arrow_downward';
+                    }
+                    
+                    // Здесь должна быть логика сортировки данных
+                    console.log(`Сортировка по ${column} ${currentSort.direction}`);
+                });
+            });
+            
+            // Модальное окно настройки столбцов
+            const columnSettingsBtn = document.getElementById('column-settings-btn');
+            const columnSettingsModal = document.getElementById('column-settings-modal');
+            const closeModalBtn = columnSettingsModal.querySelector('.modal-close');
+            const saveColumnsBtn = document.getElementById('save-columns-btn');
+            const resetColumnsBtn = document.getElementById('reset-columns-btn');
+            
+            columnSettingsBtn.addEventListener('click', function() {
+                columnSettingsModal.classList.add('show');
+            });
+            
+            closeModalBtn.addEventListener('click', function() {
+                columnSettingsModal.classList.remove('show');
+            });
+            
+            columnSettingsModal.addEventListener('click', function(e) {
+                if (e.target === columnSettingsModal) {
+                    columnSettingsModal.classList.remove('show');
+                }
+            });
+            
+            // Drag and drop для столбцов
+            const columnsList = document.getElementById('columns-list');
+            let draggedElement = null;
+            
+            columnsList.addEventListener('dragstart', function(e) {
+                if (e.target.classList.contains('column-item')) {
+                    draggedElement = e.target;
+                    e.target.classList.add('dragging');
+                }
+            });
+            
+            columnsList.addEventListener('dragend', function(e) {
+                if (e.target.classList.contains('column-item')) {
+                    e.target.classList.remove('dragging');
+                }
+            });
+            
+            columnsList.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                const afterElement = getDragAfterElement(columnsList, e.clientY);
+                if (afterElement == null) {
+                    columnsList.appendChild(draggedElement);
+                } else {
+                    columnsList.insertBefore(draggedElement, afterElement);
+                }
+            });
+            
+            function getDragAfterElement(container, y) {
+                const draggableElements = [...container.querySelectorAll('.column-item:not(.dragging)')];
+                
+                return draggableElements.reduce((closest, child) => {
+                    const box = child.getBoundingClientRect();
+                    const offset = y - box.top - box.height / 2;
+                    
+                    if (offset < 0 && offset > closest.offset) {
+                        return { offset: offset, element: child };
+                    } else {
+                        return closest;
+                    }
+                }, { offset: Number.NEGATIVE_INFINITY }).element;
+            }
+            
+            saveColumnsBtn.addEventListener('click', function() {
+                // Здесь должна быть логика сохранения настроек столбцов
+                console.log('Сохранение настроек столбцов');
+                columnSettingsModal.classList.remove('show');
+            });
+            
+            resetColumnsBtn.addEventListener('click', function() {
+                // Здесь должна быть логика сброса настроек столбцов
+                console.log('Сброс настроек столбцов');
+            });
+        });
+    </script>
+</head>
+<body>
+    <!-- Сайдбар -->
+    <div class="sidebar">
+        <div class="menu">
+            <div class="menu-item active" onclick="window.location.href='index.html'">
+                <i class="material-icons">home</i>
+                <span>Объявления</span>
+            </div>
+            <div class="menu-item" onclick="window.location.href='settings.html'">
+                <i class="material-icons">settings</i>
+                <span>Настройки</span>
+            </div>
+            <div class="menu-item" onclick="window.location.href='tariffs.html'">
+                <i class="material-icons">payment</i>
+                <span>Тарифы</span>
+            </div>
+            <div class="menu-item">
+                <i class="material-icons">star</i>
+                <span>Избранное</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Основной контент -->
+    <div class="main-content">
+        <!-- Верхняя панель -->
+        <div class="header">
+            <div class="header-left">
+                <img src="logo/logo.svg" alt="Логотип" class="header-logo">
+            </div>
+            <div class="header-right">
+                <button class="header-btn">
+                    <i class="material-icons">support_agent</i>
+                    <span>Написать в поддержку</span>
+                </button>
+                <button class="header-btn primary">
+                    <i class="material-icons">account_balance_wallet</i>
+                    <span>Биллинг</span>
+                </button>
+                <div class="access-info">
+                    <div class="access-date">Доступ до 25.11.2024</div>
+                    <div class="access-remaining">Осталось 678 дней</div>
+                </div>
+                <div class="header-icon" title="Связь с приложением">
+                    <i class="material-icons">phonelink</i>
+                    <div id="connection-indicator" class="connection-indicator"></div>
+                </div>
+                <div class="header-icon dropdown">
+                    <div class="dropdown-toggle">
+                        <i class="material-icons">phone</i>
+                        <div id="phone-status-indicator" class="phone-status-indicator"></div>
+                    </div>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-item" onclick="setPhoneStatus('busy')">
+                            <i class="material-icons">do_not_disturb</i>
+                            <span>Не беспокоить</span>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-item" onclick="setPhoneStatus('ready')">
+                            <i class="material-icons">check_circle</i>
+                            <span>Готов</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-profile dropdown">
+                    <div class="dropdown-toggle">
+                        <div class="user-avatar">
+                            <img src="https://placehold.co/100x100?text=ИИ" alt="Аватар пользователя">
+                        </div>
+                    </div>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-item" onclick="window.location.href='profile.html'">
+                            <i class="material-icons">person</i>
+                            <span>Профиль</span>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-item">
+                            <i class="material-icons">exit_to_app</i>
+                            <span>Выход</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Основной контейнер -->
+        <div class="container">
+            <!-- Статистические карточки -->
+            <div class="stats-cards">
+                <div class="stats-card primary">
+                    <i class="material-icons stats-card-icon">dashboard</i>
+                    <div class="stats-title">Всего объявлений</div>
+                    <div class="stats-value">1,258</div>
+                    <div class="stats-trend up">
+                        <i class="material-icons" style="font-size: 14px;">trending_up</i>
+                        <span>12% с прошлой недели</span>
+                    </div>
+                </div>
+                <div class="stats-card success">
+                    <i class="material-icons stats-card-icon">apartment</i>
+                    <div class="stats-title">Наших квартир</div>
+                    <div class="stats-value">764</div>
+                    <div class="stats-trend up">
+                        <i class="material-icons" style="font-size: 14px;">trending_up</i>
+                        <span>8% с прошлой недели</span>
+                    </div>
+                </div>
+                <div class="stats-card warning">
+                    <i class="material-icons stats-card-icon">do_not_disturb_on</i>
+                    <div class="stats-title">Не снял</div>
+                    <div class="stats-value">352</div>
+                    <div class="stats-trend down">
+                        <i class="material-icons" style="font-size: 14px;">trending_down</i>
+                        <span>5% с прошлой недели</span>
+                    </div>
+                </div>
+                <div class="stats-card danger">
+                    <i class="material-icons stats-card-icon">low_priority</i>
+                    <div class="stats-title">Не первые</div>
+                    <div class="stats-value">289</div>
+                    <div class="stats-trend up">
+                        <i class="material-icons" style="font-size: 14px;">trending_up</i>
+                        <span>3% с прошлой недели</span>
+                    </div>
+                </div>
+                <div class="stats-card">
+                    <i class="material-icons stats-card-icon">phone_missed</i>
+                    <div class="stats-title">Не дозвонился</div>
+                    <div class="stats-value">147</div>
+                    <div class="stats-trend down">
+                        <i class="material-icons" style="font-size: 14px;">trending_down</i>
+                        <span>2% с прошлой недели</span>
+                    </div>
+                </div>
+                <div class="stats-card success">
+                    <i class="material-icons stats-card-icon">stacked_line_chart</i>
+                    <div class="stats-title">Конверсия</div>
+                    <div class="stats-value">32%</div>
+                    <div class="stats-trend up">
+                        <i class="material-icons" style="font-size: 14px;">trending_up</i>
+                        <span>4% с прошлой недели</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Фильтр -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Фильтры</div>
+                    <button id="filter-toggle-btn" class="btn btn-outline" style="display: flex; align-items: center;">
+                        <i id="filter-icon" class="material-icons" style="margin-right: 5px; font-size: 18px;">expand_more</i>
+                        <span>Свернуть</span>
+                    </button>
+                </div>
+                <div id="filter-body" class="card-body">
+                    <form class="filter-form">
+                        <!-- Первая строка: основные фильтры -->
+                        <div class="form-group date-group">
+                            <label class="form-label">Дата</label>
+                            <div class="form-row">
+                                <div class="date-input">
+                                    <input type="text" class="form-control" placeholder="01.01.2024">
+                                </div>
+                                <div class="date-input">
+                                    <input type="text" class="form-control" placeholder="31.12.2024">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Номер объявления</label>
+                            <input type="text" class="form-control" placeholder="Введите номер">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Телефон</label>
+                            <input type="text" class="form-control" placeholder="Введите номер телефона">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Категория</label>
+                            <div class="multiselect">
+                                <div class="multiselect-toggle">
+                                    <span>Выберите...</span>
+                                    <i class="material-icons">expand_more</i>
+                                </div>
+                                <div class="multiselect-dropdown">
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="all">
+                                        Все категории
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="rental">
+                                        Аренда. Жилая
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="sale">
+                                        Продажа. Жилая
+                                    </label>
+                                </div>
+                                <div class="multiselect-selected"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Вторая строка: категория и статус -->
+                        <div class="form-group">
+                            <label class="form-label">Статус</label>
+                            <div class="multiselect">
+                                <div class="multiselect-toggle">
+                                    <span>Выберите...</span>
+                                    <i class="material-icons">expand_more</i>
+                                </div>
+                                <div class="multiselect-dropdown">
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="our">
+                                        Наша квартира
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="no-answer">
+                                        Не дозвонился
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="not-rented">
+                                        Не снял
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="agent">
+                                        Агент
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="not-first">
+                                        Не первые
+                                    </label>
+                                </div>
+                                <div class="multiselect-selected"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Локация</label>
+                            <div class="multiselect">
+                                <div class="multiselect-toggle">
+                                    <span>Выберите...</span>
+                                    <i class="material-icons">expand_more</i>
+                                </div>
+                                <div class="multiselect-dropdown">
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="moscow">
+                                        Москва
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="moscow-region">
+                                        Московская область
+                                    </label>
+                                </div>
+                                <div class="multiselect-selected"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Третья строка: метро и источники -->
+                        <div class="form-group">
+                            <label class="form-label">Метро</label>
+                            <div class="multiselect">
+                                <div class="multiselect-toggle">
+                                    <span>Выберите...</span>
+                                    <i class="material-icons">expand_more</i>
+                                </div>
+                                <div class="multiselect-dropdown">
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="lenina">
+                                        Площадь Ленина
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="pushkinskaya">
+                                        Пушкинская
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="gagarinskaya">
+                                        Гагаринская
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="sportivnaya">
+                                        Спортивная
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="centralnaya">
+                                        Центральная
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="mirnaya">
+                                        Мирная
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="sovetskaya">
+                                        Советская
+                                    </label>
+                                </div>
+                                <div class="multiselect-selected"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Источник</label>
+                            <div class="multiselect">
+                                <div class="multiselect-toggle">
+                                    <span>Выберите...</span>
+                                    <i class="material-icons">expand_more</i>
+                                </div>
+                                <div class="multiselect-dropdown">
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="avito">
+                                        Авито
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="cian">
+                                        ЦИАН
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="youla">
+                                        Юла
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="yandex">
+                                        Яндекс.Недвижимость
+                                    </label>
+                                </div>
+                                <div class="multiselect-selected"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Кол-во комнат</label>
+                            <div class="multiselect">
+                                <div class="multiselect-toggle">
+                                    <span>Выберите...</span>
+                                    <i class="material-icons">expand_more</i>
+                                </div>
+                                <div class="multiselect-dropdown">
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="studio">
+                                        Студия
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="1">
+                                        1 комната
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="2">
+                                        2 комнаты
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="3">
+                                        3 комнаты
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="4">
+                                        4 комнаты
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="5+">
+                                        5 комнат и больше
+                                    </label>
+                                    <label class="multiselect-option">
+                                        <input type="checkbox" value="free">
+                                        Свободная планировка
+                                    </label>
+                                </div>
+                                <div class="multiselect-selected"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Пешком до метро, мин</label>
+                            <div class="form-row">
+                                <input type="number" class="form-control" placeholder="От">
+                                <input type="number" class="form-control" placeholder="До">
+                            </div>
+                        </div>
+                        
+                        <!-- Четвертая строка: цена и площадь -->
+                        <div class="form-group">
+                            <label class="form-label">Цена, ₽</label>
+                            <div class="form-row">
+                                <input type="number" class="form-control" placeholder="От">
+                                <input type="number" class="form-control" placeholder="До">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Общая площадь, м²</label>
+                            <div class="form-row">
+                                <input type="number" class="form-control" placeholder="От">
+                                <input type="number" class="form-control" placeholder="До">
+                            </div>
+                        </div>
+                        
+                        <!-- Кнопки действий -->
+                        <div class="actions">
+                            <button type="button" class="btn btn-outline">Сбросить</button>
+                            <button type="button" class="btn btn-primary">Применить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Таблица объявлений -->
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="card-title">Объявления</div>
+                    <div class="table-actions">
+                        <button id="column-settings-btn" class="btn btn-outline btn-icon">
+                            <i class="material-icons">view_column</i>
+                            Настройка столбцов
+                        </button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-column="date">
+                                    Дата и время
+                                    <i class="material-icons">unfold_more</i>
+                                </th>
+                                <th>Заголовок</th>
+                                <th class="sortable" data-column="source">
+                                    Источник
+                                    <i class="material-icons">unfold_more</i>
+                                </th>
+                                <th class="sortable" data-column="price">
+                                    Цена, ₽
+                                    <i class="material-icons">unfold_more</i>
+                                </th>
+                                <th>Адрес</th>
+                                <th>Контакт</th>
+                                <th class="duplicates-column">Дубликаты</th>
+                                <th class="sortable" data-column="area">
+                                    Общая площадь
+                                    <i class="material-icons">unfold_more</i>
+                                </th>
+                                <th class="status-column">Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>15.03.2024<br><span style="font-size: 12px; color: var(--text-light);">14:30</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">2-комн. квартира, 52 м²</div>
+                                            <div class="ad-params">Этаж: 4/9, Кирпичный дом, 2010 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon avito">Авито</div></td>
+                                <td>5,200,000</td>
+                                <td>
+                                    ул. Ленина, 25, кв. 47
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot red"></span>
+                                            <span>Площадь Ленина</span>
+                                            <span class="metro-time">(10 мин)</span>
+                                        </div>
+                                        <div class="metro-station">
+                                            <span class="metro-dot green"></span>
+                                            <span>Заречная</span>
+                                            <span class="metro-time">(15 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (911) 123-45-67</div>
+                                        <div class="contact-name">Иванов А.С.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source cian" onclick="window.open('https://cian.ru', '_blank')" title="Перейти на ЦИАН">Ц</div>
+                                        <div class="duplicate-source yandex" onclick="window.open('https://realty.yandex.ru', '_blank')" title="Перейти на Яндекс">Я</div>
+                                    </div>
+                                </td>
+                                <td>52 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-success">Наша квартира</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>16.03.2024<br><span style="font-size: 12px; color: var(--text-light);">09:15</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star</i>
+                                                <span class="tooltip">Убрать из избранного</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">1-комн. квартира, 35 м²</div>
+                                            <div class="ad-params">Этаж: 2/5, Панельный дом, 1985 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon cian">ЦИАН</div></td>
+                                <td>3,500,000</td>
+                                <td>
+                                    ул. Пушкина, 10, кв. 12
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot blue"></span>
+                                            <span>Пушкинская</span>
+                                            <span class="metro-time">(5 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="no-phone">Без звонков</div>
+                                        <div class="contact-name">Петров Н.И.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="no-duplicates">Нет дубликатов</div>
+                                </td>
+                                <td>35 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-warning">Не дозвонился</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>17.03.2024<br><span style="font-size: 12px; color: var(--text-light);">11:45</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">3-комн. квартира, 78 м²</div>
+                                            <div class="ad-params">Этаж: 7/12, Монолитный дом, 2015 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon yandex">Яндекс</div></td>
+                                <td>7,800,000</td>
+                                <td>
+                                    ул. Гагарина, 15, кв. 3
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot orange"></span>
+                                            <span>Гагаринская</span>
+                                            <span class="metro-time">(12 мин)</span>
+                                        </div>
+                                        <div class="metro-station">
+                                            <span class="metro-dot purple"></span>
+                                            <span>Спортивная</span>
+                                            <span class="metro-time">(20 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (931) 987-65-43</div>
+                                        <div class="contact-name">Сидорова Е.В.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source avito" onclick="window.open('https://avito.ru', '_blank')" title="Перейти на Авито">А</div>
+                                    </div>
+                                </td>
+                                <td>78 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-danger">Не снял</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>18.03.2024<br><span style="font-size: 12px; color: var(--text-light);">16:20</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">Студия, 28 м²</div>
+                                            <div class="ad-params">Этаж: 12/16, Монолитный дом, 2019 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon youla">Юла</div></td>
+                                <td>2,900,000</td>
+                                <td>
+                                    ул. Мира, 5, кв. 89
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot green"></span>
+                                            <span>Мирная</span>
+                                            <span class="metro-time">(7 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="paid-number">Платный номер</div>
+                                        <div class="contact-name">Лесной М.Р.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="no-duplicates">Нет дубликатов</div>
+                                </td>
+                                <td>28 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-info">Агент</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>19.03.2024<br><span style="font-size: 12px; color: var(--text-light);">10:05</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star</i>
+                                                <span class="tooltip">Убрать из избранного</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">2-комн. квартира, 48 м²</div>
+                                            <div class="ad-params">Этаж: 3/9, Кирпичный дом, 2005 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon avito">Авито</div></td>
+                                <td>4,800,000</td>
+                                <td>
+                                    ул. Советская, 33, кв. 15
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot red"></span>
+                                            <span>Советская</span>
+                                            <span class="metro-time">(3 мин)</span>
+                                        </div>
+                                        <div class="metro-station">
+                                            <span class="metro-dot blue"></span>
+                                            <span>Центральная</span>
+                                            <span class="metro-time">(8 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (950) 555-44-33</div>
+                                        <div class="contact-name">Морозов А.Д.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source cian" onclick="window.open('https://cian.ru', '_blank')" title="Перейти на ЦИАН">Ц</div>
+                                        <div class="duplicate-source youla" onclick="window.open('https://youla.ru', '_blank')" title="Перейти на Юла">Ю</div>
+                                    </div>
+                                </td>
+                                <td>48 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-secondary">Не первые</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>02.04.2024<br><span style="font-size: 12px; color: var(--text-light);">15:30</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">1-комн. квартира, 40 м²</div>
+                                            <div class="ad-params">Этаж: 5/7, Панельный дом, 1992 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon yandex">Яндекс</div></td>
+                                <td>4,000,000</td>
+                                <td>
+                                    ул. Окраинная, 45, кв. 67
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot red"></span>
+                                            <span>Окраинная</span>
+                                            <span class="metro-time">(22 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (945) 678-90-12</div>
+                                        <div class="contact-name">Васильев А.Н.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="no-duplicates">Нет дубликатов</div>
+                                </td>
+                                <td>40 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-danger">Не снял</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>03.04.2024<br><span style="font-size: 12px; color: var(--text-light);">09:10</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">2-комн. квартира, 65 м²</div>
+                                            <div class="ad-params">Этаж: 8/12, Кирпичный дом, 2014 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon avito">Авито</div></td>
+                                <td>6,500,000</td>
+                                <td>
+                                    ул. Зеленая, 123, кв. 456
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot green"></span>
+                                            <span>Зеленая</span>
+                                            <span class="metro-time">(4 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (956) 789-01-23</div>
+                                        <div class="contact-name">Петрова К.С.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source cian" onclick="window.open('https://cian.ru', '_blank')" title="Перейти на ЦИАН">Ц</div>
+                                    </div>
+                                </td>
+                                <td>65 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-success">Наша квартира</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>04.04.2024<br><span style="font-size: 12px; color: var(--text-light);">14:25</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star</i>
+                                                <span class="tooltip">Убрать из избранного</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">3-комн. квартира, 92 м²</div>
+                                            <div class="ad-params">Этаж: 3/8, Монолитный дом, 2019 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon cian">ЦИАН</div></td>
+                                <td>9,200,000</td>
+                                <td>
+                                    ул. Элитная, 77, кв. 88
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot purple"></span>
+                                            <span>Элитная</span>
+                                            <span class="metro-time">(6 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (967) 890-12-34</div>
+                                        <div class="contact-name">Богданов М.П.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source avito" onclick="window.open('https://avito.ru', '_blank')" title="Перейти на Авито">А</div>
+                                        <div class="duplicate-source yandex" onclick="window.open('https://realty.yandex.ru', '_blank')" title="Перейти на Яндекс">Я</div>
+                                    </div>
+                                </td>
+                                <td>92 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-warning">Не дозвонился</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>05.04.2024<br><span style="font-size: 12px; color: var(--text-light);">11:40</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">Студия, 26 м²</div>
+                                            <div class="ad-params">Этаж: 18/22, Монолитный дом, 2022 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon youla">Юла</div></td>
+                                <td>2,600,000</td>
+                                <td>
+                                    ул. Высокая, 200, кв. 1800
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot orange"></span>
+                                            <span>Высокая</span>
+                                            <span class="metro-time">(16 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="no-phone">Без звонков</div>
+                                        <div class="contact-name">Новикова А.В.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="no-duplicates">Нет дубликатов</div>
+                                </td>
+                                <td>26 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-info">Агент</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>06.04.2024<br><span style="font-size: 12px; color: var(--text-light);">16:55</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">1-комн. квартира, 44 м²</div>
+                                            <div class="ad-params">Этаж: 6/9, Панельный дом, 1987 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon yandex">Яндекс</div></td>
+                                <td>4,400,000</td>
+                                <td>
+                                    ул. Рабочая, 56, кв. 78
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot red"></span>
+                                            <span>Рабочая</span>
+                                            <span class="metro-time">(14 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (989) 012-34-56</div>
+                                        <div class="contact-name">Рабочий И.С.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source avito" onclick="window.open('https://avito.ru', '_blank')" title="Перейти на Авито">А</div>
+                                    </div>
+                                </td>
+                                <td>44 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-secondary">Не первые</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>07.04.2024<br><span style="font-size: 12px; color: var(--text-light);">08:20</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">2-комн. квартира, 50 м²</div>
+                                            <div class="ad-params">Этаж: 4/12, Кирпичный дом, 2000 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon avito">Авито</div></td>
+                                <td>5,000,000</td>
+                                <td>
+                                    ул. Садовая, 15, кв. 42
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot green"></span>
+                                            <span>Садовая</span>
+                                            <span class="metro-time">(8 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (900) 111-22-33</div>
+                                        <div class="contact-name">Садовников П.Р.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="no-duplicates">Нет дубликатов</div>
+                                </td>
+                                <td>50 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-success">Наша квартира</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>08.04.2024<br><span style="font-size: 12px; color: var(--text-light);">10:45</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star</i>
+                                                <span class="tooltip">Убрать из избранного</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">Студия, 30 м²</div>
+                                            <div class="ad-params">Этаж: 15/25, Монолитный дом, 2021 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon cian">ЦИАН</div></td>
+                                <td>3,200,000</td>
+                                <td>
+                                    ул. Новая, 100, кв. 500
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot blue"></span>
+                                            <span>Новая</span>
+                                            <span class="metro-time">(12 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (911) 222-33-44</div>
+                                        <div class="contact-name">Новиков А.А.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source youla" onclick="window.open('https://youla.ru', '_blank')" title="Перейти на Юла">Ю</div>
+                                        <div class="duplicate-source yandex" onclick="window.open('https://realty.yandex.ru', '_blank')" title="Перейти на Яндекс">Я</div>
+                                    </div>
+                                </td>
+                                <td>30 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-info">Агент</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>09.04.2024<br><span style="font-size: 12px; color: var(--text-light);">12:10</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">3-комн. квартира, 75 м²</div>
+                                            <div class="ad-params">Этаж: 8/10, Панельный дом, 1995 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon yandex">Яндекс</div></td>
+                                <td>7,500,000</td>
+                                <td>
+                                    ул. Центральная, 28, кв. 65
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot purple"></span>
+                                            <span>Центральная</span>
+                                            <span class="metro-time">(5 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (922) 333-44-55</div>
+                                        <div class="contact-name">Центров В.Г.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="no-duplicates">Нет дубликатов</div>
+                                </td>
+                                <td>75 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-danger">Не снял</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>10.04.2024<br><span style="font-size: 12px; color: var(--text-light);">14:35</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star</i>
+                                                <span class="tooltip">Убрать из избранного</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">1-комн. квартира, 38 м²</div>
+                                            <div class="ad-params">Этаж: 3/9, Кирпичный дом, 2008 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon avito">Авито</div></td>
+                                <td>4,100,000</td>
+                                <td>
+                                    ул. Парковая, 45, кв. 23
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot green"></span>
+                                            <span>Парковая</span>
+                                            <span class="metro-time">(7 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (933) 444-55-66</div>
+                                        <div class="contact-name">Парков Д.Е.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source cian" onclick="window.open('https://cian.ru', '_blank')" title="Перейти на ЦИАН">Ц</div>
+                                    </div>
+                                </td>
+                                <td>38 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-warning">Не дозвонился</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>11.04.2024<br><span style="font-size: 12px; color: var(--text-light);">16:00</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">2-комн. квартира, 55 м²</div>
+                                            <div class="ad-params">Этаж: 5/9, Панельный дом, 1990 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon youla">Юла</div></td>
+                                <td>5,500,000</td>
+                                <td>
+                                    ул. Школьная, 32, кв. 17
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot orange"></span>
+                                            <span>Школьная</span>
+                                            <span class="metro-time">(10 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (944) 555-66-77</div>
+                                        <div class="contact-name">Школьный А.П.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="no-duplicates">Нет дубликатов</div>
+                                </td>
+                                <td>55 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-secondary">Не первые</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>12.04.2024<br><span style="font-size: 12px; color: var(--text-light);">09:30</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star</i>
+                                                <span class="tooltip">Убрать из избранного</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">4-комн. квартира, 95 м²</div>
+                                            <div class="ad-params">Этаж: 10/16, Монолитный дом, 2017 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon cian">ЦИАН</div></td>
+                                <td>9,500,000</td>
+                                <td>
+                                    ул. Академическая, 5, кв. 101
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot red"></span>
+                                            <span>Академическая</span>
+                                            <span class="metro-time">(15 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (955) 666-77-88</div>
+                                        <div class="contact-name">Академиков К.Л.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source avito" onclick="window.open('https://avito.ru', '_blank')" title="Перейти на Авито">А</div>
+                                        <div class="duplicate-source youla" onclick="window.open('https://youla.ru', '_blank')" title="Перейти на Юла">Ю</div>
+                                    </div>
+                                </td>
+                                <td>95 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-success">Наша квартира</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>13.04.2024<br><span style="font-size: 12px; color: var(--text-light);">11:15</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">Студия, 25 м²</div>
+                                            <div class="ad-params">Этаж: 22/24, Монолитный дом, 2023 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon yandex">Яндекс</div></td>
+                                <td>2,800,000</td>
+                                <td>
+                                    ул. Молодежная, 10, кв. 220
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot blue"></span>
+                                            <span>Молодежная</span>
+                                            <span class="metro-time">(9 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (966) 777-88-99</div>
+                                        <div class="contact-name">Молодцов И.Е.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="no-duplicates">Нет дубликатов</div>
+                                </td>
+                                <td>25 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-info">Агент</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>14.04.2024<br><span style="font-size: 12px; color: var(--text-light);">13:50</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">1-комн. квартира, 42 м²</div>
+                                            <div class="ad-params">Этаж: 7/14, Кирпичный дом, 2012 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon avito">Авито</div></td>
+                                <td>4,500,000</td>
+                                <td>
+                                    ул. Лесная, 20, кв. 140
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot green"></span>
+                                            <span>Лесная</span>
+                                            <span class="metro-time">(6 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (977) 888-99-00</div>
+                                        <div class="contact-name">Лесной М.Р.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source cian" onclick="window.open('https://cian.ru', '_blank')" title="Перейти на ЦИАН">Ц</div>
+                                        <div class="duplicate-source youla" onclick="window.open('https://youla.ru', '_blank')" title="Перейти на Юла">Ю</div>
+                                    </div>
+                                </td>
+                                <td>42 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-danger">Не снял</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>15.04.2024<br><span style="font-size: 12px; color: var(--text-light);">15:25</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star</i>
+                                                <span class="tooltip">Убрать из избранного</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">2-комн. квартира, 58 м²</div>
+                                            <div class="ad-params">Этаж: 9/16, Панельный дом, 2005 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon youla">Юла</div></td>
+                                <td>5,800,000</td>
+                                <td>
+                                    ул. Речная, 55, кв. 79
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot purple"></span>
+                                            <span>Речная</span>
+                                            <span class="metro-time">(11 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (988) 999-00-11</div>
+                                        <div class="contact-name">Речкин А.В.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="no-duplicates">Нет дубликатов</div>
+                                </td>
+                                <td>58 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-warning">Не дозвонился</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>16.04.2024<br><span style="font-size: 12px; color: var(--text-light);">17:40</span></td>
+                                <td>
+                                    <div class="ad-title-container">
+                                        <div class="ad-title-icons">
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">photo_camera</i>
+                                                <span class="tooltip">Обработать фото</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">star_border</i>
+                                                <span class="tooltip">Добавить в избранное</span>
+                                            </div>
+                                            <div class="ad-title-icon">
+                                                <i class="material-icons">link</i>
+                                                <span class="tooltip">Перейти к объявлению</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="ad-title">3-комн. квартира, 85 м²</div>
+                                            <div class="ad-params">Этаж: 12/14, Монолитный дом, 2018 г.</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div class="source-icon cian">ЦИАН</div></td>
+                                <td>8,500,000</td>
+                                <td>
+                                    ул. Кленовая, 7, кв. 122
+                                    <div class="metro-stations">
+                                        <div class="metro-station">
+                                            <span class="metro-dot orange"></span>
+                                            <span>Кленовая</span>
+                                            <span class="metro-time">(13 мин)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        <div class="contact-phone">+7 (999) 000-11-22</div>
+                                        <div class="contact-name">Кленов С.Т.</div>
+                                    </div>
+                                </td>
+                                <td class="duplicates-column">
+                                    <div class="duplicates-list">
+                                        <div class="duplicate-source avito" onclick="window.open('https://avito.ru', '_blank')" title="Перейти на Авито">А</div>
+                                    </div>
+                                </td>
+                                <td>85 м²</td>
+                                <td class="status-column">
+                                    <div class="ad-status">
+                                        <span class="badge badge-success">Наша квартира</span>
+                                        <div class="call-action-btn">
+                                            <i class="material-icons">call</i>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Пагинация -->
+            <div class="pagination-container">
+                <div class="per-page-selector">
+                    <span>Строк на странице:</span>
+                    <select class="form-control" style="width: 70px">
+                        <option>10</option>
+                        <option selected>20</option>
+                        <option>50</option>
+                        <option>100</option>
+                    </select>
+                </div>
+                
+                <div class="pagination">
+                    <div class="page-item">←</div>
+                    <div class="page-item active">1</div>
+                    <div class="page-item">2</div>
+                    <div class="page-item">3</div>
+                    <div class="page-item">4</div>
+                    <div class="page-item">5</div>
+                    <div class="page-item">→</div>
+                </div>
+                
+                <div class="results-info">
+                    Показано 1-20 из 156 записей
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно настройки столбцов -->
+    <div id="column-settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Настройка столбцов</h2>
+                <div class="modal-close">
+                    <i class="material-icons">close</i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 20px; color: var(--text-light);">
+                    Перетащите элементы для изменения порядка столбцов. Снимите галочку, чтобы скрыть столбец.
+                </p>
+                <ul id="columns-list" class="column-settings">
+                    <li class="column-item" draggable="true">
+                        <i class="material-icons drag-handle">drag_indicator</i>
+                        <input type="checkbox" checked>
+                        <span class="column-name">Дата и время</span>
+                    </li>
+                    <li class="column-item" draggable="true">
+                        <i class="material-icons drag-handle">drag_indicator</i>
+                        <input type="checkbox" checked>
+                        <span class="column-name">Заголовок</span>
+                    </li>
+                    <li class="column-item" draggable="true">
+                        <i class="material-icons drag-handle">drag_indicator</i>
+                        <input type="checkbox" checked>
+                        <span class="column-name">Источник</span>
+                    </li>
+                    <li class="column-item" draggable="true">
+                        <i class="material-icons drag-handle">drag_indicator</i>
+                        <input type="checkbox" checked>
+                        <span class="column-name">Цена, ₽</span>
+                    </li>
+                    <li class="column-item" draggable="true">
+                        <i class="material-icons drag-handle">drag_indicator</i>
+                        <input type="checkbox" checked>
+                        <span class="column-name">Адрес</span>
+                    </li>
+                    <li class="column-item" draggable="true">
+                        <i class="material-icons drag-handle">drag_indicator</i>
+                        <input type="checkbox" checked>
+                        <span class="column-name">Контакт</span>
+                    </li>
+                    <li class="column-item" draggable="true">
+                        <i class="material-icons drag-handle">drag_indicator</i>
+                        <input type="checkbox" checked>
+                        <span class="column-name">Дубликаты</span>
+                    </li>
+                    <li class="column-item" draggable="true">
+                        <i class="material-icons drag-handle">drag_indicator</i>
+                        <input type="checkbox" checked>
+                        <span class="column-name">Общая площадь</span>
+                    </li>
+                    <li class="column-item" draggable="true">
+                        <i class="material-icons drag-handle">drag_indicator</i>
+                        <input type="checkbox" checked disabled>
+                        <span class="column-name">Статус (закреплен)</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button id="reset-columns-btn" class="btn btn-outline">Сбросить</button>
+                <button id="save-columns-btn" class="btn btn-primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

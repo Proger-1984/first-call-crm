@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * 
  * @property-read Collection|TariffPrice[] $tariffPrices
  * @property-read Collection|UserSubscription[] $userSubscriptions
+ * @property-read Collection|City[] $cities
  * @method static Location findOrFail(int $id)
  * @method static Builder|self where($column, $operator = null, $value = null)
  */
@@ -65,6 +66,22 @@ class Location extends Model
     {
         return $this->hasMany(UserSubscription::class);
     }
+
+    /**
+     * Получить все города в этой локации
+     */
+    public function cities(): HasMany
+    {
+        return $this->hasMany(City::class, 'location_parent_id');
+    }
+
+    /**
+     * Получить только основные города в локации
+     */
+    public function mainCities(): HasMany
+    {
+        return $this->cities()->whereRaw('id = city_parent_id');
+    }
     
     /**
      * Получить полное название локации (город, регион)
@@ -72,5 +89,56 @@ class Location extends Model
     public function getFullName(): string
     {
         return "$this->city, $this->region";
+    }
+
+    /**
+     * Получить все объявления в этой локации (через города)
+     */
+    public function getAllListings(): Collection
+    {
+        $cityIds = $this->cities()->pluck('id')->toArray();
+        
+        if (empty($cityIds)) {
+            return collect();
+        }
+        
+        return Listing::whereIn('city_id', $cityIds)->get();
+    }
+
+    /**
+     * Получить количество объявлений в локации
+     */
+    public function getListingsCount(): int
+    {
+        $cityIds = $this->cities()->pluck('id')->toArray();
+        
+        if (empty($cityIds)) {
+            return 0;
+        }
+        
+        return Listing::whereIn('city_id', $cityIds)->count();
+    }
+
+    /**
+     * Получить статистику по группам городов
+     */
+    public function getCityGroupsStats(): array
+    {
+        $stats = [];
+        $mainCities = $this->mainCities()->get();
+        
+        foreach ($mainCities as $mainCity) {
+            $groupCities = $this->cities()->where('city_parent_id', $mainCity->id)->get();
+            $listingsCount = Listing::whereIn('city_id', $groupCities->pluck('id'))->count();
+            
+            $stats[] = [
+                'main_city' => $mainCity->name,
+                'cities_count' => $groupCities->count(),
+                'listings_count' => $listingsCount,
+                'cities' => $groupCities->pluck('name')->toArray()
+            ];
+        }
+        
+        return $stats;
     }
 } 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -274,5 +275,37 @@ class UserSubscription extends Model
         }
         
         return $result;
+    }
+
+    /**
+     * Получает уникальные комбинации локаций и категорий из активных подписок пользователей
+     * @return array Массив уникальных комбинаций локаций и категорий
+     */
+    public static function getUniqueLocationCategoryPairs(): array
+    {
+        try {
+            // Запрос для получения уникальных комбинаций локаций и категорий из активных подписок
+            $subscriptions = self::select('location_id', 'category_id')
+                ->where('status', 'active')
+                ->distinct()
+                ->with(['location', 'category'])
+                ->get();
+            
+            // Преобразуем результат в нужный формат
+            $pairs = [];
+            foreach ($subscriptions as $subscription) {
+                $pairs[] = [
+                    'location_id' => $subscription->location->id,
+                    'location_name' => $subscription->location->city,
+                    'category_id' => $subscription->category->id,
+                    'category_name' => $subscription->category->name,
+                ];
+            }
+            
+            return $pairs;
+            
+        } catch (Exception) {
+            return [];
+        }
     }
 } 

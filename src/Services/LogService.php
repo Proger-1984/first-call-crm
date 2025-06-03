@@ -57,13 +57,10 @@ class LogService
      */
     private function log(string $level, string $message, array $context = [], ?string $filename = null): void
     {
-        // Добавляем временную метку
-        $context['timestamp'] = date('Y-m-d H:i:s');
-        
         // Форматируем сообщение
         $logMessage = sprintf(
             "[%s] %s %s\n",
-            $context['timestamp'],
+            date('Y-m-d H:i:s'),
             strtoupper($level),
             $message
         );

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Tariff;
 use App\Models\TariffPrice;
+use App\Models\UserSubscription;
 use Psr\Container\ContainerInterface;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -48,5 +49,15 @@ class SubscriptionService
         // Если цена для локации не найдена, берем стандартную цену из тарифа
         $tariff = Tariff::find($tariffId);
         return $tariff ? (float)$tariff->price : null;
+    }
+
+    /**
+     * Получает уникальные комбинации локаций и категорий из активных подписок
+     * 
+     * @return array Массив уникальных комбинаций локаций и категорий
+     */
+    public function getUniqueLocationCategoryPairs(): array
+    {
+        return UserSubscription::getUniqueLocationCategoryPairs();
     }
 } 
