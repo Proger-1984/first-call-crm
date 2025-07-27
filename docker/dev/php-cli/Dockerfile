@@ -1,4 +1,4 @@
-FROM php:8.3-cli-alpine
+FROM php:8.3-zts-alpine
 
 # Устанавливаем зависимости
 RUN apk add --no-cache \
@@ -7,10 +7,17 @@ RUN apk add --no-cache \
     zip \
     unzip \
     git \
-    curl
+    curl \
+    autoconf \
+    gcc \
+    g++ \
+    make
 
 # Устанавливаем расширения PHP
 RUN docker-php-ext-install pdo pdo_pgsql pgsql zip
+
+# Устанавливаем расширение parallel
+RUN pecl install parallel && docker-php-ext-enable parallel
 
 # Устанавливаем composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer

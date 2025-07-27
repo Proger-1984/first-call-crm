@@ -4,13 +4,12 @@ namespace App\Commands;
 
 use App\Services\LogService;
 use App\Services\SubscriptionService;
+use App\Services\CianParallelParser;
+use App\Models\LocationProxy;
+use App\Models\CianAuth;
 use Exception;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Database\Capsule\Manager as DB;
 use Illuminate\Support\Carbon;
-use JetBrains\PhpStorm\ArrayShape;
-use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use Psr\Container\ContainerExceptionInterface;
@@ -21,21 +20,18 @@ use Symfony\Component\Console\Output\OutputInterface;
 use parallel\Runtime;
 use parallel\Channel;
 use Psr\Container\ContainerInterface;
+use Throwable;
 
 class ParseCianMultiThreadCommand extends Command
 {
     private LogService $logger;
     private SubscriptionService $subscriptionService;
-    private bool $log_status;
     private int $num_threads;
     private array $futureList = [];
-    private array $processedItems = [];
 
-    private const THREADS_COUNT = 1;
+    private const THREADS_COUNT = 19;
+    private const SOURCE_ID = 3; // Циан
     private const COMMAND_NAME = 'parse-cian-multi';
-    private const DIR_LOG = 'logs/cian/';
-    private const STATUS_LOG = true;
-    private const BATCH_SIZE = 50;
 
     private const MESSAGES = [
         'START'            => 'Начало парсинга Циан',
@@ -72,6 +68,7 @@ class ParseCianMultiThreadCommand extends Command
 
         $cmd = '/usr/bin/supervisorctl stop ' . self::COMMAND_NAME;
         $this->logger->info(self::MESSAGES['START'], [], self::COMMAND_NAME);
+        exit;
 
         try {
             /** Получаем уникальные комбинации локаций и категорий
@@ -90,289 +87,105 @@ class ParseCianMultiThreadCommand extends Command
 
             // Получаем параметры запросов для всех комбинаций локаций и категорий
             $requestParams = $this->generateRequestParams($locationCategoryPairs);
+            unset($locationCategoryPairs);
 
-            // Получаем список существующих объявлений для проверки дубликатов
-            foreach (Items::getItemsBySource(3) as $value) {
-                $this->processedItems[$value['id']] = $value['id'];
+            // Загружаем прокси/объявления/токены для Циан
+            $optimizedParams = [];
+            foreach ($requestParams AS $requestData) {
+                $locationId = $requestData['location_id'];
+                $categoryId = $requestData['category_id'];
+
+                $proxies = $this->loadProxiesForSource(self::SOURCE_ID, $locationId, $categoryId);
+                $authToken = $this->loadCianAuthToken($categoryId, $locationId);
+                if (empty($proxies) || empty($authToken)) {
+                    $this->logger->warning('Не хватает данных для работы с Циан', [
+                        'location_id' => $locationId,
+                        'category_id' => $categoryId,
+                        'count_proxy' => count($proxies),
+                        'auth_token'  => $authToken,
+                    ], self::COMMAND_NAME);
+
+                    continue;
+                }
+
+                // Загружаем существующие объявления для локации/категории
+                $requestData['items'] = $this->loadExistingItemsForLocation($locationId, $categoryId, self::SOURCE_ID);
+
+                $requestData['proxies'] = $proxies;
+                $requestData['auth_token'] = $authToken;
+                $optimizedParams[] = $requestData;
             }
 
-            // Создаем категории для парсинга на основе сформированных параметров
-            $categories = [];
-            foreach ($requestParams as $requestId => $requestData) {
-                $categories[] = [
-                    'name' => $requestData['name'],
-                    'type' => $requestData['category']['type'],
-                    'region' => $requestData['location']['region'],
-                    'room' => $requestData['category']['rooms'],
-                    'price' => $requestData['category']['price'],
-                    'is_by_homeowner' => true,
-                    'request_id' => $requestId
-                ];
+            unset($requestParams);
+            if (empty($optimizedParams)) {
+                $this->logger->warning('Недостаточно данных для парсинга', [], self::COMMAND_NAME);
+                exec($cmd);
+                return 0;
             }
-            
-            $this->logger->info(self::MESSAGES['NUMBER_OF_TASKS'] . count($categories), [], self::COMMAND_NAME);
 
-            // Если категорий меньше чем потоков, уменьшаем количество потоков
-            if (count($categories) < $this->num_threads) {
-                $this->num_threads = count($categories);
+            $this->logger->info(self::MESSAGES['NUMBER_OF_TASKS'] . count($optimizedParams), [], self::COMMAND_NAME);
+
+            // Если поисков меньше чем потоков, уменьшаем количество потоков
+            if (count($optimizedParams) < $this->num_threads) {
+                $this->num_threads = count($optimizedParams);
             }
 
             // Запускаем многопоточную обработку
-            $this->handleParallelProcessing($categories);
+            $this->handleParallelProcessing($optimizedParams);
 
         } catch (Exception $e) {
             $this->logger->error('Ошибка выполнения: ' . $e->getMessage(), [], self::COMMAND_NAME);
         }
 
-        $end_time = microtime(true);
-        $execution_time = $end_time - $start_time;
 
-        $minutes = floor($execution_time / 60);
-        $seconds = number_format($execution_time - ($minutes * 60));
-
-        $this->logger->info("Время выполнения $minutes минут $seconds секунд", [], self::COMMAND_NAME);
-        $this->logger->info('Выполнено ' . date('Y-m-d H:i:s'), [], self::COMMAND_NAME);
+        $this->logger->info('Скрипт циан завершил работу', [], self::COMMAND_NAME);
 
         exec($cmd);
         return 0;
     }
 
     /**
-     * Получение локаций для парсинга
-     * @return array
-     */
-    private function getLocationsForParsing(): array
-    {
-        // Здесь можно добавить логику получения локаций из базы данных
-        // Например, из таблицы настроек или из аргументов командной строки
-        
-        // В простейшем случае возвращаем фиксированный список локаций
-        return [
-            1, // Москва
-            2, // Санкт-Петербург
-            // Можно добавить другие города
-        ];
-    }
-
-    /**
-     * Определяет категории для парсинга с учетом локаций
-     * @param array $locations Массив локаций для парсинга
-     * @param array $categoryTypes Массив типов категорий для парсинга
-     * @return array
-     */
-    private function getCategoriesForParsing(array $locations = [], array $categoryTypes = []): array
-    {
-        // Если локации не заданы, используем Москву по умолчанию
-        if (empty($locations)) {
-            $locations = [1]; // ID Москвы
-        }
-        
-        // Если категории не заданы, используем стандартный набор
-        if (empty($categoryTypes)) {
-            $categoryTypes = ['rent'];
-        }
-        
-        $categories = [];
-        
-        // Настройки цен по локациям
-        $priceSettings = [
-            // Москва
-            1 => [
-                'rent_1room' => ['min' => 17500, 'max' => 80000],
-                'rent_2room' => ['min' => 25000, 'max' => 120000],
-                'rent_3room' => ['min' => 30000, 'max' => 150000],
-                'rent_studio' => ['min' => 17500, 'max' => 80000],
-                'sale_1room' => ['min' => 4000000, 'max' => 15000000],
-                'sale_2room' => ['min' => 6000000, 'max' => 20000000],
-                'sale_3room' => ['min' => 8000000, 'max' => 30000000],
-                'sale_studio' => ['min' => 3500000, 'max' => 12000000],
-            ],
-            // Санкт-Петербург
-            2 => [
-                'rent_1room' => ['min' => 15000, 'max' => 60000],
-                'rent_2room' => ['min' => 20000, 'max' => 90000],
-                'rent_3room' => ['min' => 25000, 'max' => 120000],
-                'rent_studio' => ['min' => 15000, 'max' => 60000],
-                'sale_1room' => ['min' => 3000000, 'max' => 10000000],
-                'sale_2room' => ['min' => 4500000, 'max' => 15000000],
-                'sale_3room' => ['min' => 6000000, 'max' => 20000000],
-                'sale_studio' => ['min' => 2500000, 'max' => 8000000],
-            ],
-            // Другие города (по умолчанию)
-            'default' => [
-                'rent_1room' => ['min' => 10000, 'max' => 40000],
-                'rent_2room' => ['min' => 15000, 'max' => 60000],
-                'rent_3room' => ['min' => 20000, 'max' => 80000],
-                'rent_studio' => ['min' => 10000, 'max' => 40000],
-                'sale_1room' => ['min' => 1500000, 'max' => 6000000],
-                'sale_2room' => ['min' => 2500000, 'max' => 8000000],
-                'sale_3room' => ['min' => 3500000, 'max' => 12000000],
-                'sale_studio' => ['min' => 1200000, 'max' => 5000000],
-            ],
-        ];
-        
-        // Для каждой локации и категории создаем конфигурацию
-        foreach ($locations as $locationId) {
-            $locationPrices = $priceSettings[$locationId] ?? $priceSettings['default'];
-            
-            foreach ($categoryTypes as $categoryType) {
-                // Аренда квартир
-                if ($categoryType === 'rent') {
-                    // 1-комнатные
-                    $categories[] = [
-                        'name' => 'rent_1room_' . $locationId,
-                        'type' => 'flatrent',
-                        'region' => [$locationId],
-                        'room' => [1],
-                        'price' => $locationPrices['rent_1room'],
-                        'is_by_homeowner' => true
-                    ];
-                    
-                    // 2-комнатные
-                    $categories[] = [
-                        'name' => 'rent_2room_' . $locationId,
-                        'type' => 'flatrent',
-                        'region' => [$locationId],
-                        'room' => [2],
-                        'price' => $locationPrices['rent_2room'],
-                        'is_by_homeowner' => true
-                    ];
-                    
-                    // 3-комнатные
-                    $categories[] = [
-                        'name' => 'rent_3room_' . $locationId,
-                        'type' => 'flatrent',
-                        'region' => [$locationId],
-                        'room' => [3],
-                        'price' => $locationPrices['rent_3room'],
-                        'is_by_homeowner' => true
-                    ];
-                    
-                    // Студии
-                    $categories[] = [
-                        'name' => 'rent_studio_' . $locationId,
-                        'type' => 'flatrent',
-                        'region' => [$locationId],
-                        'room' => [9],
-                        'price' => $locationPrices['rent_studio'],
-                        'is_by_homeowner' => true
-                    ];
-                }
-                
-                // Продажа квартир
-                if ($categoryType === 'sale') {
-                    // 1-комнатные
-                    $categories[] = [
-                        'name' => 'sale_1room_' . $locationId,
-                        'type' => 'flatsale',
-                        'region' => [$locationId],
-                        'room' => [1],
-                        'price' => $locationPrices['sale_1room'],
-                        'is_by_homeowner' => true
-                    ];
-                    
-                    // 2-комнатные
-                    $categories[] = [
-                        'name' => 'sale_2room_' . $locationId,
-                        'type' => 'flatsale',
-                        'region' => [$locationId],
-                        'room' => [2],
-                        'price' => $locationPrices['sale_2room'],
-                        'is_by_homeowner' => true
-                    ];
-                    
-                    // 3-комнатные
-                    $categories[] = [
-                        'name' => 'sale_3room_' . $locationId,
-                        'type' => 'flatsale',
-                        'region' => [$locationId],
-                        'room' => [3],
-                        'price' => $locationPrices['sale_3room'],
-                        'is_by_homeowner' => true
-                    ];
-                    
-                    // Студии
-                    $categories[] = [
-                        'name' => 'sale_studio_' . $locationId,
-                        'type' => 'flatsale',
-                        'region' => [$locationId],
-                        'room' => [9],
-                        'price' => $locationPrices['sale_studio'],
-                        'is_by_homeowner' => true
-                    ];
-                }
-            }
-        }
-        
-        return $categories;
-    }
-
-    /**
      * Запускает многопоточную обработку категорий
-     * @param array $categories
+     * @param array $requestParams
      */
-    private function handleParallelProcessing(array $categories): void
+    private function handleParallelProcessing(array $requestParams): void
     {
         // Создаем рантаймы для каждого потока
         $runtimeList = array_map(fn() => new Runtime(), range(0, $this->num_threads - 1));
         $this->logger->info(self::MESSAGES['NUMBER_OF_THREADS'] . count($runtimeList), [], self::COMMAND_NAME);
 
-        // Разбиваем категории на группы по количеству потоков
-        $categoryChunks = array_chunk($categories, ceil(count($categories) / $this->num_threads));
-        
-        // Получаем данные, необходимые для всех потоков
-        $metroStations = Metro::findByCoordinatesAll();
-        $regions = Cities::findAllByParentId();
-        $cities = Cities::findAll();
-        $proxies = Proxy::findAllByNumber([1]);
-        $simpleToken = CianAuthorizedUsers::findOne(1)['simple'];
+        // Разбиваем поиски на группы по количеству потоков
+        $requestChunks = array_chunk($requestParams, ceil(count($requestParams) / $this->num_threads));
         
         // Запускаем задачи в каждом потоке
-        foreach ($categoryChunks as $index => $chunk) {
-            $this->futureList[] = $runtimeList[$index]->run(function ($index, $chunk, $proxies, $simpleToken, $metroStations, $regions, $cities) {
+        foreach ($requestChunks as $index => $chunk) {
+            $this->futureList[] = $runtimeList[$index]->run(function ($index, $chunk) {
                 try {
-                    // Инициализация в отдельном потоке
-                    ini_set('memory_limit', '2G');
+                    // Инициализация в отдельном потоке - аналогично старому коду
+                    ini_set('memory_limit', '1G');
                     require_once __DIR__ . '/../../vendor/autoload.php';
-                    $container = require __DIR__ . '/../../src/Config/container.php';
                     
-                    // Создаем экземпляр текущего класса для обработки в потоке
-                    $parser = new ParseCianMultiThread();
+                    // Загружаем конфигурацию приложения (инициализирует БД)
+                    $config = require __DIR__ . '/../../bootstrap/app.php';
+                    
+                    // Загружаем контейнер зависимостей
+                    $containerLoader = require __DIR__ . '/../../bootstrap/container.php';
+                    $container = $containerLoader($config);
                     
                     // Создаем логгер для этого потока
-                    $tempLog = new Logger('info');
-                    $tempLog->pushHandler(new RotatingFileHandler(self::PATH_TO_TEMP_LOG . $index . '.log', 2, Logger::INFO));
+                    $tempLog = new Logger('cian_thread_' . $index);
                     $tempLog->pushHandler(new StreamHandler('php://stdout'));
                     
-                    // Парсим каждую категорию в этом потоке
-                    $results = [];
-                    foreach ($chunk as $category) {
-                        $tempLog->info(self::MESSAGES['TASK_INFO_START'], [
-                            'category' => $category['name'],
-                            'thread' => $index
-                        ]);
-                        
-                        $items = $parser->parseCategory($category, $proxies, $simpleToken, $metroStations, $regions, $cities, $tempLog);
-                        
-                        $tempLog->info(self::MESSAGES['TASK_INFO_ITEMS'], [
-                            'category' => $category['name'],
-                            'thread' => $index,
-                            'count' => count($items)
-                        ]);
-                        
-                        $results[$category['name']] = count($items);
-                        
-                        $tempLog->info(self::MESSAGES['TASK_INFO_END'], [
-                            'category' => $category['name'],
-                            'thread' => $index
-                        ]);
-                    }
+                    // Создаем парсер
+                    $parser = new CianParallelParser($container, $tempLog);
                     
-                    return $results;
-                } catch (\Throwable $e) {
-                    return ['success' => false, 'error' => $e->getMessage()];
+                    // Парсим chunk в этом потоке
+                    return $parser->parseRequestData($chunk[$index]);
+
+                } catch (Throwable $e) {
+                    return ['success' => false, 'error' => $e->getMessage(), 'thread' => $index];
                 }
-            }, [$index, $chunk, $proxies, $simpleToken, $metroStations, $regions, $cities]);
+            }, [$index, $chunk]);
         }
         
         // Ожидаем завершения всех задач
@@ -382,287 +195,6 @@ class ParseCianMultiThreadCommand extends Command
         }
     }
     
-    /**
-     * Парсит одну категорию
-     * @param array $category Параметры категории
-     * @param array $proxies Список прокси
-     * @param string $simpleToken Токен авторизации
-     * @param array $metroStations Станции метро
-     * @param array $regions Регионы
-     * @param array $cities Города
-     * @param Logger $log Логгер для потока
-     * @return array Обработанные объявления
-     */
-    public function parseCategory(array $category, array $proxies, string $simpleToken, array $metroStations, array $regions, array $cities, Logger $log): array
-    {
-        $client = new Client();
-        $items = [];
-        $itemsBatch = [];
-        $processedItems = [];
-        $metroCache = [];
-        $regionCache = [];
-        $startTime = microtime(true);
-        $gaid = $this->gaid();
-        $proxy = $this->getAndRemoveRandomProxy($proxies);
-        $simple = $simpleToken;
-        
-        // Получение токена
-        try {
-            $tokenData = $this->getAuthToken($client, $simple, $gaid, $proxy);
-            if ($tokenData) {
-                $simple = 'simple ' . $tokenData;
-            }
-        } catch (Exception $e) {
-            $log->error('Ошибка получения токена: ' . $e->getMessage());
-        }
-        
-        // Основной цикл парсинга
-        $page = 1;
-        $maxPages = 20; // Ограничим количество страниц для каждой категории
-        
-        while ($page <= $maxPages) {
-            try {
-                if (empty($proxies)) {
-                    $log->info(self::MESSAGES['PROXY_EMPTY']);
-                    $proxies = Proxy::findAllByNumber([1]);
-                    if (empty($proxies)) {
-                        break; // Если прокси всё равно нет, прерываем цикл
-                    }
-                }
-                
-                $proxy = $this->getAndRemoveRandomProxy($proxies);
-                
-                // Подготовка параметров запроса
-                $postParams = $this->preparePostParams($category, $page);
-                
-                // Выполнение запроса к API
-                $response = $client->request('POST', 'https://api.cian.ru/search-offers/v4/search-offers-mobile-apps/', [
-                    'body' => $postParams,
-                    'headers' => $this->getHeaders($simple, $gaid, strlen($postParams)),
-                    'timeout' => 3.0,
-                    'connect_timeout' => 3.0,
-                    'allow_redirects' => true,
-                    'proxy' => $proxy,
-                    'http_errors' => false
-                ]);
-                
-                $statusCode = $response->getStatusCode();
-                
-                if ($statusCode != 200) {
-                    $log->error("Ошибка запроса: $statusCode", ['proxy' => $proxy]);
-                    usleep(rand(200000, 500000));
-                    continue;
-                }
-                
-                $data = json_decode($response->getBody()->getContents(), true);
-                
-                if (!isset($data['items']) || empty($data['items'])) {
-                    $log->info("Нет объявлений на странице $page");
-                    break; // Если нет объявлений, значит достигли конца выдачи
-                }
-                
-                // Обработка объявлений
-                foreach ($data['items'] as $item) {
-                    // Проверка на дубликаты
-                    if (isset($processedItems[$item['offer']['id']])) {
-                        continue;
-                    }
-                    
-                    // Проверка даты
-                    $inputDate = Carbon::parse($item['offer']['creationDate'])->format('Y-m-d');
-                    $currentDate = Carbon::now('Europe/Moscow')->format('Y-m-d');
-                    $sevenDaysAgo = Carbon::now('Europe/Moscow')->subDays(7)->format('Y-m-d');
-                    
-                    $isInRange = $inputDate >= $sevenDaysAgo && $inputDate <= $currentDate;
-                    if (!$isInRange) {
-                        $processedItems[$item['offer']['id']] = true;
-                        continue;
-                    }
-                    
-                    // Получение местоположения
-                    $locationId = $this->getCachedRegion(
-                        $item['offer']['geo']['userInput'],
-                        $regions,
-                        $cities,
-                        $regionCache
-                    );
-                    
-                    if ($locationId === 0) {
-                        $processedItems[$item['offer']['id']] = true;
-                        continue;
-                    }
-                    
-                    // Получение метро
-                    $metroId = $this->getCachedMetroStation(
-                        $item['offer']['geo']['coordinates']['lat'],
-                        $item['offer']['geo']['coordinates']['lng'],
-                        $metroStations,
-                        $metroCache
-                    );
-                    
-                    if (is_null($metroId)) {
-                        $processedItems[$item['offer']['id']] = true;
-                        continue;
-                    }
-                    
-                    // Добавляем в пакет
-                    $itemsBatch[] = $this->getItemData($item, $metroId['id'], $locationId);
-                    $processedItems[$item['offer']['id']] = true;
-                    
-                    // Когда пакет заполнен - обрабатываем
-                    if (count($itemsBatch) >= self::BATCH_SIZE) {
-                        $this->processBatch($itemsBatch, $log);
-                        $items = array_merge($items, $itemsBatch);
-                        $itemsBatch = [];
-                    }
-                }
-                
-                // Переход на следующую страницу
-                $page++;
-                
-                // Задержка между запросами
-                usleep(rand(500000, 1000000));
-                
-            } catch (Exception $e) {
-                $log->error("Ошибка парсинга: " . $e->getMessage());
-                usleep(rand(500000, 1000000));
-            }
-        }
-        
-        // Обрабатываем оставшиеся элементы
-        if (!empty($itemsBatch)) {
-            $this->processBatch($itemsBatch, $log);
-            $items = array_merge($items, $itemsBatch);
-        }
-        
-        return $items;
-    }
-
-    /**
-     * Получает токен авторизации
-     * @param Client $client
-     * @param string $simple
-     * @param string $gaid
-     * @param string $proxy
-     * @return string|null
-     * @throws GuzzleException
-     */
-    private function getAuthToken(Client $client, string $simple, string $gaid, string $proxy): ?string
-    {
-        try {
-            $response = $client->request('GET', 'https://api.cian.ru/mobile-assist/token/', [
-                'headers' => $this->getHeaders($simple, $gaid, false),
-                'timeout' => 3.0,
-                'connect_timeout' => 3.0,
-                'allow_redirects' => true,
-                'verify' => false,
-                'http_errors' => false,
-                'proxy' => $proxy,
-            ]);
-            
-            $data = json_decode($response->getBody()->getContents(), true);
-            
-            if (!empty($data) && array_key_exists('guid', $data)) {
-                $hash = $this->encryptToHash($data['guid'], $gaid);
-                
-                $response = $client->request('POST', 'https://api.cian.ru/mobile-assist/token/', [
-                    'headers' => $this->getHeaders($simple, $gaid, 75),
-                    'body' => json_encode(['hash' => $hash]),
-                    'timeout' => 3.0,
-                    'connect_timeout' => 3.0,
-                    'allow_redirects' => true,
-                    'verify' => false,
-                    'http_errors' => false,
-                    'proxy' => $proxy,
-                ]);
-                
-                $data = json_decode($response->getBody()->getContents(), true);
-                
-                if (!empty($data) && array_key_exists('token', $data)) {
-                    return $data['token'];
-                }
-            }
-        } catch (Exception $e) {
-            // Ошибка получения токена
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Формирует параметры запроса на основе локации и категории
-     * @param array $locationConfig Настройки локации
-     * @param array $categoryConfig Настройки категории
-     * @param int $page Номер страницы
-     * @param array $options Дополнительные опции
-     * @return string JSON строка с параметрами запроса
-     */
-    private function buildPostParams(array $locationConfig, array $categoryConfig, int $page = 1, array $options = []): string
-    {
-        // Базовые параметры запроса
-        $params = [
-            'query' => [
-                '_type' => $categoryConfig['type'] ?? 'flatrent',
-                'region' => ['type' => 'terms', 'value' => $locationConfig['region'] ?? [-1]],
-                'room' => ['type' => 'terms', 'value' => $categoryConfig['rooms'] ?? [1, 2, 3, 9]],
-                'object_type' => ['type' => 'terms', 'value' => [0]],
-                'building_status' => ['type' => 'term', 'value' => 0],
-                'engine_version' => ['type' => 'term', 'value' => '2'],
-                'page' => ['type' => 'term', 'value' => $page],
-                'limit' => ['type' => 'term', 'value' => $options['limit'] ?? 20],
-                'commission_type' => ['type' => 'term', 'value' => 0],
-                'is_by_homeowner' => ['type' => 'term', 'value' => $options['is_by_homeowner'] ?? true],
-                'for_day' => ['type' => 'term', 'value' => '0'],
-                'with_neighbors' => ['type' => 'term', 'value' => false],
-                'newbuilding_results_type' => ['type' => 'term', 'value' => "offers"],
-            ]
-        ];
-        
-        // Настройка цен
-        if (isset($categoryConfig['price'])) {
-            $minPrice = $categoryConfig['price']['min'];
-            $maxPrice = $categoryConfig['price']['max'];
-            
-            // Если установлена опция случайных цен, генерируем случайные значения в заданном диапазоне
-            if (!empty($options['randomize_price'])) {
-                $minPriceRange = isset($options['min_price_range']) ? $options['min_price_range'] : 500;
-                $maxPriceRange = isset($options['max_price_range']) ? $options['max_price_range'] : 5000;
-                
-                $minPrice = rand($minPrice, $minPrice + $minPriceRange);
-                $maxPrice = rand($maxPrice - $maxPriceRange, $maxPrice);
-            }
-            
-            $params['query']['price'] = [
-                'type' => 'range',
-                'value' => [
-                    'gte' => $minPrice,
-                    'lte' => $maxPrice
-                ]
-            ];
-        }
-        
-        // Настройка сортировки
-        if (isset($options['sort'])) {
-            $params['query']['sort'] = ['type' => 'term', 'value' => $options['sort']];
-        } else {
-            $params['query']['sort'] = ['type' => 'term', 'value' => 'creation_date_desc'];
-        }
-        
-        // Период публикации (если указан)
-        if (isset($options['publish_period'])) {
-            $params['query']['publish_period'] = ['type' => 'term', 'value' => $options['publish_period']];
-        }
-        
-        // Дополнительные параметры, которые могут быть переданы
-        if (isset($options['additional_params']) && is_array($options['additional_params'])) {
-            foreach ($options['additional_params'] as $key => $value) {
-                $params['query'][$key] = $value;
-            }
-        }
-        
-        return json_encode($params);
-    }
-
     /**
      * @param string $locationName
      * @return int Возвращает идентификатор локации для поиска
@@ -742,6 +274,9 @@ class ParseCianMultiThreadCommand extends Command
                 $baseRequestParams['query']['for_day'] = ['type' => 'term', 'value' => '0'];
             }
 
+            // Добавляем метаданные для поиска
+            $locationCategoryPairs[$key]['name'] = $locationName . '_' . ($categoryId == 1 ? 'rent' : 'sale');
+            $locationCategoryPairs[$key]['location_id'] = $this->getLocationIdByName($locationName);
             $locationCategoryPairs[$key]['json'] = json_encode($baseRequestParams);
         }
 
@@ -841,276 +376,144 @@ class ParseCianMultiThreadCommand extends Command
     }
 
     /**
-     * Формирует заголовки для запроса
-     * @param string $simple
-     * @param string $gaid
-     * @param bool|int $contentLength
-     * @return array
+     * Подгружает список прокси для указанного источника
+     * @param int $sourceId ID источника (1-Авито, 2-Юла, 3-Циан)
+     * @param int $locationId
+     * @param int $categoryId
+     * @return array Массив прокси в простом формате
      */
-    private function getHeaders(string $simple, string $gaid, bool|int $contentLength): array
-    {
-        $headers = [
-            'Host' => 'api.cian.ru',
-            'authorization' => $simple,
-            'os' => 'android',
-            'buildnumber' => '2.302.0',
-            'versioncode' => '23020300',
-            'device' => 'Phone',
-            'applicationid' => $gaid,
-            'crossapplicationid' => $gaid,
-            'package' => 'ru.cian.main',
-            'user-agent' => "Cian/2.302.0 (Android; 23020300; Phone; sdk_gphone64_x86_64; 32; $gaid)",
-            'accept' => '*/*',
-            'content-type' => 'application/json; charset=utf-8',
-            'accept-encoding' => 'gzip',
-        ];
-        
-        if ($contentLength !== false) {
-            $headers['Content-Length'] = $contentLength;
-        }
-        
-        return $headers;
-    }
-    
-    /**
-     * Генерация уникального идентификатора
-     * @return string
-     */
-    private function gaid(): string
-    {
-        return strtolower(sprintf('%04X%04X-%04X-%04X-%04X-%04X%04X%04X',
-            mt_rand(0, 65535),
-            mt_rand(0, 65535),
-            mt_rand(0, 65535),
-            mt_rand(16384, 20479),
-            mt_rand(32768, 49151),
-            mt_rand(0, 65535),
-            mt_rand(0, 65535),
-            mt_rand(0, 65535)
-        ));
-    }
-    
-    /**
-     * Шифрование хэша для авторизации
-     * @param string $guid
-     * @param string $gaid
-     * @return string
-     */
-    private function encryptToHash(string $guid, string $gaid): string
-    {
-        $user_agent = "Cian/2.302.0 (Android; 23020300; Phone; sdk_gphone64_x86_64; 32; $gaid)";
-        $hash = $guid . "_" . $user_agent . "_ac83d1d66254adbc668fd4667e2517614d861641";
-        
-        return hash('sha256', $hash);
-    }
-    
-    /**
-     * Получает и удаляет случайный прокси из списка
-     * @param array &$proxies
-     * @return string
-     */
-    private function getAndRemoveRandomProxy(array &$proxies): string
-    {
-        if (empty($proxies)) {
-            return '';
-        }
-        
-        $index = array_rand($proxies);
-        $proxy = $proxies[$index];
-        unset($proxies[$index]);
-        $proxies = array_values($proxies);
-        
-        return $proxy;
-    }
-    
-    /**
-     * Получение данных объявления для сохранения
-     * @param array $item
-     * @param int $metroId
-     * @param array $locationId
-     * @return array
-     */
-    private function getItemData(array $item, int $metroId, array $locationId): array
-    {
-        $title = $this->functions->clearTitle($item['offer']['formattedFullInfo']);
-        $param = $this->parseApartmentString($item['offer']['formattedFullInfo']);
-        $address = $this->extractStreet($item['offer']['geo']['address']);
-        
-        return [
-            'id' => $item['offer']['id'],
-            'category_id' => 24,
-            'group_id' => 1,
-            'source_id' => 3,
-            'room_id' => $this->functions->getRoomId($title),
-            'city_id' => $locationId[0],
-            'title' => $title,
-            'address' => $item['offer']['geo']['userInput'],
-            'price' => $this->functions->getInt($item['offer']['formattedFullPrice']),
-            'phone' => $this->functions->clearPhone($item['offer']['agent']['phones'][0]),
-            'url' => $item['offer']['siteUrl'],
-            'lat' => $item['offer']['geo']['coordinates']['lat'],
-            'lng' => $item['offer']['geo']['coordinates']['lng'],
-            'metro_id' => $metroId,
-            'raised_id' => 1,
-            'status_id' => 1,
-            'square_meters' => $param['square_meters'],
-            'total_floors' => $param['total_floors'],
-            'floor' => $param['floor'],
-            'locality_id' => $locationId[1],
-            'street' => $address['street'],
-            'house' => $address['house'],
-        ];
-    }
-    
-    /**
-     * Пакетная обработка объявлений
-     * @param array $items
-     * @param Logger $log
-     */
-    private function processBatch(array $items, Logger $log): void
+    private function loadProxiesForSource(int $sourceId, int $locationId, int $categoryId): array
     {
         try {
-            DB::table('items')->upsert($items, ['id', 'source_id'],
-                ['updated_at', 'square_meters', 'total_floors', 'floor', 'locality_id', 'street', 'house']);
+            // Получаем все прокси для источника
+            $locationProxies = LocationProxy::getProxiesForSource($sourceId, $locationId, $categoryId);
             
-            $log->info("Добавлено объявлений", [
-                'count' => count($items),
-            ]);
+            $proxies = [];
+            foreach ($locationProxies as $locationProxy) {
+                $proxies[] = $locationProxy->getSimpleFormat();
+            }
+            
+            $this->logger->info(
+                "Загружено прокси для источника $sourceId: " . count($proxies),
+                ['source_id' => $sourceId, 'proxies_count' => count($proxies)], 
+                self::COMMAND_NAME
+            );
+            
+            return $proxies;
             
         } catch (Exception $e) {
-            $log->error("Ошибка пакетной обработки", [
-                'error' => $e->getMessage(),
-                'count' => count($items)
-            ]);
+            $this->logger->error(
+                "Ошибка загрузки прокси для источника $sourceId: " . $e->getMessage(),
+                ['source_id' => $sourceId, 'error' => $e->getMessage()], 
+                self::COMMAND_NAME
+            );
+            return [];
         }
     }
-    
+
     /**
-     * Получение ближайшего метро с кэшированием
+     * Подгружает ID объявлений по указанной локации/категории для проверки дубликатов
+     * @param int $locationId ID локации
+     * @param int $categoryId
+     * @param int $sourceId
+     * @return array Массив ID объявлений
      */
-    private function getCachedMetroStation(float $lat, float $lng, array $metroStations, array &$metroCache): ?array
+    private function loadExistingItemsForLocation(int $locationId, int $categoryId, int $sourceId): array
     {
-        $key = "$lat:$lng";
-        
-        if (!isset($metroCache[$key])) {
-            $metroCache[$key] = $this->functions->getNearestMetroStation($lat, $lng, $metroStations);
+        try {
+            $existingItemIds = DB::table('listings')
+                ->where('location_id', $locationId)
+                ->where('category_id', $categoryId)
+                ->where('source_id', $sourceId)
+                ->where('created_at', '>=', Carbon::now()->subDays(30))
+                ->pluck('external_id')
+                ->toArray();
             
-            if (count($metroCache) > 1000) {
-                array_shift($metroCache);
-            }
+            $this->logger->info(
+                "Загружено существующих объявлений для локации $locationId: " . count($existingItemIds),
+                [
+                    'location_id' => $locationId,
+                    'category_id' => $categoryId,
+                    'source_id'   => $sourceId,
+                    'items_count' => count($existingItemIds)
+                ],
+                self::COMMAND_NAME
+            );
+            
+            return $existingItemIds;
+            
+        } catch (Exception $e) {
+            $this->logger->error(
+                "Ошибка загрузки объявлений для локации $locationId: " . $e->getMessage(),
+                ['location_id' => $locationId, 'category_id' => $categoryId, 'source_id' => $sourceId, 'error' => $e->getMessage()],
+                self::COMMAND_NAME
+            );
+            return [];
         }
-        
-        return $metroCache[$key];
     }
-    
+
     /**
-     * Получение региона с кэшированием
+     * Получает ID локации по её названию
+     * @param string $locationName Название локации
+     * @return int ID локации или 0 если не найдена
      */
-    private function getCachedRegion(string $userInput, array $regions, array $cities, array &$regionCache): int|array
+    private function getLocationIdByName(string $locationName): int
     {
-        $key = md5($userInput);
-        
-        if (!isset($regionCache[$key])) {
-            $regionCache[$key] = $this->functions->filterRegion($regions, $cities, $userInput);
+        try {
+            $location = DB::table('locations')
+                ->where('city', $locationName)
+                ->first();
             
-            if (count($regionCache) > 1000) {
-                array_shift($regionCache);
-            }
+            return $location ? $location->id : 0;
+            
+        } catch (Exception $e) {
+            $this->logger->error(
+                "Ошибка поиска локации по названию '$locationName': " . $e->getMessage(),
+                ['location_name' => $locationName, 'error' => $e->getMessage()], 
+                self::COMMAND_NAME
+            );
+            return 0;
         }
-        
-        return $regionCache[$key];
     }
-    
+
     /**
-     * Извлекает параметры квартиры из строки
+     * Загружает токен авторизации для Циан
+     * @param int $categoryId
+     * @param int $locationId
+     * @return string|null Токен авторизации или null если не найден
      */
-    #[ArrayShape(['square_meters' => "float|null", 'floor' => "int|null", 'total_floors' => "int|null"])]
-    private function parseApartmentString(string $str): array
+    private function loadCianAuthToken(int $categoryId, int $locationId): ?string
     {
-        $square = null;
-        $floor = null;
-        $totalFloors = null;
-        
-        $parts = array_map('trim', explode('•', $str));
-        
-        foreach ($parts as $part) {
-            if (str_contains($part, 'м²') || str_contains($part, 'м2')) {
-                if (preg_match('/(\d+(?:[.,]\d+)?)/', $part, $matches)) {
-                    $square = (float)str_replace(',', '.', $matches[1]);
-                }
+        try {
+            // Получаем активный токен авторизации
+            $authToken = CianAuth::getActiveAuthToken($categoryId, $locationId);
+            
+            if ($authToken) {
+                $this->logger->info(
+                    'Загружен токен авторизации для Циан', 
+                    ['token_length' => strlen($authToken)], 
+                    self::COMMAND_NAME
+                );
+                
+                return $authToken;
             }
             
-            if (str_contains($part, 'этаж')) {
-                if (preg_match('/(\d+)\/(\d+)/', $part, $matches)) {
-                    $floor = (int)$matches[1];
-                    $totalFloors = (int)$matches[2];
-                }
-            }
-        }
-        
-        return [
-            'square_meters' => $square,
-            'floor' => $floor,
-            'total_floors' => $totalFloors
-        ];
-    }
-    
-    /**
-     * Извлекает название улицы из массива адресных данных
-     */
-    #[ArrayShape(['street' => "mixed|null", 'house' => "mixed|null"])]
-    private function extractStreet(array $addressParts): array
-    {
-        $streetKeywords = [
-            'улица',
-            'проспект',
-            'переулок',
-            'бульвар',
-            'набережная',
-            'площадь',
-            'аллея',
-            'шоссе'
-        ];
-        
-        $result = [
-            'street' => null,
-            'house' => null
-        ];
-        
-        $lastElement = end($addressParts);
-        
-        if (isset($lastElement['name'])) {
-            if (preg_match('/^(\d+(?:[АА-Яа-я])?(?:к\d+|с\d+|\/\d+)?|\d+[АА-Яа-я]к\d+)$/u', $lastElement['name'])) {
-                $result['house'] = $lastElement['name'];
-                array_pop($addressParts);
-            }
-        }
-        
-        foreach ($addressParts as $part) {
-            if (!isset($part['fullName']) || !isset($part['name'])) {
-                continue;
-            }
+            $this->logger->warning(
+                'Не найден активный токен авторизации для Циан', 
+                [], 
+                self::COMMAND_NAME
+            );
             
-            $fullName = mb_strtolower($part['fullName'], 'UTF-8');
+            return null;
             
-            foreach ($streetKeywords as $keyword) {
-                if (mb_stripos($fullName, $keyword) !== false) {
-                    $result['street'] = $part['name'];
-                    break 2;
-                }
-            }
-        }
-        
-        return $result;
-    }
-    
-    /**
-     * Логирование сообщений
-     */
-    private function toLog(string $level, string $message, array $context = []): void
-    {
-        if ($this->log_status) {
-            $this->log->log($level, $message, $context);
+        } catch (Exception $e) {
+            $this->logger->error(
+                'Ошибка загрузки токена авторизации для Циан: ' . $e->getMessage(), 
+                ['error' => $e->getMessage()], 
+                self::COMMAND_NAME
+            );
+            
+            return null;
         }
     }
 } 

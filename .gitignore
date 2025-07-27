@@ -31,6 +31,7 @@ config/secret.php
 # Логи и кэш
 /logs/
 /log/
+/test/
 *.log
 var/cache/
 var/logs/

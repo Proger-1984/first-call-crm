@@ -9,6 +9,15 @@ class FillCitiesTable
         return 'cities';
     }
 
+    /**
+     * Указывает, что эта миграция модифицирует существующую таблицу
+     * и должна выполняться, даже если таблица уже существует
+     */
+    public function modifiesExistingTable(): bool
+    {
+        return true;
+    }
+
     public function up()
     {
         // Получаем все локации из таблицы locations
@@ -45,8 +54,16 @@ class FillCitiesTable
             $city['updated_at'] = $timestamp;
         }
 
-        // Вставляем данные
-        Manager::table('cities')->insert($cities);
+        // Используем upsert для вставки/обновления данных
+        // Уникальные ключи: name, city_parent_id (как в unique constraint)
+        // Обновляемые поля: location_parent_id, updated_at
+        Manager::table('cities')->upsert(
+            $cities,
+            ['name', 'city_parent_id'], // уникальные ключи для определения дубликатов
+            ['location_parent_id', 'updated_at'] // поля для обновления при конфликте
+        );
+        
+        echo "Обработано " . count($cities) . " городов в таблице cities (вставка/обновление).\n";
     }
 
     /**
