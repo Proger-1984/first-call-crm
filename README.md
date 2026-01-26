@@ -1,136 +1,115 @@
-# First Call API
+# First Call CRM
 
-Проект API для сервиса First Call.
+CRM-система для управления подписками на недвижимость с автоматическими уведомлениями через Telegram Bot.
+
+## Основной функционал
+
+- Авторизация через Telegram Login Widget
+- Управление подписками на объявления недвижимости
+- Парсинг объявлений с CIAN, Avito
+- Автозвонок по новым объявлениям
+- Telegram уведомления
+
+## Технологический стек
+
+### Backend
+| Технология | Версия | Назначение |
+|------------|--------|------------|
+| PHP | 8.3+ | Строгая типизация, современный синтаксис |
+| Slim 4 | 4.x | Легковесный REST API framework |
+| PHP-DI | 7.x | Dependency Injection контейнер |
+| Eloquent ORM | 10.x | Работа с БД через модели |
+| PostgreSQL | 15 | Основная БД |
+| PostGIS | 3.x | Геопространственные запросы |
+| JWT | - | Авторизация (access + refresh токены) |
+
+### Frontend
+| Технология | Версия | Назначение |
+|------------|--------|------------|
+| React | 18.3+ | UI библиотека |
+| TypeScript | 5.9+ | Типизация |
+| Vite | 5.4+ | Сборка |
+| Zustand | 5.0+ | State management |
+| TanStack Query | 5.90+ | Серверный state |
+| Axios | 1.9+ | HTTP клиент |
+| React Router | 7.12+ | Роутинг |
 
 ## Системные требования
 
 - Docker и Docker Compose
 - Git
 - Make (опционально)
-- PHP 8.3 или выше
 
 ## Структура проекта
 
 ```
-├── app/                # Основная директория приложения
-├── bootstrap/          # Загрузочные файлы приложения
+├── bootstrap/           # Инициализация приложения
+│   ├── app.php         # Конфигурация + Eloquent
+│   ├── container.php   # DI контейнер
+│   └── middleware.php  # Глобальные middleware
 ├── config/             # Конфигурационные файлы
-├── db/                 # Работа с базой данных
-│   └── migrations/     # Миграции базы данных
-├── docker/             # Конфигурации Docker
-│   └── dev/            # Для разработки
-├── docs/               # Документация API
-├── logs/               # Логи приложения
-├── public/             # Публичные файлы (точка входа)
-├── routes/             # Маршруты приложения
-├── src/                # Исходный код
-│   ├── Console/        # Консольные команды
+├── db/migrations/      # Миграции базы данных
+├── docker/             # Docker конфигурации
+├── docs/               # Документация
+├── frontend-react/     # React фронтенд
+│   ├── src/
+│   │   ├── components/ # UI компоненты
+│   │   ├── pages/      # Страницы
+│   │   ├── stores/     # Zustand stores
+│   │   ├── services/   # API клиент
+│   │   └── types/      # TypeScript типы
+│   └── public/         # Статика
+├── public/             # Точка входа backend
+├── routes/             # API маршруты
+├── src/                # Исходный код backend
 │   ├── Controllers/    # Контроллеры
-│   ├── Middleware/     # Промежуточное ПО
-│   ├── Models/         # Модели
-│   ├── Services/       # Сервисы
-│   ├── Traits/         # Трейты
-│   └── Utils/          # Утилиты
-├── tests/              # Тесты
-├── vendor/             # Зависимости Composer
-├── .env                # Переменные окружения
-├── .env.example        # Пример переменных окружения
-├── .gitignore          # Игнорируемые Git файлы
-├── composer.json       # Конфигурация Composer
-├── composer.lock       # Фиксированные версии зависимостей
-├── docker-compose.yml  # Docker конфигурация
-├── docker-compose.redoc.yml # Конфигурация Redoc
-├── fix-permissions.sh  # Скрипт исправления прав доступа
-├── Makefile           # Make команды
-└── start-dev.sh       # Скрипт запуска
+│   ├── Services/       # Бизнес-логика
+│   ├── Models/         # Eloquent модели
+│   ├── Middleware/     # PSR-15 middleware
+│   └── Commands/       # CLI команды
+└── storage/            # Загрузки, файлы
 ```
 
-## Установка и запуск
+## Быстрый старт
 
-1. Клонировать репозиторий
-   ```bash
-   git clone https://your-repo-url.git first-call
-   cd first-call
-   ```
+### 1. Клонирование репозитория
 
-2. Копирование .env файла (если отсутствует)
-   ```bash
-   cp .env.example .env
-   # Отредактируйте .env, указав необходимые настройки
-   ```
+```bash
+git clone https://github.com/Proger-1984/first-call-crm.git
+cd first-call-crm
+```
 
-3. Исправление прав доступа (если необходимо)
-   ```bash
-   # Если у вас возникают ошибки прав доступа, выполните:
-   chmod +x fix-permissions.sh
-   ./fix-permissions.sh
-   ```
+### 2. Настройка окружения
 
-4. Запуск контейнеров
-   ```bash
-   ./start-dev.sh
-   # или
-   make up
-   ```
+```bash
+cp .env.example .env
+# Отредактируйте .env, указав необходимые настройки
+```
 
-5. Установка зависимостей
-   ```bash
-   make install
-   ```
+### 3. Первоначальная инициализация
 
-6. Запуск миграций
-   ```bash
-   make migrate
-   ```
-
-Или используйте одну команду для инициализации:
 ```bash
 make init
 ```
 
-### Устранение проблем при запуске
-
-Если вы столкнулись с ошибками при запуске:
-
-1. **Ошибка прав доступа**: 
-   ```
-   cp: cannot create regular file '.env': Permission denied
-   ```
-   
-   Решение:
-   ```bash
-   chmod +x fix-permissions.sh
-   ./fix-permissions.sh
-   ```
-
-2. **Ошибка Bash в контейнере**:
-   ```
-   OCI runtime exec failed: exec failed: unable to start container process: exec: "bash": executable file not found in $PATH: unknown
-   ```
-   
-   Решение:
-   Убедитесь, что файл миграций `db/migrations/run.php` существует.
-
-## Быстрый старт
+Или запуск всего проекта одной командой:
 
 ```bash
-# Запуск ВСЕГО проекта одной командой
-# (бэкенд, БД, фронтенд, документация)
 make dev
 ```
 
-После запуска будут доступны:
-- **Backend API:** https://local.firstcall.com/api/v1
-- **Frontend:** http://localhost:5173
-- **API Docs:** http://localhost:8080/redoc.html
-- **pgAdmin:** http://localhost:5050
+## Доступные адреса
 
-```bash
-# Остановка всего
-make dev-stop
-```
+После запуска `make dev` доступны:
 
-## Базовые команды
+| Сервис | URL |
+|--------|-----|
+| Frontend | https://local.firstcall.com |
+| Backend API | https://local.firstcall.com/api/v1 |
+| API Docs | http://localhost:8080/redoc.html |
+| pgAdmin | http://localhost:5050 |
+
+## Основные команды
 
 ```bash
 # Запуск всего проекта
@@ -145,17 +124,12 @@ make down
 
 # Только фронтенд
 make frontend
-make frontend-stop
 
-# Только документация
+# Только документация API
 make docs
-make docs-stop
 
 # Пересборка контейнеров
 make build
-
-# Перезапуск контейнеров
-make restart
 
 # Просмотр логов
 make logs
@@ -163,45 +137,50 @@ make logs
 # Запуск миграций
 make migrate
 
-# Исправление прав доступа
-make fix-permissions
+# Войти в PHP контейнер
+docker exec -it slim_php-cli bash
 ```
 
-## Структура базы данных
+## Документация
 
-Миграции базы данных находятся в директории `db/migrations/`. Файл `run.php` должен содержать логику запуска миграций. 
+| Документ | Описание |
+|----------|----------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Архитектура проекта |
+| [docs/DATABASE.md](docs/DATABASE.md) | Схема базы данных |
+| [docs/API-QUICK-REFERENCE.md](docs/API-QUICK-REFERENCE.md) | Справочник API |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Деплой и запуск |
+| [docs/FRONTEND_REACT.md](docs/FRONTEND_REACT.md) | Документация фронтенда |
+| [docs/TELEGRAM_SETUP.md](docs/TELEGRAM_SETUP.md) | Настройка Telegram бота |
 
-## Тестирование
+## API Документация
 
-Для запуска тестов используйте команду:
+Интерактивная документация API доступна через Redoc:
+
 ```bash
-make test
-# или
-composer test
+make docs
+# Открыть http://localhost:8080/redoc.html
 ```
 
-## Документация API
-
-### Просмотр документации
-
-Документация API создана с использованием OpenAPI 3.0 и Redoc.
-
-**Запуск локально:**
-```bash
-cd docs/api && python3 -m http.server 8080
-```
-
-После запуска документация будет доступна по адресу: http://localhost:8080/redoc.html
-
-**Файлы документации:**
-- `docs/api/openapi.yaml` — OpenAPI спецификация всех эндпоинтов
+Файлы:
+- `docs/api/openapi.yaml` — OpenAPI спецификация
 - `docs/api/redoc.html` — интерактивная документация
 
-### Что содержит документация
+## Устранение проблем
 
-- Все доступные API эндпоинты (публичные, защищённые, административные)
-- Форматы запросов и ответов
-- Схемы данных
-- Коды ошибок
-- Примеры использования
-- Требования к авторизации (JWT) 
+### Ошибка прав доступа
+
+```bash
+chmod +x fix-permissions.sh
+./fix-permissions.sh
+```
+
+### Пересборка контейнеров
+
+```bash
+make build
+make restart
+```
+
+## Лицензия
+
+Проприетарное ПО. Все права защищены.
