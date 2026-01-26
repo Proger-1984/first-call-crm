@@ -31,6 +31,12 @@ export const Profile = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [telegramBotId, setTelegramBotId] = useState<string>('');
+  
+  // Состояние модалки продления
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState<UserSubscriptionFull | null>(null);
+  const [extendNotes, setExtendNotes] = useState('Хочу продлить подписку');
+  const [isExtending, setIsExtending] = useState(false);
 
   useEffect(() => {
     // Загружаем данные только если пользователь авторизован
@@ -51,6 +57,7 @@ export const Profile = () => {
       setDownloadInfo(downloadResponse.data.data);
       
       const subscriptionsResponse = await subscriptionsApi.getAll();
+      console.log('Подписки из API:', subscriptionsResponse.data.data.subscriptions);
       setSubscriptions(subscriptionsResponse.data.data.subscriptions);
     } catch (error) {
       console.error('Ошибка загрузки данных профиля:', error);
@@ -162,6 +169,49 @@ export const Profile = () => {
       delete (window as any).onTelegramAuth;
     };
   }, [updateUser]);
+
+  // Открытие модалки продления для активной подписки
+  const handleExtendClick = (subscription: UserSubscriptionFull) => {
+    setSelectedSubscription(subscription);
+    setExtendNotes('Хочу продлить подписку');
+    setExtendModalOpen(true);
+  };
+
+  // Отправка заявки на продление
+  const handleExtendSubmit = async () => {
+    if (!selectedSubscription) return;
+    
+    setIsExtending(true);
+    setMessage(null);
+    
+    try {
+      const response = await subscriptionsApi.requestExtend(
+        selectedSubscription.id,
+        selectedSubscription.tariff_id,
+        extendNotes
+      );
+      
+      setMessage({ 
+        type: 'success', 
+        text: response.data.message || 'Заявка на продление отправлена. Реквизиты для оплаты отправлены в Telegram.' 
+      });
+      setExtendModalOpen(false);
+      setSelectedSubscription(null);
+    } catch (error: any) {
+      setMessage({ 
+        type: 'error', 
+        text: error.response?.data?.message || 'Ошибка отправки заявки на продление' 
+      });
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
+  // Переход на страницу тарифов для оформления новой подписки
+  const handleResubscribe = (subscription: UserSubscriptionFull) => {
+    // Передаём параметры для предзаполнения формы
+    navigate(`/tariffs?category=${subscription.category_id}&location=${subscription.location_id}`);
+  };
 
   if (isLoading && !appLogin) {
     return (
@@ -320,7 +370,17 @@ export const Profile = () => {
           Мои подписки
         </h2>
         
-        {subscriptions.length === 0 ? (
+        {/* Показываем загрузку пока данные не получены */}
+        {isLoading ? (
+          <div className="profile-card">
+            <div className="profile-card-body">
+              <div className="subscriptions-loading">
+                <span className="material-icons spinning">sync</span>
+                <p>Загрузка подписок...</p>
+              </div>
+            </div>
+          </div>
+        ) : subscriptions.length === 0 ? (
           <div className="profile-card">
             <div className="profile-card-body">
               <div className="subscriptions-empty">
@@ -378,11 +438,26 @@ export const Profile = () => {
                     </div>
                   )}
                 </div>
-                {sub.status === 'expired' && (
+                {/* Кнопки действий в зависимости от статуса */}
+                {sub.status === 'active' && (
                   <div className="subscription-actions">
-                    <button className="btn btn-primary btn-sm">
+                    <button 
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleExtendClick(sub)}
+                    >
                       <span className="material-icons">refresh</span>
                       Продлить
+                    </button>
+                  </div>
+                )}
+                {(sub.status === 'expired' || sub.status === 'cancelled') && (
+                  <div className="subscription-actions">
+                    <button 
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleResubscribe(sub)}
+                    >
+                      <span className="material-icons">add</span>
+                      Оформить заново
                     </button>
                   </div>
                 )}
@@ -391,6 +466,92 @@ export const Profile = () => {
           </div>
         )}
       </div>
+
+      {/* Модалка продления подписки */}
+      {extendModalOpen && selectedSubscription && (
+        <div className="modal-overlay" onClick={() => setExtendModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                <span className="material-icons">refresh</span>
+                Продление подписки
+              </h3>
+              <button 
+                className="modal-close" 
+                onClick={() => setExtendModalOpen(false)}
+              >
+                <span className="material-icons">close</span>
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="extend-info">
+                <div className="extend-info-row">
+                  <span className="extend-label">Локация:</span>
+                  <span className="extend-value">{selectedSubscription.location_name}</span>
+                </div>
+                <div className="extend-info-row">
+                  <span className="extend-label">Категория:</span>
+                  <span className="extend-value">{selectedSubscription.category_name}</span>
+                </div>
+                <div className="extend-info-row">
+                  <span className="extend-label">Тариф:</span>
+                  <span className="extend-value">{selectedSubscription.tariff_name}</span>
+                </div>
+                {selectedSubscription.end_date && (
+                  <div className="extend-info-row">
+                    <span className="extend-label">Действует до:</span>
+                    <span className="extend-value">
+                      {new Date(selectedSubscription.end_date).toLocaleDateString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="extend-notes-field">
+                <label>Комментарий к заявке</label>
+                <textarea
+                  value={extendNotes}
+                  onChange={(e) => setExtendNotes(e.target.value)}
+                  placeholder="Хочу продлить подписку"
+                  rows={3}
+                />
+              </div>
+
+              <div className="extend-hint">
+                <span className="material-icons">info</span>
+                <p>После отправки заявки вам придёт сообщение в Telegram с реквизитами для оплаты.</p>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                className="btn btn-secondary"
+                onClick={() => setExtendModalOpen(false)}
+                disabled={isExtending}
+              >
+                Отмена
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={handleExtendSubmit}
+                disabled={isExtending}
+              >
+                <span className="material-icons">
+                  {isExtending ? 'hourglass_empty' : 'send'}
+                </span>
+                {isExtending ? 'Отправка...' : 'Отправить заявку'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

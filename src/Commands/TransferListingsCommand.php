@@ -27,6 +27,9 @@ class TransferListingsCommand extends Command
 {
     private LogService $logger;
     private ?PDO $remoteDb = null;
+    
+    /** @var array<string, int> Кэш соответствия паттернов комнат к room_id */
+    private array $roomPatterns = [];
 
     private const COMMAND_NAME = 'transfer-listings';
     
@@ -38,14 +41,20 @@ class TransferListingsCommand extends Command
     private const REMOTE_DB_PASS = '3eRT_6RcVm/)_tyM';
 
     // Настройки переноса
-    private const BATCH_SIZE = 200;           // Количество записей за один запрос
+    private const BATCH_SIZE_FIRST = 100;     // Количество записей в первом запросе
+    private const BATCH_SIZE = 20;            // Количество записей в последующих запросах
     private const SLEEP_INTERVAL = 2000000;   // Пауза между итерациями (2 секунды)
     private const KEEP_DAYS = 31;             // Хранить объявления за последние N дней
+    private const RECONNECT_DELAY = 5;        // Задержка перед переподключением (секунды)
+    private const MAX_RECONNECT_ATTEMPTS = 5; // Максимум попыток переподключения подряд
     
     // Локальные значения по умолчанию
     private const DEFAULT_LOCATION_ID = 1;        // Москва и область
     private const DEFAULT_CATEGORY_ID = 1;        // Категория по умолчанию
     private const DEFAULT_LISTING_STATUS_ID = 1;  // Статус "Новое"
+    
+    // ID источника CIAN (в удалённой БД)
+    private const SOURCE_CIAN = 3;
 
     /**
      * @throws ContainerExceptionInterface
@@ -66,14 +75,19 @@ class TransferListingsCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         date_default_timezone_set('Europe/Moscow');
-        
+
         $this->logger->info('Запуск переноса объявлений', [], self::COMMAND_NAME);
 
         try {
             // Подключаемся к удалённой БД
+            $this->logger->info("Подключение к удалённой БД...", [], self::COMMAND_NAME);
             $this->connectToRemoteDb();
             
+            // Загружаем паттерны комнат из БД
+            $this->loadRoomPatterns();
+            
             // Удаляем старые объявления
+            $this->logger->info("Удаление старых объявлений...", [], self::COMMAND_NAME);
             $this->deleteOldListings();
 
             // Основной цикл переноса
@@ -134,20 +148,26 @@ class TransferListingsCommand extends Command
     private function runTransferLoop(): void
     {
         $connectionCheckTime = time();
+        $reconnectAttempts = 0;
+        $isFirstIteration = true;
 
         while (true) {
             try {
-                $limit = self::BATCH_SIZE;
+                // Первый запрос — больше записей, последующие — меньше
+                $limit = $isFirstIteration ? self::BATCH_SIZE_FIRST : self::BATCH_SIZE;
                 
                 // Проверка соединения каждые 3 минуты
                 if (time() - $connectionCheckTime >= 180) {
                     $connectionCheckTime = time();
-                    $limit = 50; // Меньше записей при проверке соединения
                     $this->checkRemoteConnection();
+                    $this->logger->info("Проверка соединения OK", [], self::COMMAND_NAME);
                 }
 
                 // Получаем новые объявления с удалённого сервера
                 $items = $this->fetchRemoteListings($limit);
+                
+                // После первого запроса переключаемся на меньший лимит
+                $isFirstIteration = false;
 
                 // Фильтруем объявления по условиям
                 $items = $this->filterItems($items);
@@ -161,14 +181,25 @@ class TransferListingsCommand extends Command
                 $insertedCount = $this->insertListings($items);
 
                 if ($insertedCount > 0) {
-                    $this->logger->info("Перенесено объявлений: {$insertedCount}", [], self::COMMAND_NAME);
+                    $this->logger->info("Перенесено объявлений: $insertedCount", [], self::COMMAND_NAME);
                 }
+                
+                // Сбрасываем счётчик попыток при успешной итерации
+                $reconnectAttempts = 0;
 
             } catch (PDOException $e) {
                 $this->logger->warning('Ошибка БД: ' . $e->getMessage(), [], self::COMMAND_NAME);
+                $reconnectAttempts++;
+                
+                if ($reconnectAttempts > self::MAX_RECONNECT_ATTEMPTS) {
+                    $this->logger->error("Превышено максимальное количество попыток переподключения ($reconnectAttempts)", [], self::COMMAND_NAME);
+                    throw $e; // Пусть supervisor перезапустит скрипт
+                }
+                
                 $this->reconnectToRemoteDb();
             } catch (Throwable $e) {
                 $this->logger->warning('Ошибка: ' . $e->getMessage(), [], self::COMMAND_NAME);
+                // Для других ошибок просто продолжаем работу
             }
 
             usleep(self::SLEEP_INTERVAL);
@@ -185,7 +216,8 @@ class TransferListingsCommand extends Command
                     id, category_id, group_id, source_id, city_id, 
                     title, address, price, url, lat, lng, phone, 
                     metro_id, room_id, raised_id, created_at, 
-                    removed, is_paid, status_id
+                    removed, is_paid, status_id, square_meters, 
+                    total_floors, floor, street, house 
                 FROM items 
                 WHERE (TIMESTAMPDIFF(SECOND, created_at, NOW()) > 2) 
                   AND status_id != 2
@@ -199,15 +231,13 @@ class TransferListingsCommand extends Command
     /**
      * Фильтрация объявлений по условиям из старого скрипта
      * 
-     * - Платные объявления (is_paid=1) с телефоном
-     * - Статус 1 или 7
+     * - Платные объявления (is_paid=1)
+     * - Статус 1 или 7 (Новое, Звонок)
      * - group_id=1 и определённые city_id
      * - Созданные более 2 минут назад
      */
     private function filterItems(array $items): array
     {
-        $allowedCityIds = range(1, 24);
-
         foreach ($items as $key => $item) {
             // Фильтр для платных объявлений с телефоном
             if ($item['is_paid'] == 1 && !empty($item['phone'])) {
@@ -218,13 +248,11 @@ class TransferListingsCommand extends Command
                 $diffSeconds = $currentTimestamp - $targetTimestamp;
                 $diffMinutes = floor($diffSeconds / 60);
 
-                // Статус 1 или 7, group_id=1, определённые города
-                if (in_array($item['status_id'], [1, 7])) {
-                    if ($item['group_id'] == 1 && in_array($item['city_id'], $allowedCityIds)) {
-                        // Пропускаем объявления младше 2 минут
-                        if ($diffMinutes <= 2) {
-                            unset($items[$key]);
-                        }
+                // Статус 1 или 7, group_id=1
+                if (in_array($item['status_id'], [1, 7]) && $item['group_id'] == 1) {
+                    // Пропускаем объявления младше 2 минут
+                    if ($diffMinutes <= 2) {
+                        unset($items[$key]);
                     }
                 }
             }
@@ -276,6 +304,12 @@ class TransferListingsCommand extends Command
     {
         // Очистка заголовка от служебных меток
         $title = $this->cleanTitle($item['title'] ?? '');
+        
+        // Очистка URL от параметров (для CIAN)
+        $url = $this->cleanUrl($item['url'] ?? '', (int) $item['source_id']);
+        
+        // Определяем room_id по заголовку
+        $roomId = $this->detectRoomIdFromTitle($title);
 
         return [
             'external_id'       => (string) $item['id'],
@@ -287,10 +321,15 @@ class TransferListingsCommand extends Command
             'address'           => $item['address'] ?? null,
             'price'             => $item['price'] ?? null,
             'phone'             => $item['phone'] ?? null,
-            'url'               => $item['url'] ?? null,
+            'url'               => $url,
             'lat'               => $item['lat'] ?? null,
             'lng'               => $item['lng'] ?? null,
-            'rooms'             => $item['room_id'] ?? null,
+            'room_id'           => $roomId,
+            'square_meters'     => $item['square_meters'] ?? null,
+            'floors_total'      => $item['total_floors'] ?? null,
+            'floor'             => $item['floor'] ?? null,
+            'street'            => $item['street'] ?? null,
+            'house'             => $item['house'] ?? null,
             'is_paid'           => (bool) ($item['is_paid'] ?? false),
             'created_at'        => $item['created_at'] ?? Carbon::now(),
             'updated_at'        => Carbon::now(),
@@ -326,14 +365,19 @@ class TransferListingsCommand extends Command
                     continue;
                 }
 
+                // Генерируем случайное время пешком до метро (1-15 минут)
+                $travelTimeMin = random_int(1, 15);
+                
                 // Вставляем связь (игнорируем дубликаты)
                 DB::table('listing_metro')->insertOrIgnore([
                     'listing_id'       => $listing->id,
                     'metro_station_id' => $metroId,
+                    'travel_time_min'  => $travelTimeMin,
+                    'travel_type'      => 'walk',
                     'created_at'       => Carbon::now(),
                     'updated_at'       => Carbon::now(),
                 ]);
-            } catch (Throwable $e) {
+            } catch (Throwable) {
                 // Игнорируем ошибки вставки метро
             }
         }
@@ -377,22 +421,134 @@ class TransferListingsCommand extends Command
 
     /**
      * Проверка соединения с удалённой БД
+     * 
+     * @throws PDOException Если соединение потеряно
      */
     private function checkRemoteConnection(): void
     {
-        $this->remoteDb->query(/** @lang text */ "SELECT id FROM items LIMIT 1")->fetch();
+        if ($this->remoteDb === null) {
+            throw new PDOException('Соединение с удалённой БД не установлено');
+        }
+        
+        $this->remoteDb->query(/** @lang text */ "SELECT 1")->fetch();
     }
 
     /**
      * Переподключение к удалённой БД
+     * 
+     * @throws PDOException Если не удалось переподключиться
      */
     private function reconnectToRemoteDb(): void
     {
         $this->logger->info('Переподключение к удалённой БД...', [], self::COMMAND_NAME);
         
         $this->remoteDb = null;
-        sleep(5);
+        sleep(self::RECONNECT_DELAY);
         
         $this->connectToRemoteDb();
+    }
+
+    /**
+     * Загрузка паттернов комнат из БД
+     * Создаёт маппинг паттернов поиска к room_id
+     */
+    private function loadRoomPatterns(): void
+    {
+        try {
+            $rooms = DB::table('rooms')->get(['id', 'code']);
+            
+            foreach ($rooms as $room) {
+                // Паттерны для поиска в заголовке -> room_id
+                switch ($room->code) {
+                    case 'studio':
+                        $this->roomPatterns['студия'] = $room->id;
+                        break;
+                    case '1':
+                        $this->roomPatterns['1-к.'] = $room->id;
+                        $this->roomPatterns['1-комн'] = $room->id;
+                        $this->roomPatterns['однокомн'] = $room->id;
+                        break;
+                    case '2':
+                        $this->roomPatterns['2-к.'] = $room->id;
+                        $this->roomPatterns['2-комн'] = $room->id;
+                        $this->roomPatterns['двухкомн'] = $room->id;
+                        break;
+                    case '3':
+                        $this->roomPatterns['3-к.'] = $room->id;
+                        $this->roomPatterns['3-комн'] = $room->id;
+                        $this->roomPatterns['трёхкомн'] = $room->id;
+                        $this->roomPatterns['трехкомн'] = $room->id;
+                        break;
+                    case '4':
+                        $this->roomPatterns['4-к.'] = $room->id;
+                        $this->roomPatterns['4-комн'] = $room->id;
+                        $this->roomPatterns['четырёхкомн'] = $room->id;
+                        $this->roomPatterns['четырехкомн'] = $room->id;
+                        break;
+                    case '5+':
+                        // 5+ комнат — все варианты 5, 6, 7 и более
+                        $this->roomPatterns['5-к.'] = $room->id;
+                        $this->roomPatterns['5-комн'] = $room->id;
+                        $this->roomPatterns['6-к.'] = $room->id;
+                        $this->roomPatterns['6-комн'] = $room->id;
+                        $this->roomPatterns['7-к.'] = $room->id;
+                        $this->roomPatterns['7-комн'] = $room->id;
+                        $this->roomPatterns['многокомн'] = $room->id;
+                        break;
+                    case 'free':
+                        $this->roomPatterns['свободн'] = $room->id;
+                        break;
+                }
+            }
+            
+            $this->logger->info('Загружено паттернов комнат: ' . count($this->roomPatterns), [], self::COMMAND_NAME);
+        } catch (Throwable $e) {
+            $this->logger->warning('Не удалось загрузить паттерны комнат: ' . $e->getMessage(), [], self::COMMAND_NAME);
+            // Продолжаем работу без паттернов — room_id будет null
+        }
+    }
+
+    /**
+     * Определение room_id по заголовку объявления
+     * 
+     * @param string $title Заголовок объявления
+     * @return int|null room_id или null если не определено
+     */
+    private function detectRoomIdFromTitle(string $title): ?int
+    {
+        $titleLower = mb_strtolower($title);
+        
+        foreach ($this->roomPatterns as $pattern => $roomId) {
+            if (mb_strpos($titleLower, $pattern) !== false) {
+                return $roomId;
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Очистка URL от параметров запроса
+     * Для CIAN: https://www.cian.ru/rent/flat/326209530/?params -> https://www.cian.ru/rent/flat/326209530/
+     * 
+     * @param string $url Исходный URL
+     * @param int $sourceId ID источника
+     * @return string|null Очищенный URL
+     */
+    private function cleanUrl(string $url, int $sourceId): ?string
+    {
+        if (empty($url)) {
+            return null;
+        }
+        
+        // Для CIAN удаляем параметры запроса
+        if ($sourceId === self::SOURCE_CIAN) {
+            $parsedUrl = parse_url($url);
+            if ($parsedUrl !== false && isset($parsedUrl['scheme'], $parsedUrl['host'], $parsedUrl['path'])) {
+                return $parsedUrl['scheme'] . '://' . $parsedUrl['host'] . $parsedUrl['path'];
+            }
+        }
+        
+        return $url;
     }
 }

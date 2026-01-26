@@ -335,6 +335,28 @@
   color: var(--primary);
 }
 
+/* Загрузка подписок */
+.subscriptions-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.subscriptions-loading .material-icons {
+  font-size: 36px;
+  color: var(--primary);
+  margin-bottom: 12px;
+}
+
+.subscriptions-loading p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
 /* Пустое состояние подписок */
 .subscriptions-empty {
   display: flex;
@@ -418,7 +440,8 @@
 }
 
 .subscription-card.expired {
-  opacity: 0.7;
+  /* Убрана opacity, чтобы кнопки внутри не были блеклыми */
+  background: var(--bg-secondary);
 }
 
 .subscription-card.pending {
@@ -509,6 +532,32 @@
   font-size: 16px;
 }
 
+/* Кнопка primary для подписок */
+.subscription-actions .btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.subscription-actions .btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.subscription-actions .btn-primary .material-icons {
+  color: #ffffff;
+}
+
+/* Кнопка secondary для подписок */
+.subscription-actions .btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.subscription-actions .btn-secondary:hover:not(:disabled) {
+  background: var(--bg-secondary);
+}
+
 /* Загрузка */
 .profile-loading {
   display: flex;
@@ -527,4 +576,173 @@
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   МОДАЛКА ПРОДЛЕНИЯ ПОДПИСКИ
+   ============================================ */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--card-bg);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.modal-header h3 .material-icons {
+  font-size: 22px;
+  color: var(--primary);
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.modal-close:hover {
+  background: var(--bg-secondary);
+}
+
+.modal-close .material-icons {
+  font-size: 20px;
+  color: var(--text-secondary);
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* Информация о подписке в модалке */
+.extend-info {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.extend-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.extend-info-row:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.extend-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.extend-value {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Поле комментария */
+.extend-notes-field {
+  margin-bottom: 16px;
+}
+
+.extend-notes-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.extend-notes-field textarea {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.extend-notes-field textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* Подсказка в модалке */
+.extend-hint {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+}
+
+.extend-hint .material-icons {
+  font-size: 18px;
+  color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.extend-hint p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
 }

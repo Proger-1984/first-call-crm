@@ -314,6 +314,25 @@ export const subscriptionsApi = {
   
   cancel: (id: number) =>
     api.delete<ApiResponse<void>>(`/subscriptions/${id}`),
+  
+  /**
+   * Создать заявку на продление подписки
+   * POST /api/v1/subscriptions/extend-request
+   * 
+   * После успешного запроса:
+   * - Администратору отправляется уведомление в Telegram
+   * - Пользователю отправляется уведомление с реквизитами для оплаты
+   * 
+   * @param subscriptionId - ID подписки для продления
+   * @param tariffId - ID тарифа (обычно текущий тариф подписки)
+   * @param notes - Комментарий к заявке (опционально)
+   */
+  requestExtend: (subscriptionId: number, tariffId: number, notes?: string) =>
+    api.post<ApiResponse<{ subscription_id: number; message: string }>>('/subscriptions/extend-request', {
+      subscription_id: subscriptionId,
+      tariff_id: tariffId,
+      notes: notes || 'Хочу продлить подписку',
+    }),
 };
 
 // === SETTINGS ===
