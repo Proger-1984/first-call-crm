@@ -27,6 +27,10 @@ class CreateListingsTable
             $table->unsignedInteger('listing_status_id')->default(1);
             $table->foreign('listing_status_id')->references('id')->on('listing_statuses');
             
+            // Внешний ключ к локации
+            $table->unsignedInteger('location_id')->nullable();
+            $table->foreign('location_id')->references('id')->on('locations');
+            
             // Идентификатор объявления во внешней системе (уникален для конкретного источника)
             $table->string('external_id', 100);
             
@@ -61,7 +65,7 @@ class CreateListingsTable
             $table->string('street', 150)->nullable();
             
             // Номер дома
-            $table->string('building', 20)->nullable();
+            $table->string('house', 20)->nullable();
             
             // Полный адрес (может быть полезен для поиска)
             $table->string('address', 255)->nullable();
@@ -73,33 +77,20 @@ class CreateListingsTable
             $table->decimal('lat', 10, 8)->nullable();
             $table->decimal('lng', 11, 8)->nullable();
             
-            // Флаг поднятого объявления
-            $table->boolean('is_promoted')->default(false);
-            
-            // Флаг платного объявления
+            // Флаг платного объявления (на площадке)
             $table->boolean('is_paid')->default(false);
-            
-            // Дата и время поднятия объявления
-            $table->timestamp('promoted_at')->nullable();
-            
-            // Дата и время обработки автозвонком
-            $table->timestamp('auto_call_processed_at')->nullable();
             
             // Уникальный индекс для комбинации источник + внешний ID
             $table->unique(['source_id', 'external_id']);
             
             // Индексы для частых запросов
             $table->index(['listing_status_id', 'created_at']);
-            $table->index(['is_promoted', 'promoted_at']);
             $table->index(['is_paid']);
-            $table->index(['auto_call_processed_at']);
             $table->index(['category_id', 'created_at']);
+            $table->index(['location_id']);
             
             // Метки времени создания и обновления записи
             $table->timestamps();
-            
-            // Метка мягкого удаления
-            $table->softDeletes();
         });
     }
 

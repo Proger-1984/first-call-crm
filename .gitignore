@@ -115,3 +115,13 @@ bootstrap/cache/
 bootstrap/cache/*.php
 app/cache/
 app/logs/
+
+# Storage (downloads, uploads)
+storage/*
+!storage/downloads/
+storage/downloads/*
+!storage/downloads/firstcall.apk
+!storage/downloads/.gitkeep
+
+# GitHub токен
+.github-token

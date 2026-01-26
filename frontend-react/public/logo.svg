@@ -1,0 +1,15 @@
+<svg width="200" height="44" viewBox="0 0 200 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="40" height="40" rx="12" fill="url(#grad1)"/>
+  <path d="M14 18C14 15.5 15.8 13.5 18.5 13.5C20 13.5 21.2 14.3 21.8 15.5L23.5 19.5C23.8 20.3 23.6 21.2 23 21.8L21 23.5C22 26.5 24.5 29 27.5 30L29.2 28C29.8 27.4 30.7 27.2 31.5 27.5L35.5 29.2C36.7 29.8 37.5 31 37.5 32.5C37.5 35.2 35.5 37 32.5 37C22 37 14 29 14 18Z" fill="white" transform="translate(-4, -4) scale(0.7)"/>
+  <circle cx="32" cy="12" r="8" fill="#f59e0b"/>
+  <text x="29" y="16" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="white">1</text>
+  <text x="52" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#111827" letter-spacing="-0.5">First</text>
+  <text x="104" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#10b981" letter-spacing="-0.5">Call</text>
+  <text x="52" y="40" font-family="system-ui, sans-serif" font-size="9" font-weight="500" fill="#6b7280" letter-spacing="2">CRM PLATFORM</text>
+</svg>

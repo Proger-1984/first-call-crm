@@ -68,7 +68,6 @@ class ParseCianMultiThreadCommand extends Command
 
         $cmd = '/usr/bin/supervisorctl stop ' . self::COMMAND_NAME;
         $this->logger->info(self::MESSAGES['START'], [], self::COMMAND_NAME);
-        exit;
 
         try {
             /** Получаем уникальные комбинации локаций и категорий

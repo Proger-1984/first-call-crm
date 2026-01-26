@@ -1,0 +1,12 @@
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradIcon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="20" fill="url(#gradIcon)"/>
+  <path d="M28 32C28 27.5 31 24 35.5 24C38.5 24 41 25.5 42.5 28L45.5 35C46.2 36.8 45.8 38.8 44.5 40L40.5 43.5C42.5 49 48 54.5 53.5 56.5L57 52.5C58.2 51.2 60.2 50.8 62 51.5L69 54.5C71.5 55.8 73 58 73 61C73 66.5 69 70 63 70C43 70 28 55 28 32Z" fill="white" transform="translate(-8, -8) scale(0.75)"/>
+  <circle cx="60" cy="20" r="14" fill="#f59e0b"/>
+  <text x="55" y="26" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="white">1</text>
+</svg>

@@ -111,14 +111,45 @@ make init
    Решение:
    Убедитесь, что файл миграций `db/migrations/run.php` существует.
 
+## Быстрый старт
+
+```bash
+# Запуск ВСЕГО проекта одной командой
+# (бэкенд, БД, фронтенд, документация)
+make dev
+```
+
+После запуска будут доступны:
+- **Backend API:** https://local.firstcall.com/api/v1
+- **Frontend:** http://localhost:5173
+- **API Docs:** http://localhost:8080/redoc.html
+- **pgAdmin:** http://localhost:5050
+
+```bash
+# Остановка всего
+make dev-stop
+```
+
 ## Базовые команды
 
 ```bash
-# Запуск контейнеров
-make up
+# Запуск всего проекта
+make dev
 
-# Остановка контейнеров
+# Остановка всего
+make dev-stop
+
+# Только Docker контейнеры (бэкенд + БД)
+make up
 make down
+
+# Только фронтенд
+make frontend
+make frontend-stop
+
+# Только документация
+make docs
+make docs-stop
 
 # Пересборка контейнеров
 make build
@@ -134,8 +165,6 @@ make migrate
 
 # Исправление прав доступа
 make fix-permissions
-# или
-./fix-permissions.sh
 ```
 
 ## Структура базы данных
@@ -153,9 +182,26 @@ composer test
 
 ## Документация API
 
-Документация API доступна через Redoc. Для запуска Redoc используйте:
+### Просмотр документации
+
+Документация API создана с использованием OpenAPI 3.0 и Redoc.
+
+**Запуск локально:**
 ```bash
-docker-compose -f docker-compose.redoc.yml up
+cd docs/api && python3 -m http.server 8080
 ```
 
-После запуска документация будет доступна по адресу: http://localhost:8080 
+После запуска документация будет доступна по адресу: http://localhost:8080/redoc.html
+
+**Файлы документации:**
+- `docs/api/openapi.yaml` — OpenAPI спецификация всех эндпоинтов
+- `docs/api/redoc.html` — интерактивная документация
+
+### Что содержит документация
+
+- Все доступные API эндпоинты (публичные, защищённые, административные)
+- Форматы запросов и ответов
+- Схемы данных
+- Коды ошибок
+- Примеры использования
+- Требования к авторизации (JWT) 

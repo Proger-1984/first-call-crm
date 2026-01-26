@@ -11,6 +11,8 @@ services:
       - ./docker/dev/nginx/ssl:/etc/nginx/ssl
     depends_on:
       - php-fpm
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - slim_network
 
@@ -31,10 +33,15 @@ services:
       context: ./docker/dev/php-cli
       dockerfile: Dockerfile
     container_name: slim_php-cli
+    restart: unless-stopped
     volumes:
       - .:/var/www
+      - cli_logs:/var/log/cron
     depends_on:
-      - postgres
+      postgres:
+        condition: service_started
+    environment:
+      - TZ=Europe/Moscow
     networks:
       - slim_network
     tty: true
@@ -71,6 +78,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  cli_logs:
     driver: local
 
 networks:

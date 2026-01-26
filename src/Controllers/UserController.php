@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use App\Utils\PasswordGenerator;
 use App\Services\TelegramService;
 use App\Services\UserService;
+use Slim\Psr7\Stream;
 
 class UserController
 {
@@ -82,15 +83,19 @@ class UserController
             return 'Отсутствуют ключи: ' . implode(', ', $missingFields);
         }
 
-        $requiredFields = ['settings', 'sources', 'active_subscriptions'];
-        $emptyFields = [];
-        foreach ($requiredFields as $field) {
-            if (empty($data[$field])) {
-                $emptyFields[] = $field;
-            }
+        // Проверяем только settings и sources — active_subscriptions может быть пустым
+        if (empty($data['settings'])) {
+            return 'Пустые значения: settings';
         }
-        if (!empty($emptyFields)) {
-            return 'Пустые значения: ' . implode(', ', $emptyFields);
+        
+        // sources может быть пустым если источников нет в системе
+        if (!is_array($data['sources'])) {
+            return 'sources должен быть массивом';
+        }
+        
+        // active_subscriptions может быть пустым если нет активных подписок
+        if (!is_array($data['active_subscriptions'])) {
+            return 'active_subscriptions должен быть массивом';
         }
 
         return null;
@@ -112,12 +117,13 @@ class UserController
                 return $this->respondWithError($response, $message,null,400);
             }
 
-            $this->userSettingsService->updateUserSettings($userId, $data);
+            $updatedSettings = $this->userSettingsService->updateUserSettings($userId, $data);
 
             return $this->respondWithData($response, [
                 'code' => 200,
                 'status' => 'success',
                 'message' => 'Настройки успешно обновлены.',
+                'data' => $updatedSettings
             ], 200);
 
         } catch (Exception) {
@@ -192,15 +198,17 @@ class UserController
                 ->first();
 
             // Формируем текст о статусе подписки
-            $subscriptionStatusText = 'Нет активных подписок';
             if ($latestSubscription) {
                 $endDate = $latestSubscription->end_date;
-                $remainingDays = Carbon::now()->diffInDays($endDate, false);
+                $remainingDays = max(0, Carbon::now()->diffInDays($endDate, false));
                 $subscriptionStatusText = sprintf(
-                    "Доступ до %s\nОсталось %d дней",
+                    "Доступ до %s\nОсталось %d %s",
                     $endDate->format('d.m.Y H:i'),
-                    $remainingDays
+                    $remainingDays,
+                    $this->pluralizeDays($remainingDays)
                 );
+            } else {
+                $subscriptionStatusText = "Нет активной подписки";
             }
 
             // Формируем ответ
@@ -212,6 +220,8 @@ class UserController
                     'role' => $user->role,
                     'is_trial_used' => $user->is_trial_used,
                     'phone_status' => $user->phone_status,
+                    'app_connected' => $user->app_connected ?? false,
+                    'app_last_ping_at' => $user->app_last_ping_at?->toIso8601String(),
                     'auto_call' => $user->settings ? $user->settings->auto_call : false,
                     'auto_call_raised' => $user->settings ? $user->settings->auto_call_raised : false,
                     'has_active_subscription' => $user->hasAnyActiveSubscription(),
@@ -328,6 +338,29 @@ class UserController
     }
 
     /**
+     * Склонение слова "день" в зависимости от числа
+     */
+    private function pluralizeDays(int $number): string
+    {
+        $lastTwo = $number % 100;
+        $lastOne = $number % 10;
+        
+        if ($lastTwo >= 11 && $lastTwo <= 19) {
+            return 'дней';
+        }
+        
+        if ($lastOne === 1) {
+            return 'день';
+        }
+        
+        if ($lastOne >= 2 && $lastOne <= 4) {
+            return 'дня';
+        }
+        
+        return 'дней';
+    }
+
+    /**
      * Обновление статуса автозвонка на поднятые объявления
      */
     public function updateAutoCallRaised(Request $request, Response $response): Response
@@ -410,5 +443,95 @@ class UserController
                 500
             );
         }
+    }
+
+    /**
+     * Скачивание приложения для Android
+     * Доступно только авторизованным пользователям
+     */
+    public function downloadAndroidApp(Request $request, Response $response): Response
+    {
+        try {
+            $filePath = __DIR__ . '/../../storage/downloads/firstcall.apk';
+            
+            if (!file_exists($filePath)) {
+                return $this->respondWithError(
+                    $response, 
+                    'Файл приложения не найден. Обратитесь в поддержку.', 
+                    'file_not_found', 
+                    404
+                );
+            }
+
+            $fileSize = filesize($filePath);
+            $fileName = 'FirstCall.apk';
+
+            // Устанавливаем заголовки для скачивания
+            $response = $response
+                ->withHeader('Content-Type', 'application/vnd.android.package-archive')
+                ->withHeader('Content-Disposition', 'attachment; filename="' . $fileName . '"')
+                ->withHeader('Content-Length', (string)$fileSize)
+                ->withHeader('Cache-Control', 'no-cache, must-revalidate')
+                ->withHeader('Pragma', 'no-cache');
+
+            // Отдаём файл
+            $stream = fopen($filePath, 'rb');
+            return $response->withBody(new Stream($stream));
+
+        } catch (Exception $e) {
+            return $this->respondWithError(
+                $response, 
+                'Ошибка при скачивании: ' . $e->getMessage(), 
+                null, 
+                500
+            );
+        }
+    }
+
+    /**
+     * Получение информации о доступных приложениях для скачивания
+     */
+    public function getDownloadInfo(Request $request, Response $response): Response
+    {
+        try {
+            $androidPath = __DIR__ . '/../../storage/downloads/firstcall.apk';
+            $androidAvailable = file_exists($androidPath);
+            $androidSize = $androidAvailable ? filesize($androidPath) : null;
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'data' => [
+                    'android' => [
+                        'available' => $androidAvailable,
+                        'size' => $androidSize,
+                        'size_formatted' => $androidSize ? $this->formatFileSize($androidSize) : null,
+                        'download_url' => '/api/v1/me/download/android',
+                    ],
+                    'ios' => [
+                        'available' => false,
+                        'size' => null,
+                        'download_url' => null,
+                    ]
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+            return $this->respondWithError($response, $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Форматирование размера файла
+     */
+    private function formatFileSize(int $bytes): string
+    {
+        $units = ['Б', 'КБ', 'МБ', 'ГБ'];
+        $i = 0;
+        while ($bytes >= 1024 && $i < count($units) - 1) {
+            $bytes /= 1024;
+            $i++;
+        }
+        return round($bytes, 2) . ' ' . $units[$i];
     }
 } 

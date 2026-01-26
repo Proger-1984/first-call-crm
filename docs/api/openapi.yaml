@@ -1587,8 +1587,158 @@ paths:
               example:
                 code: 500
                 status: error
-                message: Внутренняя ошибка сервера
-                error: internal_error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/subscriptions/all:
+    get:
+      tags:
+        - Подписки
+      summary: Получение всех подписок пользователя (для профиля)
+      description: |
+        Возвращает все подписки пользователя, включая активные, истёкшие и отменённые.
+        
+        Используется на странице профиля для отображения истории подписок.
+        
+        Подписки отсортированы: сначала активные, затем ожидающие, затем истёкшие.
+        
+        Требуется аутентификация с помощью JWT токена.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Успешное получение списка всех подписок
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      subscriptions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              description: ID подписки
+                              example: 2
+                            category_id:
+                              type: integer
+                              description: ID категории
+                              example: 1
+                            category_name:
+                              type: string
+                              description: Название категории
+                              example: "Аренда. Жилая"
+                            location_id:
+                              type: integer
+                              description: ID локации
+                              example: 1
+                            location_name:
+                              type: string
+                              description: Полное название локации
+                              example: "Москва, Московская область"
+                            tariff_id:
+                              type: integer
+                              description: ID тарифа
+                              example: 2
+                            tariff_name:
+                              type: string
+                              description: Название тарифа
+                              example: "Премиум 1 месяц"
+                            status:
+                              type: string
+                              description: Статус подписки
+                              enum: [active, pending, expired, cancelled]
+                              example: "active"
+                            start_date:
+                              type: string
+                              format: date-time
+                              nullable: true
+                              description: Дата начала подписки
+                              example: "2024-01-15T10:00:00+03:00"
+                            end_date:
+                              type: string
+                              format: date-time
+                              nullable: true
+                              description: Дата окончания подписки
+                              example: "2024-02-15T10:00:00+03:00"
+                            price_paid:
+                              type: number
+                              description: Оплаченная сумма
+                              example: 5000
+                            is_enabled:
+                              type: boolean
+                              description: Включена ли подписка
+                              example: true
+              example:
+                code: 200
+                status: success
+                data:
+                  subscriptions:
+                    - id: 2
+                      category_id: 1
+                      category_name: "Аренда. Жилая"
+                      location_id: 1
+                      location_name: "Москва, Московская область"
+                      tariff_id: 2
+                      tariff_name: "Премиум 1 месяц"
+                      status: "active"
+                      start_date: "2024-01-15T10:00:00+03:00"
+                      end_date: "2024-02-15T10:00:00+03:00"
+                      price_paid: 5000
+                      is_enabled: true
+                    - id: 1
+                      category_id: 1
+                      category_name: "Аренда. Жилая"
+                      location_id: 1
+                      location_name: "Москва, Московская область"
+                      tariff_id: 1
+                      tariff_name: "Демо"
+                      status: "expired"
+                      start_date: "2024-01-01T10:00:00+03:00"
+                      end_date: "2024-01-01T13:00:00+03:00"
+                      price_paid: 0
+                      is_enabled: false
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token expired"
+                    error: "token_expired"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
 
   /api/v1/location-polygons/subscription/{subscription_id}:
     get:
@@ -2661,6 +2811,174 @@ paths:
                 status: error
                 message: "Не удалось отправить сообщение в Telegram"
                 error: "telegram_send_failed"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/me/download-info:
+    get:
+      tags:
+        - Пользователь
+      summary: Получение информации о доступных приложениях для скачивания
+      description: |
+        Возвращает информацию о доступных для скачивания приложениях.
+        
+        Включает информацию о наличии файла, его размере и URL для скачивания.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Успешное получение информации
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      android:
+                        type: object
+                        properties:
+                          available:
+                            type: boolean
+                            description: Доступен ли файл для скачивания
+                            example: true
+                          size:
+                            type: integer
+                            nullable: true
+                            description: Размер файла в байтах
+                            example: 15728640
+                          size_formatted:
+                            type: string
+                            nullable: true
+                            description: Размер файла в читаемом формате
+                            example: "15 MB"
+                          download_url:
+                            type: string
+                            description: URL для скачивания
+                            example: "/api/v1/me/download/android"
+                      ios:
+                        type: object
+                        properties:
+                          available:
+                            type: boolean
+                            description: Доступен ли файл для скачивания
+                            example: false
+                          size:
+                            type: integer
+                            nullable: true
+                            description: Размер файла в байтах
+                            example: null
+                          download_url:
+                            type: string
+                            nullable: true
+                            description: URL для скачивания
+                            example: null
+              example:
+                code: 200
+                status: success
+                data:
+                  android:
+                    available: true
+                    size: 15728640
+                    size_formatted: "15 MB"
+                    download_url: "/api/v1/me/download/android"
+                  ios:
+                    available: false
+                    size: null
+                    download_url: null
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/me/download/android:
+    get:
+      tags:
+        - Пользователь
+      summary: Скачать Android приложение
+      description: |
+        Скачивает APK файл Android приложения.
+        
+        Требуется авторизация. Файл возвращается как бинарный поток.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Файл успешно возвращён
+          content:
+            application/vnd.android.package-archive:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="FirstCall.apk"'
+            Content-Length:
+              schema:
+                type: integer
+                example: 15728640
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Access token not found"
+                    error: "token_not_found"
+        '404':
+          description: Файл приложения не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Файл приложения не найден"
+                error: "file_not_found"
         '500':
           description: Внутренняя ошибка сервера
           content:

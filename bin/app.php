@@ -9,6 +9,7 @@ use App\Commands\MetroStationsParserCommand;
 use App\Commands\NotifySubscriptionExpiringCommand;
 use App\Commands\NotifySubscriptionExpiredCommand;
 use App\Commands\ParseCianMultiThreadCommand;
+use App\Commands\TransferListingsCommand;
 use App\Commands\UpdateExpiredSubscriptionsCommand;
 use Symfony\Component\Console\Application;
 
@@ -29,6 +30,7 @@ try {
     $cli->add(new NotifySubscriptionExpiredCommand($container));
     $cli->add(new UpdateExpiredSubscriptionsCommand($container));
     $cli->add(new ParseCianMultiThreadCommand($container));
+    $cli->add(new TransferListingsCommand($container));
     
     $cli->run();
 

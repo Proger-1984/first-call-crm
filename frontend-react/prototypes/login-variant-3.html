@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вариант 3: Полноэкранный с фоном</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #849873;
+            --primary-hover: #6b7d5c;
+            --accent: #D4AB4A;
+            --bg-main: #ECF2F4;
+            --bg-card: #ffffff;
+            --text-primary: #0E1212;
+            --text-secondary: #697D94;
+            --text-muted: #A0B8BC;
+            --text-inverse: #ECF2F4;
+            --shadow-xl: 0 16px 40px rgba(14, 18, 18, 0.1);
+            --border-radius-lg: 14px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow: hidden;
+        }
+
+        .fullscreen-container {
+            position: relative;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #849873 0%, #6b7d5c 50%, #3D4857 100%);
+            overflow: hidden;
+        }
+
+        /* Декоративные элементы */
+        .circle {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .circle-1 {
+            width: 400px;
+            height: 400px;
+            top: -100px;
+            left: -100px;
+            animation-delay: 0s;
+        }
+
+        .circle-2 {
+            width: 300px;
+            height: 300px;
+            top: 50%;
+            right: -50px;
+            animation-delay: 5s;
+        }
+
+        .circle-3 {
+            width: 200px;
+            height: 200px;
+            bottom: -50px;
+            left: 30%;
+            animation-delay: 10s;
+        }
+
+        .circle-4 {
+            width: 150px;
+            height: 150px;
+            top: 20%;
+            right: 20%;
+            animation-delay: 15s;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0) scale(1);
+                opacity: 0.05;
+            }
+            50% {
+                transform: translateY(-30px) scale(1.1);
+                opacity: 0.08;
+            }
+        }
+
+        /* Glass карточка */
+        .glass-card {
+            position: relative;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 60px 50px;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            text-align: center;
+            animation: scaleIn 0.6s ease;
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .logo-wrapper {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 32px;
+        }
+
+        .logo {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #849873 0%, #6b7d5c 100%);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 32px rgba(132, 152, 115, 0.3);
+            animation: pulse 3s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 8px 32px rgba(132, 152, 115, 0.3);
+            }
+            50% {
+                box-shadow: 0 12px 48px rgba(132, 152, 115, 0.5);
+            }
+        }
+
+        .logo .material-icons {
+            font-size: 56px;
+            color: white;
+        }
+
+        .app-title {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .app-subtitle {
+            font-size: 16px;
+            font-weight: 400;
+            color: var(--text-secondary);
+            margin-bottom: 48px;
+        }
+
+        .telegram-button {
+            background: linear-gradient(135deg, #0088cc, #006699);
+            color: white;
+            border: none;
+            padding: 18px 32px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 136, 204, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .telegram-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .telegram-button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .telegram-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 28px rgba(0, 136, 204, 0.4);
+        }
+
+        .telegram-button .material-icons {
+            font-size: 28px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .telegram-button span:not(.material-icons) {
+            position: relative;
+            z-index: 1;
+        }
+
+        .info-section {
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .info-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .mini-feature {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            padding: 8px;
+            background: rgba(132, 152, 115, 0.05);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .mini-feature:hover {
+            background: rgba(132, 152, 115, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .mini-feature .material-icons {
+            font-size: 18px;
+            color: var(--primary);
+        }
+
+        .security-badge {
+            margin-top: 24px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(132, 152, 115, 0.1);
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .security-badge .material-icons {
+            font-size: 16px;
+        }
+
+        @media (max-width: 576px) {
+            .glass-card {
+                padding: 40px 30px;
+            }
+
+            .app-title {
+                font-size: 28px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="fullscreen-container">
+        <!-- Декоративные круги -->
+        <div class="circle circle-1"></div>
+        <div class="circle circle-2"></div>
+        <div class="circle circle-3"></div>
+        <div class="circle circle-4"></div>
+
+        <!-- Glass карточка -->
+        <div class="glass-card">
+            <div class="logo-wrapper">
+                <div class="logo">
+                    <span class="material-icons">home_work</span>
+                </div>
+            </div>
+            
+            <h1 class="app-title">First Call CRM</h1>
+            <p class="app-subtitle">Система управления недвижимостью</p>
+            
+            <button class="telegram-button" onclick="alert('Здесь будет Telegram Login Widget')">
+                <span class="material-icons">telegram</span>
+                <span>Войти через Telegram</span>
+            </button>
+
+            <div class="info-section">
+                <p class="info-title">Что вы получаете</p>
+                <div class="feature-grid">
+                    <div class="mini-feature">
+                        <span class="material-icons">flash_on</span>
+                        <span>Быстрый вход</span>
+                    </div>
+                    <div class="mini-feature">
+                        <span class="material-icons">security</span>
+                        <span>Безопасно</span>
+                    </div>
+                    <div class="mini-feature">
+                        <span class="material-icons">notifications</span>
+                        <span>Уведомления</span>
+                    </div>
+                    <div class="mini-feature">
+                        <span class="material-icons">analytics</span>
+                        <span>Аналитика</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="security-badge">
+                <span class="material-icons">verified_user</span>
+                <span>Защищённое соединение</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

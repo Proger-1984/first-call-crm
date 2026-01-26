@@ -1,0 +1,56 @@
+---
+description: Команды для запуска и управления проектом First Call CRM
+alwaysApply: true
+---
+
+# Команды проекта
+
+## Быстрый старт
+
+```bash
+# Запуск ВСЕГО проекта одной командой
+make dev
+```
+
+После запуска доступны:
+- **Frontend:** https://local.firstcall.com
+- **Backend API:** https://local.firstcall.com/api/v1
+- **API Docs:** http://localhost:8080/redoc.html
+- **pgAdmin:** http://localhost:5050
+
+## Основные команды
+
+| Команда | Описание |
+|---------|----------|
+| `make dev` | Запуск всего (бэкенд + БД + фронтенд + документация) |
+| `make dev-stop` | Остановка всего |
+| `make frontend` | Только React фронтенд |
+| `make docs` | Только API документация |
+| `make up` | Только Docker контейнеры |
+| `make down` | Остановка Docker |
+| `make logs` | Просмотр логов |
+| `make migrate` | Запуск миграций БД |
+| `make init` | Первоначальная настройка проекта |
+
+## Работа с контейнерами
+
+```bash
+# Войти в PHP контейнер
+docker exec -it slim_php-cli bash
+
+# Пересобрать контейнеры
+make build
+
+# Перезапустить
+make restart
+```
+
+## Composer
+
+```bash
+# Установка зависимостей
+make install
+
+# Произвольная команда composer
+make composer require package-name
+```

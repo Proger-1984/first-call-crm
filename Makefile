@@ -1,10 +1,78 @@
-.PHONY: up down build restart logs ps migrate composer install create-dirs
+.PHONY: up down build restart logs ps migrate composer install create-dirs dev dev-stop frontend frontend-stop docs docs-stop
 
 # Создание необходимых директорий
 create-dirs:
 	mkdir -p logs
 
-# Команды для разработки
+# ===========================================
+# ГЛАВНАЯ КОМАНДА - ЗАПУСК ВСЕГО ПРОЕКТА
+# ===========================================
+
+# Запуск всего: бэкенд + БД + фронтенд + документация
+dev:
+	@echo "🚀 Запуск First Call CRM..."
+	@echo ""
+	@echo "📦 Запуск Docker контейнеров (бэкенд, БД, nginx)..."
+	@./start-dev.sh
+	@echo ""
+	@echo "⏳ Ожидание запуска контейнеров..."
+	@sleep 3
+	@echo ""
+	@echo "📚 Запуск документации API (Redoc)..."
+	@docker-compose -f docker-compose.redoc.yml up -d 2>/dev/null || true
+	@echo ""
+	@echo "⚛️  Запуск React фронтенда..."
+	@cd frontend-react && npm install --silent 2>/dev/null && npm run dev &
+	@sleep 2
+	@echo ""
+	@echo "✅ Всё запущено!"
+	@echo ""
+	@echo "🌐 Доступные адреса:"
+	@echo "   • Backend API:    https://local.firstcall.com/api/v1"
+	@echo "   • Frontend:       http://localhost:5173"
+	@echo "   • API Docs:       http://localhost:8080/redoc.html"
+	@echo "   • pgAdmin:        http://localhost:5050"
+	@echo ""
+	@echo "💡 Для остановки: make dev-stop"
+
+# Остановка всего
+dev-stop:
+	@echo "🛑 Остановка всех сервисов..."
+	@-pkill -f "vite" 2>/dev/null || true
+	@docker-compose -f docker-compose.redoc.yml down 2>/dev/null || true
+	@docker-compose down
+	@echo "✅ Все сервисы остановлены"
+
+# ===========================================
+# ОТДЕЛЬНЫЕ КОМАНДЫ
+# ===========================================
+
+# Запуск только фронтенда
+frontend:
+	@echo "⚛️  Запуск React фронтенда..."
+	@cd frontend-react && npm run dev
+
+# Остановка фронтенда
+frontend-stop:
+	@-pkill -f "vite" 2>/dev/null || true
+	@echo "✅ Фронтенд остановлен"
+
+# Запуск документации
+docs:
+	@echo "📚 Запуск документации API..."
+	@docker-compose -f docker-compose.redoc.yml up -d
+	@echo "📖 Документация: http://localhost:8080/redoc.html"
+
+# Остановка документации
+docs-stop:
+	@docker-compose -f docker-compose.redoc.yml down
+	@echo "✅ Документация остановлена"
+
+# ===========================================
+# DOCKER КОМАНДЫ
+# ===========================================
+
+# Запуск Docker контейнеров
 up:
 	./start-dev.sh
 

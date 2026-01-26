@@ -39,7 +39,7 @@ class SubscriptionController
     }
     
     /**
-     * Получение списка активных подписок пользователя
+     * Получение списка активных подписок пользователя (для настроек локаций)
      */
     public function getUserSubscriptions(Request $request, Response $response): Response
     {
@@ -60,6 +60,55 @@ class SubscriptionController
                             'center_lng' => $subscription->location->center_lng,
                             'bounds' => $subscription->location->bounds
                         ]
+                    ];
+                });
+            
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'data' => [
+                    'subscriptions' => $subscriptions,
+                ]
+            ], 200);
+            
+        } catch (Exception $e) {
+            return $this->respondWithError($response, $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Получение всех подписок пользователя (для профиля)
+     * Включает активные, истёкшие и отменённые
+     */
+    public function getAllUserSubscriptions(Request $request, Response $response): Response
+    {
+        try {
+            $userId = $request->getAttribute('userId');
+            
+            $subscriptions = UserSubscription::with(['category', 'location', 'tariff'])
+                ->where('user_id', $userId)
+                ->orderByRaw("CASE 
+                    WHEN status = 'active' THEN 1 
+                    WHEN status = 'pending' THEN 2 
+                    WHEN status = 'expired' THEN 3 
+                    ELSE 4 
+                END")
+                ->orderBy('end_date', 'desc')
+                ->get()
+                ->map(function ($subscription) {
+                    return [
+                        'id' => $subscription->id,
+                        'category_id' => $subscription->category_id,
+                        'category_name' => $subscription->category->name,
+                        'location_id' => $subscription->location_id,
+                        'location_name' => $subscription->location->getFullName(),
+                        'tariff_id' => $subscription->tariff_id,
+                        'tariff_name' => $subscription->tariff->name,
+                        'status' => $subscription->status,
+                        'start_date' => $subscription->start_date?->toIso8601String(),
+                        'end_date' => $subscription->end_date?->toIso8601String(),
+                        'price_paid' => $subscription->price_paid,
+                        'is_enabled' => $subscription->is_enabled,
                     ];
                 });
             
@@ -220,8 +269,10 @@ class SubscriptionController
             // 1. Получаем все категории
             $categories = Category::all(['id', 'name']);
             
-            // 2. Получаем все локации и сортируем по имени
-            $locations = Location::all(['id', 'city', 'region'])
+            // 2. Получаем локации только для Москвы (id=1) и Санкт-Петербурга (id=2)
+            $allowedLocationIds = [1, 2];
+            $locations = Location::whereIn('id', $allowedLocationIds)
+                ->get(['id', 'city', 'region'])
                 ->map(function ($location) {
                     return [
                         'id' => $location->id,
@@ -237,7 +288,9 @@ class SubscriptionController
                     return [
                         'id' => $tariff->id,
                         'name' => $tariff->name,
+                        'code' => $tariff->code,
                         'description' => $tariff->description,
+                        'duration_hours' => $tariff->duration_hours,
                     ];
                 })
                 ->sortBy('id')

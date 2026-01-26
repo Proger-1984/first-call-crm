@@ -1,0 +1,76 @@
+.telegram-login-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.telegram-login-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* Скелетон пока загружается виджет */
+.telegram-login-skeleton {
+  display: flex;
+  justify-content: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.skeleton-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 32px;
+  background: linear-gradient(135deg, #0088cc, #006699);
+  color: white;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  width: 100%;
+  max-width: 400px;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.skeleton-button .material-icons {
+  font-size: 24px;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Ошибка загрузки */
+.telegram-login-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--danger-bg, #fef2f2);
+  border: 1px solid var(--danger, #c45c5c);
+  border-radius: 10px;
+  color: var(--danger, #c45c5c);
+}
+
+.telegram-login-error .material-icons {
+  font-size: 20px;
+}
+
+.telegram-login-error p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Переопределяем стили Telegram виджета для соответствия дизайну */
+.telegram-login-container iframe {
+  border-radius: 12px !important;
+  max-width: 100%;
+}

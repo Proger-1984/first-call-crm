@@ -1,0 +1,111 @@
+.stats-card {
+    background: var(--bg-card);
+    border-radius: var(--border-radius-lg);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-fast);
+    border: 1px solid var(--border-light);
+    animation: fadeInUp 0.5s ease-out backwards;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.stats-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--border);
+}
+
+.stats-card.featured {
+    background: var(--gradient-featured);
+    border: none;
+    color: white;
+}
+
+.stats-card.featured .stats-title,
+.stats-card.featured .stats-value,
+.stats-card.featured .stats-trend {
+    color: white;
+}
+
+.stats-card.featured .stats-card-icon {
+    color: white;
+    opacity: 0.15;
+}
+
+.stats-card.featured .stats-trend {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.stats-card.primary { border-left: 3px solid var(--primary); }
+.stats-card.success { border-left: 3px solid var(--success-light); }
+.stats-card.warning { border-left: 3px solid var(--warning); }
+.stats-card.danger { border-left: 3px solid var(--danger); }
+.stats-card.info { border-left: 3px solid var(--info); }
+
+.stats-card-icon {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-size: 32px;
+    color: var(--text-muted);
+    opacity: 0.12;
+    transition: all var(--transition-fast);
+}
+
+.stats-card:hover .stats-card-icon {
+    opacity: 0.18;
+    transform: scale(1.05);
+}
+
+.stats-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.stats-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.stats-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 8px;
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.stats-trend.up {
+    color: var(--primary);
+    background: var(--primary-light);
+}
+
+.stats-trend.down {
+    color: var(--danger);
+    background: var(--danger-bg);
+}
+
+.stats-trend .material-icons {
+    font-size: 14px;
+}

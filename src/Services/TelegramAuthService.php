@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Source;
 use App\Utils\PasswordGenerator;
 use Exception;
+use GuzzleHttp\Exception\GuzzleException;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -84,7 +85,7 @@ class TelegramAuthService extends BaseAuthService
     /**
      * Авторизует пользователя через Telegram
      * Создает или обновляет пользователя в базе данных и возвращает JWT токены
-     * @throws Exception
+     * @throws Exception|GuzzleException
      */
     public function authenticateUserByTelegram(array $auth_data, string $deviceType = 'web'): ?array
     {
@@ -153,7 +154,7 @@ class TelegramAuthService extends BaseAuthService
      * @param int $userId ID пользователя
      * @param array $telegramData Данные от Telegram
      * @return array Результат операции с детальной информацией
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function rebindTelegramAccount(int $userId, array $telegramData): array
     {

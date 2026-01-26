@@ -33,6 +33,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property string $password_hash
  * @property bool $is_trial_used
  * @property bool $phone_status
+ * @property bool $app_connected
+ * @property Carbon|null $app_last_ping_at
  * @property bool $telegram_bot_blocked
  * @property string $role
  * @property Carbon $created_at
@@ -75,7 +77,9 @@ class User extends Model
 
     protected $casts = [
         'is_trial_used' => 'boolean',
-        'phone_status' => 'boolean'
+        'phone_status' => 'boolean',
+        'app_connected' => 'boolean',
+        'app_last_ping_at' => 'datetime'
     ];
 
     /**

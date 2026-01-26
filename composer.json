@@ -18,7 +18,8 @@
         "php-open-source-saver/jwt-auth": "^2.0",
         "symfony/yaml": "^7.2",
         "guzzlehttp/guzzle": "^7.9",
-      "ext-curl": "*"
+      "ext-curl": "*",
+      "ext-pdo": "*"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.5"

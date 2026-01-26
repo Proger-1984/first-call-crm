@@ -29,7 +29,6 @@ class CreateListingStatusesTable
         Manager::table('listing_statuses')->insert([
             ['name' => 'Новое', 'color' => '#4CAF50', 'sort_order' => 10],
             ['name' => 'Поднятое', 'color' => '#2196F3', 'sort_order' => 20],
-            ['name' => 'Удалено', 'color' => '#F44336', 'sort_order' => 30],
         ]);
     }
 

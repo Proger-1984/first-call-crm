@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вариант 2: Split Screen (Рекомендуемый)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #849873;
+            --primary-hover: #6b7d5c;
+            --accent: #D4AB4A;
+            --bg-main: #ECF2F4;
+            --bg-card: #ffffff;
+            --text-primary: #0E1212;
+            --text-secondary: #697D94;
+            --text-muted: #A0B8BC;
+            --text-inverse: #ECF2F4;
+            --shadow-lg: 0 8px 24px rgba(14, 18, 18, 0.08);
+            --border-radius-lg: 14px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow: hidden;
+        }
+
+        .split-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Левая часть */
+        .left-panel {
+            flex: 0 0 40%;
+            background: linear-gradient(135deg, #849873 0%, #6b7d5c 100%);
+            color: var(--text-inverse);
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .left-panel::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 400px;
+            height: 400px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+        }
+
+        .left-panel::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 50%;
+        }
+
+        .brand-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand-logo {
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 32px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .brand-logo .material-icons {
+            font-size: 56px;
+            color: white;
+        }
+
+        .brand-title {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .brand-subtitle {
+            font-size: 18px;
+            font-weight: 400;
+            opacity: 0.9;
+            margin-bottom: 48px;
+        }
+
+        .feature-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            animation: slideInLeft 0.6s ease forwards;
+            opacity: 0;
+        }
+
+        .feature-item:nth-child(1) { animation-delay: 0.2s; }
+        .feature-item:nth-child(2) { animation-delay: 0.4s; }
+        .feature-item:nth-child(3) { animation-delay: 0.6s; }
+        .feature-item:nth-child(4) { animation-delay: 0.8s; }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .feature-icon .material-icons {
+            color: white;
+            font-size: 24px;
+        }
+
+        .feature-text {
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        /* Правая часть */
+        .right-panel {
+            flex: 1;
+            background: var(--bg-card);
+            padding: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-form {
+            max-width: 440px;
+            width: 100%;
+            animation: fadeInUp 0.8s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .form-header {
+            margin-bottom: 48px;
+        }
+
+        .form-title {
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
+        .form-subtitle {
+            font-size: 16px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .telegram-button {
+            background: linear-gradient(135deg, #0088cc, #006699);
+            color: white;
+            border: none;
+            padding: 18px 32px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 136, 204, 0.2);
+            margin-bottom: 24px;
+        }
+
+        .telegram-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 136, 204, 0.35);
+        }
+
+        .telegram-button .material-icons {
+            font-size: 28px;
+        }
+
+        .security-note {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: #f4f7f2;
+            border-radius: 10px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        .security-note .material-icons {
+            color: var(--primary);
+            font-size: 20px;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 32px 0;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e8eff2;
+        }
+
+        .benefits {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .benefit-item .material-icons {
+            font-size: 16px;
+            color: var(--accent);
+        }
+
+        @media (max-width: 1024px) {
+            .split-container {
+                flex-direction: column;
+            }
+
+            .left-panel {
+                flex: 0 0 auto;
+                padding: 40px 30px;
+                min-height: auto;
+            }
+
+            .brand-title {
+                font-size: 32px;
+            }
+
+            .feature-list {
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 16px;
+            }
+
+            .feature-item {
+                flex: 0 0 calc(50% - 8px);
+            }
+
+            .right-panel {
+                padding: 40px 30px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .benefits {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="split-container">
+        <!-- Левая панель -->
+        <div class="left-panel">
+            <div class="brand-content">
+                <div class="brand-logo">
+                    <span class="material-icons">home_work</span>
+                </div>
+                
+                <h1 class="brand-title">First Call CRM</h1>
+                <p class="brand-subtitle">Профессиональная система управления недвижимостью</p>
+                
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <span class="material-icons">notifications_active</span>
+                        </div>
+                        <div class="feature-text">
+                            Мгновенные уведомления<br>о новых объявлениях
+                        </div>
+                    </div>
+                    
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <span class="material-icons">search</span>
+                        </div>
+                        <div class="feature-text">
+                            Автоматический поиск<br>по 5+ площадкам
+                        </div>
+                    </div>
+                    
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <span class="material-icons">analytics</span>
+                        </div>
+                        <div class="feature-text">
+                            Умная аналитика<br>и отчёты
+                        </div>
+                    </div>
+                    
+                    <div class="feature-item">
+                        <div class="feature-icon">
+                            <span class="material-icons">people</span>
+                        </div>
+                        <div class="feature-text">
+                            Управление подписками<br>и клиентами
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая панель -->
+        <div class="right-panel">
+            <div class="login-form">
+                <div class="form-header">
+                    <h2 class="form-title">Добро пожаловать</h2>
+                    <p class="form-subtitle">
+                        Войдите для доступа к CRM системе и начните управлять недвижимостью эффективно
+                    </p>
+                </div>
+
+                <button class="telegram-button" onclick="alert('Здесь будет Telegram Login Widget')">
+                    <span class="material-icons">telegram</span>
+                    Войти через Telegram
+                </button>
+
+                <div class="security-note">
+                    <span class="material-icons">verified_user</span>
+                    <span>Безопасная авторизация через Telegram. Ваши данные защищены.</span>
+                </div>
+
+                <div class="divider">Преимущества платформы</div>
+
+                <div class="benefits">
+                    <div class="benefit-item">
+                        <span class="material-icons">check</span>
+                        <span>Быстрый старт</span>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="material-icons">check</span>
+                        <span>Без регистрации</span>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="material-icons">check</span>
+                        <span>Безопасно</span>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="material-icons">check</span>
+                        <span>Удобно</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

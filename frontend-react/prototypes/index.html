@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Варианты дизайна страницы авторизации</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #849873 0%, #6b7d5c 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .variants-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .variant-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .variant-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+        }
+
+        .variant-number {
+            display: inline-block;
+            background: linear-gradient(135deg, #849873, #6b7d5c);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .variant-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #0E1212;
+            margin-bottom: 12px;
+        }
+
+        .variant-description {
+            font-size: 15px;
+            color: #697D94;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .variant-features {
+            list-style: none;
+            margin-bottom: 24px;
+        }
+
+        .variant-features li {
+            padding: 8px 0;
+            color: #697D94;
+            font-size: 14px;
+        }
+
+        .variant-features li::before {
+            content: "✓ ";
+            color: #849873;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .variant-badge {
+            display: inline-block;
+            background: #D4AB4A;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #849873, #6b7d5c);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .cta-button:hover {
+            transform: translateX(4px);
+        }
+
+        .recommendation {
+            text-align: center;
+            color: white;
+            font-size: 16px;
+            margin-top: 40px;
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+        }
+
+        .recommendation strong {
+            color: #D4AB4A;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 Выберите дизайн страницы авторизации</h1>
+            <p>First Call CRM - 3 варианта на выбор</p>
+        </div>
+
+        <div class="variants-grid">
+            <!-- Вариант 1 -->
+            <a href="login-variant-1.html" class="variant-card">
+                <span class="variant-number">Вариант 1</span>
+                <h2 class="variant-title">Минималистичный центр</h2>
+                <p class="variant-description">
+                    Лаконичный дизайн с центрированной карточкой. Идеален для быстрого входа без отвлекающих элементов.
+                </p>
+                <ul class="variant-features">
+                    <li>Простой и чистый интерфейс</li>
+                    <li>Отлично на мобильных</li>
+                    <li>Быстрая загрузка</li>
+                    <li>Фокус на кнопке входа</li>
+                </ul>
+                <span class="cta-button">
+                    Посмотреть →
+                </span>
+            </a>
+
+            <!-- Вариант 2 -->
+            <a href="login-variant-2.html" class="variant-card">
+                <span class="variant-badge">Рекомендуем</span>
+                <span class="variant-number">Вариант 2</span>
+                <h2 class="variant-title">Split Screen</h2>
+                <p class="variant-description">
+                    Современный split-дизайн с брендированной левой панелью и формой справа. Премиальный вид.
+                </p>
+                <ul class="variant-features">
+                    <li>Премиальный внешний вид</li>
+                    <li>Место для преимуществ</li>
+                    <li>Сильный брендинг</li>
+                    <li>Адаптивная верстка</li>
+                </ul>
+                <span class="cta-button">
+                    Посмотреть →
+                </span>
+            </a>
+
+            <!-- Вариант 3 -->
+            <a href="login-variant-3.html" class="variant-card">
+                <span class="variant-number">Вариант 3</span>
+                <h2 class="variant-title">Полноэкранный с фоном</h2>
+                <p class="variant-description">
+                    Эффектный дизайн с градиентным фоном и полупрозрачной glass-карточкой. Максимально визуальный.
+                </p>
+                <ul class="variant-features">
+                    <li>Glassmorphism эффект</li>
+                    <li>Плавные анимации</li>
+                    <li>Уникальный дизайн</li>
+                    <li>Декоративные элементы</li>
+                </ul>
+                <span class="cta-button">
+                    Посмотреть →
+                </span>
+            </a>
+        </div>
+
+        <div class="recommendation">
+            <p>
+                💡 <strong>Рекомендация:</strong> Вариант 2 (Split Screen) - оптимальный баланс между визуальной 
+                привлекательностью, функциональностью и возможностью показать преимущества системы.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

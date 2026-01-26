@@ -1,0 +1,13 @@
+# Парсинг станций метро - раз в сутки в 3:00 ночи
+0 3 * * * /usr/bin/supervisorctl start parse-metro-stations >> /var/log/supervisor/cron.log 2>&1
+
+# Обновление истёкших подписок - каждые 5 минут
+*/5 * * * * /usr/bin/supervisorctl start update-expired-subscriptions >> /var/log/supervisor/cron.log 2>&1
+
+# Уведомление об истекающих подписках - каждый день в 10:00
+0 10 * * * /usr/bin/supervisorctl start notify-subscription-expiring >> /var/log/supervisor/cron.log 2>&1
+
+# Уведомление об истёкших подписках - каждый день в 10:30
+30 10 * * * /usr/bin/supervisorctl start notify-subscription-expired >> /var/log/supervisor/cron.log 2>&1
+
+# Пустая строка в конце обязательна для cron

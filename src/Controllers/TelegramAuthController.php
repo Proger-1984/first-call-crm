@@ -47,7 +47,8 @@ class TelegramAuthController
             return 'Данные должны быть переданы в формате JSON';
         }
 
-        $allFields = ['id', 'first_name', 'last_name', 'auth_date', 'hash'];
+        // last_name опционален - у пользователя может не быть фамилии в Telegram
+        $allFields = ['id', 'first_name', 'auth_date', 'hash'];
         $missingFields = [];
         foreach ($allFields as $field) {
             if (!array_key_exists($field, $data)) {

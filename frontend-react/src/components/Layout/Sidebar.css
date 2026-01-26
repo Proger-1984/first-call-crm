@@ -1,0 +1,153 @@
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--gradient-sidebar);
+    height: calc(100vh - var(--header-height));
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 50;
+    transition: width var(--transition-normal);
+    overflow: hidden;
+}
+
+.sidebar.collapsed {
+    width: var(--sidebar-collapsed);
+}
+
+.sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all var(--transition-fast);
+}
+
+.sidebar-toggle:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-toggle .material-icons {
+    font-size: 22px;
+    transition: transform var(--transition-normal);
+}
+
+.sidebar.collapsed .sidebar-toggle .material-icons {
+    transform: rotate(180deg);
+}
+
+.menu {
+    padding: 14px 0;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.menu-item {
+    padding: 13px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.65);
+    text-decoration: none;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+}
+
+.menu-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(132, 152, 115, 0.15) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.menu-item:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.menu-item:hover::before {
+    opacity: 1;
+}
+
+.menu-item.active {
+    color: white;
+    border-left-color: var(--success-light);
+    background: rgba(177, 216, 147, 0.1);
+}
+
+.menu-item.active::before {
+    opacity: 1;
+}
+
+.menu-item .material-icons {
+    font-size: 21px;
+    width: 26px;
+    text-align: center;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.menu-item span:not(.material-icons):not(.tooltip) {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    position: relative;
+    z-index: 1;
+    transition: opacity var(--transition-fast);
+}
+
+.sidebar.collapsed .menu-item {
+    justify-content: center;
+    padding: 13px;
+}
+
+.sidebar.collapsed .menu-item span:not(.material-icons):not(.tooltip) {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+}
+
+.tooltip {
+    position: absolute;
+    left: calc(100% + 10px);
+    background: var(--bg-sidebar);
+    color: white;
+    padding: 7px 11px;
+    border-radius: 5px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+}
+
+.sidebar.collapsed .menu-item:hover .tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+@media (max-width: 992px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .sidebar.open {
+        transform: translateX(0);
+    }
+}

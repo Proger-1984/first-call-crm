@@ -64,16 +64,20 @@ return function (App $app) {
             $group->put('/auto-call-raised', [UserController::class, 'updateAutoCallRaised']);
             $group->get('/app-login', [UserController::class, 'getAppLogin']);
             $group->post('/generate-password', [UserController::class, 'generatePassword']);
+            $group->get('/download-info', [UserController::class, 'getDownloadInfo']);
+            $group->get('/download/android', [UserController::class, 'downloadAndroidApp']);
         })->add(new AuthMiddleware($container));
 
         /** Маршруты для работы с подписками
          * Создание заявки на подписку - requestSubscription
          * Получение списка активных подписок пользователя - getUserSubscriptions
+         * Получение всех подписок пользователя (для профиля) - getAllUserSubscriptions
          * Создание заявки на продление подписки - createExtendRequest
          */
         $group->group('/subscriptions', function (RouteCollectorProxy $group) {
             $group->post('', [SubscriptionController::class, 'requestSubscription']);
             $group->get('', [SubscriptionController::class, 'getUserSubscriptions']);
+            $group->get('/all', [SubscriptionController::class, 'getAllUserSubscriptions']);
             $group->post('/extend-request', [SubscriptionController::class, 'createExtendRequest']);
         })->add(new AuthMiddleware($container));
 

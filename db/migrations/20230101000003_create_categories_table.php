@@ -18,8 +18,10 @@ class CreateCategoriesTable
         });
 
         $categories = [
-            ['name' => 'Аренда. Жилая', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')],
-            ['name' => 'Продажа. Жилая', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]
+            ['name' => 'Аренда жилая (Квартиры)', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')],
+            ['name' => 'Аренда (Коммерческая недвижимость)', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')],
+            ['name' => 'Продажа жилая (Квартиры)', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')],
+            ['name' => 'Продажа (Коммерческая недвижимость)', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]
         ];
 
         Manager::table('categories')->insert($categories);

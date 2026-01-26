@@ -1,0 +1,763 @@
+# First Call - Frontend React Project Rules
+
+## Обзор проекта
+
+First Call Frontend — современное React SPA приложение для CRM системы управления подписками на недвижимость. Приложение предоставляет интерфейс для авторизации через Telegram, управления подписками, настройки локаций на карте и просмотра объявлений.
+
+---
+
+## Технологический стек
+
+### Основные технологии
+- **React**: 18.3+ с функциональными компонентами и хуками
+- **TypeScript**: 5.9+ со строгой типизацией
+- **Vite**: 5.4+ для сборки и dev-сервера
+- **React Router**: 7.12+ для маршрутизации
+- **Zustand**: 5.0+ для управления глобальным состоянием
+- **TanStack Query**: 5.90+ для серверного состояния и кэширования
+- **Axios**: 1.13+ для HTTP запросов
+
+### Карты и геолокация
+- **Leaflet**: 1.9+ для интерактивных карт
+- **React-Leaflet**: 5.0+ для React интеграции
+- **Leaflet-Draw**: 1.0+ для рисования полигонов
+
+### UI компоненты
+- **Material Icons**: для иконок
+- **Flatpickr**: 4.6+ для выбора дат
+- CSS Modules / обычный CSS для стилей
+
+---
+
+## Структура проекта
+
+```
+frontend-react/
+├── public/                    # Статические файлы
+│   ├── favicon.svg
+│   └── logo.svg
+├── src/
+│   ├── components/           # Переиспользуемые компоненты
+│   │   ├── Auth/            # Компоненты авторизации
+│   │   │   ├── ProtectedRoute.tsx
+│   │   │   └── TelegramLoginButton.tsx
+│   │   ├── Layout/          # Компоненты макета
+│   │   │   ├── Header.tsx
+│   │   │   ├── Sidebar.tsx
+│   │   │   └── Layout.tsx
+│   │   ├── Map/             # Компоненты карты
+│   │   │   └── PolygonMap.tsx
+│   │   └── UI/              # UI компоненты
+│   │       ├── Badge.tsx
+│   │       ├── DatePicker.tsx
+│   │       ├── MultiSelect.tsx
+│   │       └── StatsCard.tsx
+│   ├── pages/               # Страницы приложения
+│   │   ├── Dashboard/
+│   │   ├── Login/
+│   │   ├── Profile/
+│   │   ├── Settings/
+│   │   └── Tariffs/
+│   ├── services/            # API сервисы
+│   │   └── api.ts
+│   ├── stores/              # Zustand stores
+│   │   ├── authStore.ts
+│   │   └── uiStore.ts
+│   ├── types/               # TypeScript типы
+│   │   ├── index.ts
+│   │   └── auth.ts
+│   ├── styles/              # Глобальные стили
+│   │   └── index.css
+│   ├── App.tsx              # Корневой компонент
+│   └── main.tsx             # Точка входа
+├── index.html
+├── package.json
+├── tsconfig.json
+└── vite.config.ts
+```
+
+---
+
+## Правила написания кода
+
+### 1. Общие требования TypeScript
+
+```typescript
+// Всегда использовать строгую типизацию
+interface ComponentProps {
+  title: string;
+  count: number;
+  onAction: (id: number) => void;
+  children?: React.ReactNode;
+}
+
+// Избегать any, использовать unknown или конкретные типы
+const handleData = (data: unknown): void => {
+  if (isValidData(data)) {
+    // ...
+  }
+};
+
+// Использовать type для union типов
+type Status = 'active' | 'pending' | 'expired' | 'cancelled';
+
+// Использовать interface для объектов
+interface User {
+  id: number;
+  name: string;
+  role: 'user' | 'admin';
+}
+```
+
+### 2. Компоненты React
+
+**Структура компонента:**
+```typescript
+import { useState, useEffect, useCallback } from 'react';
+import { useAuthStore } from '../../stores/authStore';
+import { settingsApi } from '../../services/api';
+import type { UserSettings } from '../../types';
+import './ComponentName.css';
+
+interface ComponentNameProps {
+  id: number;
+  title: string;
+  onSave?: (data: UserSettings) => void;
+}
+
+export const ComponentName = ({ id, title, onSave }: ComponentNameProps) => {
+  // 1. Хуки состояния
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<UserSettings | null>(null);
+  
+  // 2. Хуки из stores
+  const { user, isAuthenticated } = useAuthStore();
+  
+  // 3. Эффекты
+  useEffect(() => {
+    loadData();
+  }, [id]);
+  
+  // 4. Обработчики событий (useCallback для оптимизации)
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await settingsApi.getSettings();
+      setData(response.data.data);
+    } catch (err) {
+      console.error('Ошибка загрузки:', err);
+      setError('Не удалось загрузить данные');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
+  
+  const handleSave = useCallback(async () => {
+    if (!data) return;
+    
+    try {
+      await settingsApi.updateSettings(data);
+      onSave?.(data);
+    } catch (err) {
+      setError('Не удалось сохранить');
+    }
+  }, [data, onSave]);
+  
+  // 5. Условный рендеринг для состояний загрузки/ошибки
+  if (isLoading) {
+    return (
+      <div className="loading">
+        <span className="material-icons spinning">sync</span>
+        Загрузка...
+      </div>
+    );
+  }
+  
+  if (error && !data) {
+    return (
+      <div className="error">
+        <span className="material-icons">error</span>
+        {error}
+        <button onClick={loadData}>Повторить</button>
+      </div>
+    );
+  }
+  
+  // 6. Основной рендер
+  return (
+    <div className="component-name">
+      <h1>{title}</h1>
+      {/* Контент */}
+    </div>
+  );
+};
+
+export default ComponentName;
+```
+
+**Правила:**
+- Один компонент = один файл
+- Именованный экспорт + default экспорт
+- Props через деструктуризацию
+- Типизация всех props через interface
+- Использовать `useCallback` для функций, передаваемых в дочерние компоненты
+- Обязательная обработка состояний: loading, error, empty, success
+
+### 3. Организация страниц
+
+**Структура папки страницы:**
+```
+pages/
+└── Settings/
+    ├── index.ts           # Реэкспорт
+    ├── Settings.tsx       # Основной компонент
+    └── Settings.css       # Стили
+```
+
+**index.ts:**
+```typescript
+export { Settings } from './Settings';
+export { default } from './Settings';
+```
+
+### 4. API сервисы
+
+**Структура api.ts:**
+```typescript
+import axios, { AxiosError } from 'axios';
+import type { ApiResponse, User } from '../types';
+
+// Создание экземпляра axios
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
+
+// Интерцептор для токена
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Интерцептор для обработки ошибок и refresh токена
+api.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    // Логика обновления токена при 401
+    // ...
+  }
+);
+
+// Группировка API по доменам
+export const userApi = {
+  getProfile: () =>
+    api.get<ApiResponse<User>>('/me/info'),
+  
+  updateProfile: (data: Partial<User>) =>
+    api.put<ApiResponse<User>>('/me/profile', data),
+};
+
+export const settingsApi = {
+  getSettings: () =>
+    api.get<ApiResponse<UserSettingsResponse>>('/me/settings'),
+  
+  updateSettings: (data: Partial<UserSettingsResponse>) =>
+    api.put<ApiResponse<UserSettingsResponse>>('/me/settings', data),
+};
+
+export default api;
+```
+
+**Правила:**
+- Группировать API методы по доменам (userApi, settingsApi, etc.)
+- Типизировать все ответы через generics
+- Документировать методы JSDoc комментариями
+- Обрабатывать refresh токена в интерцепторе
+
+### 5. Zustand Stores
+
+**Структура store:**
+```typescript
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { User } from '../types';
+import { authApi } from '../services/api';
+
+interface AuthState {
+  // Состояние
+  user: User | null;
+  accessToken: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+  
+  // Actions
+  login: (data: TelegramUser) => Promise<void>;
+  logout: () => Promise<void>;
+  checkAuth: () => Promise<void>;
+  setUser: (user: User | null) => void;
+  clearError: () => void;
+}
+
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      // Начальное состояние
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: true,
+      error: null,
+      
+      // Actions с подробными комментариями
+      /**
+       * Авторизация через Telegram
+       */
+      login: async (telegramData) => {
+        set({ isLoading: true, error: null });
+        
+        try {
+          const response = await authApi.authenticateWithTelegram(telegramData);
+          const { access_token } = response.data;
+          
+          localStorage.setItem('access_token', access_token);
+          
+          // Загружаем данные пользователя
+          const meResponse = await authApi.me();
+          const user = meResponse.data.data.user;
+          
+          set({
+            user,
+            accessToken: access_token,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        } catch (error: any) {
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: error.response?.data?.message || 'Ошибка авторизации',
+          });
+          throw error;
+        }
+      },
+      
+      /**
+       * Выход из системы
+       */
+      logout: async () => {
+        try {
+          await authApi.logout();
+        } finally {
+          localStorage.removeItem('access_token');
+          set({
+            user: null,
+            accessToken: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+        }
+      },
+      
+      // ... остальные actions
+    }),
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
+    }
+  )
+);
+```
+
+**Правила:**
+- Разделять состояние и actions в интерфейсе
+- Использовать `persist` для сохранения в localStorage
+- `partialize` для выбора сохраняемых полей
+- Документировать actions JSDoc комментариями
+- Обрабатывать ошибки и устанавливать состояние error
+
+### 6. Типы
+
+**Структура types/index.ts:**
+```typescript
+// Базовые типы сущностей
+export interface User {
+  id: number;
+  name: string;
+  telegram_id?: string;
+  telegram_photo_url?: string;
+  role?: 'user' | 'admin';
+  is_trial_used?: boolean;
+  phone_status?: boolean;
+  auto_call?: boolean;
+  has_active_subscription?: boolean;
+}
+
+// Типы для API ответов
+export interface ApiResponse<T> {
+  code: number;
+  status: 'success' | 'error';
+  message?: string;
+  data: T;
+}
+
+// Типы для пагинации
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+// Типы для фильтров
+export interface FilterParams {
+  date_from?: string;
+  date_to?: string;
+  status?: string;
+  // ...
+}
+
+// Реэкспорт из других файлов
+export type { TelegramUser, AuthResponse } from './auth';
+```
+
+**Правила:**
+- Группировать типы по назначению
+- Использовать `interface` для объектов, `type` для unions
+- Реэкспортировать типы из index.ts
+- Опциональные поля помечать `?`
+
+### 7. CSS стили
+
+**Именование классов (BEM-подобное):**
+```css
+/* Блок */
+.settings-page { }
+
+/* Элемент */
+.settings-page .settings-card { }
+.settings-card-header { }
+.settings-card-body { }
+
+/* Модификатор */
+.settings-card.active { }
+.btn.btn-primary { }
+
+/* Состояния */
+.toggle.saving { }
+.input.error { }
+.loading { }
+```
+
+**CSS переменные (в index.css):**
+```css
+:root {
+  /* Цвета */
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  
+  /* Текст */
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  
+  /* Фон */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f4f6;
+  
+  /* Границы */
+  --border-color: #e5e7eb;
+  --border-radius: 8px;
+  
+  /* Тени */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+```
+
+**Правила:**
+- Использовать CSS переменные для цветов и размеров
+- Один CSS файл на компонент
+- Избегать глубокой вложенности (max 3 уровня)
+- Mobile-first подход для адаптивности
+
+### 8. Обработка ошибок
+
+**Паттерн обработки ошибок:**
+```typescript
+const handleAction = async () => {
+  setIsLoading(true);
+  setError(null);
+  
+  try {
+    const response = await api.doSomething();
+    setData(response.data.data);
+  } catch (err: any) {
+    // Логирование для отладки
+    console.error('Ошибка:', err);
+    
+    // Пользовательское сообщение
+    const message = err.response?.data?.message || 'Произошла ошибка';
+    setError(message);
+    
+    // Опционально: показать toast/notification
+  } finally {
+    setIsLoading(false);
+  }
+};
+```
+
+**Оптимистичные обновления:**
+```typescript
+const handleToggle = async (id: number, value: boolean) => {
+  // Сохраняем предыдущее состояние
+  const previousState = { ...state };
+  
+  // Оптимистично обновляем UI
+  setState({ ...state, [id]: value });
+  
+  try {
+    await api.update(id, value);
+  } catch (err) {
+    // Откатываем при ошибке
+    setState(previousState);
+    setError('Не удалось сохранить');
+  }
+};
+```
+
+### 9. Маршрутизация
+
+**App.tsx:**
+```typescript
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Layout } from './components/Layout';
+import { ProtectedRoute } from './components/Auth';
+import { Login } from './pages/Login';
+import { Dashboard } from './pages/Dashboard';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 минут
+      retry: 1,
+    },
+  },
+});
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          {/* Публичные маршруты */}
+          <Route path="/login" element={<Login />} />
+          
+          {/* Защищённые маршруты */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="profile" element={<Profile />} />
+          </Route>
+          
+          {/* Редирект для несуществующих */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}
+```
+
+**ProtectedRoute:**
+```typescript
+import { Navigate } from 'react-router-dom';
+import { useAuthStore } from '../../stores/authStore';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+  const { isAuthenticated, isLoading } = useAuthStore();
+  
+  if (isLoading) {
+    return <div className="loading">Загрузка...</div>;
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return <>{children}</>;
+};
+```
+
+---
+
+## Соглашения по именованию
+
+### Файлы и папки
+- Компоненты: `PascalCase.tsx` (ComponentName.tsx)
+- Стили: `PascalCase.css` (ComponentName.css)
+- Хуки: `camelCase.ts` (useAuth.ts)
+- Утилиты: `camelCase.ts` (formatDate.ts)
+- Типы: `camelCase.ts` (auth.ts)
+- Stores: `camelCase.ts` (authStore.ts)
+
+### Переменные и функции
+- Компоненты: `PascalCase` (ComponentName)
+- Функции: `camelCase` (handleClick, loadData)
+- Константы: `UPPER_SNAKE_CASE` (API_URL, MAX_ITEMS)
+- Типы/Интерфейсы: `PascalCase` (UserSettings, ApiResponse)
+- Props: `camelCase` (onClick, isLoading)
+
+### CSS классы
+- Блоки: `kebab-case` (settings-page)
+- Элементы: `block-element` (settings-card-header)
+- Модификаторы: `.block.modifier` (.btn.btn-primary)
+
+---
+
+## Работа с картами (Leaflet)
+
+**Компонент карты:**
+```typescript
+import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
+import { FeatureGroup } from 'react-leaflet';
+import { EditControl } from 'react-leaflet-draw';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-draw/dist/leaflet.draw.css';
+
+interface PolygonMapProps {
+  polygons: LocationPolygon[];
+  center: [number, number];
+  zoom: number;
+  onPolygonCreate: (coordinates: [number, number][], name: string) => void;
+  onPolygonUpdate: (id: number, coordinates: [number, number][]) => void;
+  onPolygonDelete: (id: number) => void;
+  editable?: boolean;
+}
+
+export const PolygonMap = ({
+  polygons,
+  center,
+  zoom,
+  onPolygonCreate,
+  onPolygonUpdate,
+  onPolygonDelete,
+  editable = false,
+}: PolygonMapProps) => {
+  return (
+    <MapContainer center={center} zoom={zoom} className="map-container">
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; OpenStreetMap'
+      />
+      
+      {editable && (
+        <FeatureGroup>
+          <EditControl
+            position="topright"
+            onCreated={handleCreated}
+            onEdited={handleEdited}
+            onDeleted={handleDeleted}
+            draw={{
+              polygon: true,
+              rectangle: false,
+              circle: false,
+              marker: false,
+              polyline: false,
+              circlemarker: false,
+            }}
+          />
+        </FeatureGroup>
+      )}
+      
+      {polygons.map((polygon) => (
+        <Polygon
+          key={polygon.id}
+          positions={polygon.polygon_coordinates}
+          pathOptions={{ color: 'blue', fillOpacity: 0.3 }}
+        />
+      ))}
+    </MapContainer>
+  );
+};
+```
+
+---
+
+## Переменные окружения
+
+**.env файл:**
+```
+VITE_API_URL=https://api.firstcall.com/api/v1
+VITE_TELEGRAM_BOT_USERNAME=FirstCallBot
+```
+
+**Использование:**
+```typescript
+const apiUrl = import.meta.env.VITE_API_URL;
+const botUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME;
+```
+
+---
+
+## Типичные ошибки и как их избежать
+
+1. **Не забывать типизировать props** — всегда создавать interface для props
+
+2. **Использовать useCallback** для функций, передаваемых в дочерние компоненты
+
+3. **Обрабатывать все состояния** — loading, error, empty, success
+
+4. **Не мутировать состояние напрямую** — всегда создавать новые объекты
+
+5. **Очищать эффекты** — возвращать cleanup функцию из useEffect
+
+6. **Типизировать ответы API** — использовать generics для axios
+
+7. **Использовать оптимистичные обновления** — для лучшего UX
+
+8. **Логировать ошибки** — console.error для отладки
+
+9. **Проверять авторизацию** — использовать ProtectedRoute
+
+10. **Сохранять состояние** — использовать localStorage для важных данных
+
+---
+
+## Полезные ссылки
+
+- React: https://react.dev/
+- TypeScript: https://www.typescriptlang.org/docs/
+- React Router: https://reactrouter.com/
+- Zustand: https://zustand-demo.pmnd.rs/
+- TanStack Query: https://tanstack.com/query/latest
+- Leaflet: https://leafletjs.com/
+- React-Leaflet: https://react-leaflet.js.org/
+- Vite: https://vitejs.dev/
