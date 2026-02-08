@@ -20,10 +20,28 @@ info:
     - 200: Успешный запрос
     - 400: Неверный формат запроса (неправильный формат JSON, отсутствие|пустые обязательные поля, неверный тип данных)
     - 401: Не авторизован
-    - 403: Доступ запрещен
+    - 403: Доступ запрещен (нет прав или требуется активная подписка)
     - 404: Ресурс не найден
     - 422: Ошибка валидации (нарушение бизнес-правил, неверный формат данных, конфликт значений)
     - 500: Внутренняя ошибка сервера
+    
+    ## Защита по подписке
+    Некоторые эндпоинты требуют наличия активной подписки (статус `active` или `extend_pending`).
+    При отсутствии подписки возвращается ошибка 403 с кодом `subscription_required`.
+    
+    **Эндпоинты, требующие подписку:**
+    - `/api/v1/me/settings`, `/api/v1/me/phone-status`, `/api/v1/me/auto-call`, `/api/v1/me/app-login`, `/api/v1/me/generate-password`
+    - `/api/v1/location-polygons/*`
+    - `/api/v1/filters`
+    - `/api/v1/listings/*`
+    - `/api/v1/photo-tasks/*`
+    - `/api/v1/favorites/*`
+    
+    **Эндпоинты, доступные без подписки:**
+    - `/api/v1/me/info`, `/api/v1/me/status`, `/api/v1/me/download-info`, `/api/v1/me/download/android`
+    - `/api/v1/subscriptions/*`, `/api/v1/catalog/*`, `/api/v1/billing/*`
+    
+    Администраторы имеют доступ ко всем эндпоинтам без ограничений.
 
 tags:
   - name: Аутентификация
@@ -89,7 +107,11 @@ components:
             - invalid_token_type
             - invalid_credentials
             - subscription_expired
+            - subscription_required
+            - access_denied
+            - not_found
             - validation_error
+            - internal_error
           example: validation_error
 
     Source:
@@ -5126,6 +5148,10 @@ paths:
       description: |
         Возвращает список избранных объявлений пользователя с пагинацией и фильтрами.
         
+        ## Права доступа
+        Требуется активная подписка (статус `active` или `extend_pending`).
+        Администраторы имеют доступ без ограничений.
+        
         ## Фильтры
         - `date_from`, `date_to` — фильтр по дате добавления (формат: yyyy-mm-dd)
         - `comment` — поиск по комментарию (ILIKE)
@@ -5706,8 +5732,13 @@ paths:
         - page: номер страницы (по умолчанию 1)
         - per_page: записей на странице (по умолчанию 10, максимум 100)
         
+        ## Права доступа
+        Требуется активная подписка (статус `active` или `extend_pending`).
+        Администраторы имеют доступ без ограничений.
+        
         ## Возможные ошибки
         - 401: Токен отсутствует или истёк
+        - 403: Нет активной подписки
         - 500: Внутренняя ошибка сервера
       security:
         - BearerAuth: []
@@ -5993,6 +6024,17 @@ paths:
                     status: "error"
                     message: "Access token expired"
                     error: "token_expired"
+        '403':
+          description: Требуется активная подписка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: "error"
+                message: "Для доступа к этому разделу необходима активная подписка"
+                error: "subscription_required"
         '500':
           description: Внутренняя ошибка сервера
           content:
@@ -6013,8 +6055,13 @@ paths:
       description: |
         Возвращает полную информацию об объявлении по ID.
         
+        ## Права доступа
+        Требуется активная подписка (статус `active` или `extend_pending`).
+        Администраторы имеют доступ без ограничений.
+        
         ## Возможные ошибки
         - 401: Токен отсутствует или истёк
+        - 403: Нет активной подписки
         - 404: Объявление не найдено
         - 500: Внутренняя ошибка сервера
       security:
@@ -6084,6 +6131,17 @@ paths:
                     status: "error"
                     message: "Access token expired"
                     error: "token_expired"
+        '403':
+          description: Требуется активная подписка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: "error"
+                message: "Для доступа к этому разделу необходима активная подписка"
+                error: "subscription_required"
         '404':
           description: Объявление не найдено
           content:
@@ -6115,12 +6173,17 @@ paths:
       description: |
         Обновляет статус объявления.
         
+        ## Права доступа
+        Требуется активная подписка (статус `active` или `extend_pending`).
+        Администраторы имеют доступ без ограничений.
+        
         ## Валидация полей
         - `status` — обязательно, должен существовать в системе
         
         ## Возможные ошибки
         - 400: Статус не указан или не найден
         - 401: Токен отсутствует или истёк
+        - 403: Нет активной подписки
         - 404: Объявление не найдено
         - 500: Внутренняя ошибка сервера
       security:
@@ -6333,8 +6396,9 @@ paths:
         Возвращает данные для фильтров с учётом подписок пользователя.
         
         ## Права доступа
+        Требуется активная подписка (статус `active` или `extend_pending`).
         - Обычный пользователь видит только свои оплаченные категории/локации
-        - Админ видит всё
+        - Админ видит всё без ограничений
         
         ## Связи фильтров
         - Локации зависят от выбранной категории
@@ -6343,6 +6407,7 @@ paths:
         
         ## Возможные ошибки
         - 401: Токен отсутствует или истёк
+        - 403: Нет активной подписки
         - 404: Пользователь не найден
         - 500: Внутренняя ошибка сервера
       security:
@@ -6542,6 +6607,17 @@ paths:
                     status: "error"
                     message: "Access token expired"
                     error: "token_expired"
+        '403':
+          description: Требуется активная подписка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: "error"
+                message: "Для доступа к этому разделу необходима активная подписка"
+                error: "subscription_required"
         '404':
           description: Пользователь не найден
           content:
@@ -6575,6 +6651,10 @@ paths:
       description: |
         Создаёт задачу на удаление водяных знаков с фото объявления.
         
+        ## Права доступа
+        Требуется активная подписка (статус `active` или `extend_pending`).
+        Администраторы имеют доступ без ограничений.
+        
         ## Особенности
         - Одна задача на объявление
         - Если задача уже существует — возвращает её текущий статус (код 200)
@@ -6586,6 +6666,7 @@ paths:
         ## Возможные ошибки
         - 400: listing_id не указан или некорректен
         - 401: Токен отсутствует или истёк
+        - 403: Нет активной подписки
         - 500: Внутренняя ошибка сервера
       security:
         - BearerAuth: []
@@ -6721,6 +6802,17 @@ paths:
                     status: "error"
                     message: "Access token expired"
                     error: "token_expired"
+        '403':
+          description: Требуется активная подписка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: "error"
+                message: "Для доступа к этому разделу необходима активная подписка"
+                error: "subscription_required"
         '500':
           description: Внутренняя ошибка сервера
           content:
@@ -6741,6 +6833,10 @@ paths:
       description: |
         Возвращает ZIP архив с фото без водяных знаков.
         
+        ## Права доступа
+        Требуется активная подписка (статус `active` или `extend_pending`).
+        Администраторы имеют доступ без ограничений.
+        
         ## Особенности
         - Архив доступен только после завершения задачи (status = completed)
         - Файл отдаётся с заголовками для скачивания
@@ -6748,6 +6844,7 @@ paths:
         ## Возможные ошибки
         - 400: Неверный ID задачи
         - 401: Токен отсутствует или истёк
+        - 403: Нет активной подписки
         - 404: Архив не найден или задача не завершена
         - 500: Внутренняя ошибка сервера
       security:
@@ -6800,6 +6897,17 @@ paths:
                     status: "error"
                     message: "Access token expired"
                     error: "token_expired"
+        '403':
+          description: Требуется активная подписка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: "error"
+                message: "Для доступа к этому разделу необходима активная подписка"
+                error: "subscription_required"
         '404':
           description: Архив не найден
           content:

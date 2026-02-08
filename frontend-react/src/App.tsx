@@ -11,20 +11,8 @@ import { Favorites } from './pages/Favorites';
 import { Billing } from './pages/Billing';
 import { AdminBilling } from './pages/AdminBilling';
 import { Analytics } from './pages/Analytics';
-import { ProtectedRoute } from './components/Auth';
+import { ProtectedRoute, SubscriptionRoute } from './components/Auth';
 import { useAuthStore } from './stores/authStore';
-
-function History() {
-  return (
-    <div>
-      <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
-        <span className="material-icons" style={{ color: 'var(--primary)' }}>history</span>
-        История
-      </h1>
-      <p style={{ color: 'var(--text-secondary)' }}>Страница в разработке...</p>
-    </div>
-  );
-}
 
 // Создаём клиент React Query
 const queryClient = new QueryClient({
@@ -59,19 +47,23 @@ function AppContent() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="settings" element={<Settings />} />
+        {/* Маршруты требующие активную подписку */}
+        <Route index element={<SubscriptionRoute><Dashboard /></SubscriptionRoute>} />
+        <Route path="profile" element={<SubscriptionRoute><Profile /></SubscriptionRoute>} />
+        <Route path="settings" element={<SubscriptionRoute><Settings /></SubscriptionRoute>} />
+        <Route path="favorites" element={<SubscriptionRoute><Favorites /></SubscriptionRoute>} />
+        
+        {/* Маршруты доступные всегда (без подписки) */}
         <Route path="tariffs" element={<Tariffs />} />
-        <Route path="favorites" element={<Favorites />} />
         <Route path="billing" element={<Billing />} />
+        
+        {/* Админские маршруты */}
         <Route path="admin/billing" element={<AdminBilling />} />
         <Route path="admin/analytics" element={<Analytics />} />
-        <Route path="history" element={<History />} />
       </Route>
       
-      {/* Редирект на главную для несуществующих маршрутов */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Редирект на тарифы для несуществующих маршрутов */}
+      <Route path="*" element={<Navigate to="/tariffs" replace />} />
     </Routes>
   );
 }

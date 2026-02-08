@@ -14,6 +14,7 @@ use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
 use App\Controllers\BillingController;
 use App\Middleware\AuthMiddleware;
+use App\Middleware\SubscriptionMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
 
@@ -50,13 +51,25 @@ return function (App $app) {
             $group->get('/telegram-bot-username', [TelegramAuthController::class, 'getBotUsername']);
         });
 
-        /** Защищенные маршруты пользователя (требуют аутентификации)
+        /** Маршруты пользователя, доступные без активной подписки
+         * Получение полной информации о пользователе - getUserInfo
+         * Получение статуса телефона и автозвонка - getUserStatus
+         * Получение информации о скачивании - getDownloadInfo
+         * Скачивание Android приложения - downloadAndroidApp
+         */
+        $group->group('/me', function (RouteCollectorProxy $group) {
+            $group->get('/info', [UserController::class, 'getUserInfo']);
+            $group->get('/status', [UserController::class, 'getUserStatus']);
+            $group->get('/download-info', [UserController::class, 'getDownloadInfo']);
+            $group->get('/download/android', [UserController::class, 'downloadAndroidApp']);
+        })->add(new AuthMiddleware($container));
+
+        /** Маршруты пользователя, требующие активную подписку
          * Получение настроек пользователя - getSettings
          * Обновление настроек пользователя - updateSettings
          * Обновление статуса телефона пользователя - updatePhoneStatus
-         * Получение полной информации о пользователе - getUserInfo
-         * Получение статуса телефона и автозвонка - getUserStatus
          * Обновление статуса автозвонка - updateAutoCall
+         * Обновление статуса автозвонка с приоритетом - updateAutoCallRaised
          * Получение логина для приложения - getAppLogin
          * Генерация нового пароля для приложения - generatePassword
          */
@@ -64,15 +77,11 @@ return function (App $app) {
             $group->get('/settings', [UserController::class, 'getSettings']);
             $group->put('/settings', [UserController::class, 'updateSettings']);
             $group->put('/phone-status', [UserController::class, 'updatePhoneStatus']);
-            $group->get('/info', [UserController::class, 'getUserInfo']);
-            $group->get('/status', [UserController::class, 'getUserStatus']);
             $group->put('/auto-call', [UserController::class, 'updateAutoCall']);
             $group->put('/auto-call-raised', [UserController::class, 'updateAutoCallRaised']);
             $group->get('/app-login', [UserController::class, 'getAppLogin']);
             $group->post('/generate-password', [UserController::class, 'generatePassword']);
-            $group->get('/download-info', [UserController::class, 'getDownloadInfo']);
-            $group->get('/download/android', [UserController::class, 'downloadAndroidApp']);
-        })->add(new AuthMiddleware($container));
+        })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
 
         /** Маршруты для работы с подписками
          * Создание заявки на подписку - requestSubscription
@@ -92,13 +101,15 @@ return function (App $app) {
          * Создание новой локации - createLocationPolygon
          * Обновление существующей локации - updateLocationPolygon
          * Удаление локации - deleteLocationPolygon
+         * 
+         * Требует активную подписку (SubscriptionMiddleware)
          */
         $group->group('/location-polygons', function (RouteCollectorProxy $group) {
             $group->get('/subscription/{subscription_id:[0-9]+}', [LocationPolygonController::class, 'getLocationPolygonsBySubscription']);
             $group->post('', [LocationPolygonController::class, 'createLocationPolygon']);
             $group->put('/{id:[0-9]+}', [LocationPolygonController::class, 'updateLocationPolygon']);
             $group->delete('/{id:[0-9]+}', [LocationPolygonController::class, 'deleteLocationPolygon']);
-        })->add(new AuthMiddleware($container));
+        })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
 
         /** Маршруты каталога (требуют авторизации, но доступны всем пользователям)
          * Получение всей информации о тарифах (категории, локации, тарифы и цены) - getAllTariffInfo
@@ -147,33 +158,39 @@ return function (App $app) {
         /** Маршруты для получения данных фильтров
          * Возвращает категории, локации, метро, комнаты, источники, статусы
          * с учётом подписок пользователя
+         * 
+         * Требует активную подписку (SubscriptionMiddleware)
          */
         $group->group('/filters', function (RouteCollectorProxy $group) {
             $group->get('', [FilterController::class, 'getFilters']);
-        })->add(new AuthMiddleware($container));
+        })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
 
         /** Маршруты для работы с объявлениями
          * Получение списка объявлений с фильтрацией и пагинацией - getListings
          * Получение статистики по объявлениям - getStats
          * Получение одного объявления по ID - getListing
          * Обновление статуса объявления - updateStatus
+         * 
+         * Требует активную подписку (SubscriptionMiddleware)
          */
         $group->group('/listings', function (RouteCollectorProxy $group) {
             $group->post('', [ListingController::class, 'getListings']);
             $group->get('/stats', [ListingController::class, 'getStats']);
             $group->get('/{id:[0-9]+}', [ListingController::class, 'getListing']);
             $group->patch('/{id:[0-9]+}/status', [ListingController::class, 'updateStatus']);
-        })->add(new AuthMiddleware($container));
+        })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
 
         /**
          * Маршруты для обработки фото (удаление водяных знаков)
          * Создать задачу - create
          * Скачать архив - download
+         * 
+         * Требует активную подписку (SubscriptionMiddleware)
          */
         $group->group('/photo-tasks', function (RouteCollectorProxy $group) {
             $group->post('', [PhotoTaskController::class, 'create']);
             $group->get('/{id:[0-9]+}/download', [PhotoTaskController::class, 'download']);
-        })->add(new AuthMiddleware($container));
+        })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
 
         /** Маршруты для работы с избранным
          * Получение списка избранных объявлений - index
@@ -189,6 +206,8 @@ return function (App $app) {
          * Обновить статус - FavoriteStatusController::update
          * Удалить статус - FavoriteStatusController::delete
          * Изменить порядок статусов - FavoriteStatusController::reorder
+         * 
+         * Требует активную подписку (SubscriptionMiddleware)
          */
         $group->group('/favorites', function (RouteCollectorProxy $group) {
             $group->get('', [FavoriteController::class, 'index']);
@@ -204,7 +223,7 @@ return function (App $app) {
             $group->put('/statuses/reorder', [FavoriteStatusController::class, 'reorder']);
             $group->put('/statuses/{id:[0-9]+}', [FavoriteStatusController::class, 'update']);
             $group->delete('/statuses/{id:[0-9]+}', [FavoriteStatusController::class, 'delete']);
-        })->add(new AuthMiddleware($container));
+        })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
 
     });
 }; 
