@@ -10,6 +10,7 @@ use App\Controllers\FilterController;
 use App\Controllers\ListingController;
 use App\Controllers\LocationPolygonController;
 use App\Controllers\PhotoTaskController;
+use App\Controllers\SourceAuthController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
@@ -234,6 +235,23 @@ return function (App $app) {
             $group->put('/statuses/{id:[0-9]+}', [FavoriteStatusController::class, 'update']);
             $group->delete('/statuses/{id:[0-9]+}', [FavoriteStatusController::class, 'delete']);
         })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
+
+        /** Маршруты для авторизации на источниках (CIAN, Avito)
+         * Получить статус авторизации - getStatus
+         * Сохранить куки (ручной ввод) - saveCookies
+         * Удалить куки (деавторизация) - deleteCookies
+         * Перепроверить авторизацию - revalidate
+         */
+        $group->group('/source-auth', function (RouteCollectorProxy $group) use ($container) {
+            $group->get('/status', [SourceAuthController::class, 'getStatus'])
+                ->add(new AuthMiddleware($container));
+            $group->post('/cookies', [SourceAuthController::class, 'saveCookies'])
+                ->add(new AuthMiddleware($container));
+            $group->delete('/cookies', [SourceAuthController::class, 'deleteCookies'])
+                ->add(new AuthMiddleware($container));
+            $group->post('/revalidate', [SourceAuthController::class, 'revalidate'])
+                ->add(new AuthMiddleware($container));
+        });
 
     });
 }; 

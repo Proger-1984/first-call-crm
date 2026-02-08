@@ -76,6 +76,26 @@ services:
     networks:
       - slim_network
 
+  cian-proxy:
+    build:
+      context: ./services/cian-proxy
+      dockerfile: Dockerfile
+    container_name: slim_cian-proxy
+    restart: unless-stopped
+    environment:
+      - PORT=4829
+      - TZ=Europe/Moscow
+    ports:
+      - "4829:4829"
+    networks:
+      - slim_network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4829/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 volumes:
   postgres_data:
     driver: local

@@ -68,6 +68,8 @@ tags:
     description: Методы для обработки фото (удаление водяных знаков)
   - name: Admin Users
     description: Методы для управления пользователями (только для администраторов)
+  - name: Source Auth
+    description: Методы для авторизации на внешних источниках (CIAN, Avito)
 
 servers:
   - url: http://localhost:8080
@@ -136,6 +138,96 @@ components:
           type: integer
           description: Общее количество страниц
           example: 8
+
+    SourceSubscriptionInfo:
+      type: object
+      description: Информация о подписке на источнике (CIAN, Avito)
+      properties:
+        # Поля CIAN
+        status:
+          type: string
+          description: Статус подписки (CIAN)
+          example: "active"
+        tariff:
+          type: string
+          description: Название тарифа (CIAN)
+          example: "Премиум"
+        expire_text:
+          type: string
+          description: Текст срока действия (CIAN)
+          example: "До 18 февраля"
+        limit_info:
+          type: string
+          description: Информация о лимитах (CIAN)
+          example: "50 из 100 контактов"
+        phone:
+          type: string
+          description: Телефон аккаунта (CIAN)
+          example: "+7 999 123-45-67"
+        # Поля Avito
+        name:
+          type: string
+          description: Имя пользователя (Avito)
+          example: "Служба поддержки"
+        contact_name:
+          type: string
+          description: Контактное имя (Avito)
+          example: "Дмитрий"
+        position:
+          type: string
+          description: Должность (Avito)
+          example: "Руководитель"
+        balance:
+          type: string
+          description: Баланс кошелька (Avito)
+          example: "657 ₽"
+        bonuses:
+          type: string
+          description: Бонусы (Avito)
+          example: "12 280 бонусов"
+        listings_remaining:
+          type: string
+          description: Остаток размещений (Avito)
+          example: "20"
+        messages_count:
+          type: integer
+          description: Количество непрочитанных сообщений (Avito)
+          example: 100
+        rating:
+          type: number
+          nullable: true
+          description: Рейтинг продавца (Avito)
+          example: 4.8
+
+    SourceAuthStatus:
+      type: object
+      description: Статус авторизации на источнике
+      properties:
+        is_authorized:
+          type: boolean
+          description: Авторизован ли пользователь
+          example: true
+        has_cookies:
+          type: boolean
+          description: Есть ли сохранённые куки
+          example: true
+        is_expired:
+          type: boolean
+          description: Истекли ли куки
+          example: false
+        last_validated_at:
+          type: string
+          format: date-time
+          description: Когда последний раз проверяли куки
+          example: "2026-02-08T12:00:00Z"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Когда истекает подписка на источнике
+          example: "2026-02-18T23:59:59Z"
+        subscription_info:
+          $ref: '#/components/schemas/SourceSubscriptionInfo'
 
     AdminUser:
       type: object
@@ -7386,3 +7478,422 @@ paths:
                 status: "error"
                 message: "Ошибка имперсонации"
                 error: "internal_error"
+
+  # ============================================================================
+  # Source Auth API — Авторизация на источниках (CIAN, Avito)
+  # ============================================================================
+
+  /api/v1/source-auth/status:
+    get:
+      tags:
+        - Source Auth
+      summary: Получить статус авторизации на источниках
+      description: |
+        Возвращает статус авторизации пользователя на внешних источниках (CIAN, Avito).
+        
+        ## Параметры запроса
+        - `source` (опционально) — конкретный источник: `cian` или `avito`
+        
+        ## Возвращаемые данные
+        - `is_authorized` — авторизован ли пользователь
+        - `has_cookies` — есть ли сохранённые куки
+        - `is_expired` — истекли ли куки
+        - `subscription_info` — информация о подписке на источнике
+        
+        ## Возможные ошибки
+        - 401: Токен отсутствует или истёк
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [cian, avito]
+          description: Источник для проверки (если не указан — возвращает все)
+      responses:
+        '200':
+          description: Статус авторизации
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      cian:
+                        $ref: '#/components/schemas/SourceAuthStatus'
+                      avito:
+                        $ref: '#/components/schemas/SourceAuthStatus'
+              examples:
+                all_sources:
+                  summary: Статус всех источников
+                  value:
+                    code: 200
+                    status: "success"
+                    data:
+                      cian:
+                        is_authorized: true
+                        has_cookies: true
+                        is_expired: false
+                        last_validated_at: "2026-02-08T12:00:00Z"
+                        expires_at: "2026-02-18T23:59:59Z"
+                        subscription_info:
+                          status: "active"
+                          tariff: "Премиум"
+                          expire_text: "До 18 февраля"
+                          limit_info: "50 из 100 контактов"
+                          phone: "+7 999 123-45-67"
+                      avito:
+                        is_authorized: false
+                        has_cookies: false
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Ошибка сервера"
+                error: "server_error"
+
+  /api/v1/source-auth/cookies:
+    post:
+      tags:
+        - Source Auth
+      summary: Сохранить куки (ручной ввод)
+      description: |
+        Сохраняет куки авторизации пользователя на источнике.
+        Куки проверяются на валидность через прокси-сервер.
+        
+        ## Валидация
+        - `source` — обязательно, `cian` или `avito`
+        - `cookies` — обязательно, строка с куками
+        
+        ## Процесс
+        1. Куки сохраняются в базу
+        2. Выполняется проверка через Go-прокси
+        3. При успехе извлекается информация о подписке
+        
+        ## Возможные ошибки
+        - 400: Куки не указаны или невалидны
+        - 401: Токен отсутствует или истёк
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+                - cookies
+              properties:
+                source:
+                  type: string
+                  enum: [cian, avito]
+                  description: Источник
+                cookies:
+                  type: string
+                  description: Строка с куками
+            examples:
+              cian_cookies:
+                summary: Куки CIAN
+                value:
+                  source: "cian"
+                  cookies: "_CIAN_GK=abc123; session_id=xyz789; ..."
+      responses:
+        '200':
+          description: Куки сохранены
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      message:
+                        type: string
+                      auth_status:
+                        type: boolean
+                      subscription_info:
+                        $ref: '#/components/schemas/SourceSubscriptionInfo'
+              examples:
+                success:
+                  summary: Куки валидны
+                  value:
+                    code: 200
+                    status: "success"
+                    data:
+                      success: true
+                      message: "Куки сохранены и проверены"
+                      auth_status: true
+                      subscription_info:
+                        tariff: "Премиум"
+                        expire_text: "До 18 февраля"
+                        limit_info: "50 из 100 контактов"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_cookies:
+                  summary: Куки не указаны
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Куки не указаны"
+                    error: "validation_error"
+                invalid_cookies:
+                  summary: Куки невалидны
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Куки недействительны или истекли"
+                    error: "invalid_cookies"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Source Auth
+      summary: Удалить авторизацию
+      description: |
+        Удаляет сохранённые куки авторизации на источнике.
+        
+        ## Параметры
+        - `source` — источник: `cian` или `avito`
+        
+        ## Возможные ошибки
+        - 401: Токен отсутствует или истёк
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [cian, avito]
+            default: cian
+          description: Источник
+      responses:
+        '200':
+          description: Авторизация удалена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                        example: true
+                      message:
+                        type: string
+                        example: "Авторизация удалена"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/source-auth/revalidate:
+    post:
+      tags:
+        - Source Auth
+      summary: Перепроверить авторизацию
+      description: |
+        Перепроверяет текущие сохранённые куки на валидность.
+        При успехе обновляет информацию о подписке и добавляет новые куки из ответа.
+        
+        ## Валидация
+        - `source` — обязательно, `cian` или `avito`
+        
+        ## Процесс
+        1. Берёт текущие куки из БД
+        2. Валидирует их через API источника
+        3. При успехе обновляет subscription_info и last_validated_at
+        4. Если пришли новые куки — объединяет с существующими
+        5. При неудаче помечает куки как невалидные
+        
+        ## Возможные ошибки
+        - 400: Нет сохранённых кук или куки невалидны
+        - 401: Токен отсутствует или истёк
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  enum: [cian, avito]
+                  description: Источник для перепроверки
+            examples:
+              revalidate_cian:
+                summary: Перепроверка CIAN
+                value:
+                  source: "cian"
+              revalidate_avito:
+                summary: Перепроверка Avito
+                value:
+                  source: "avito"
+      responses:
+        '200':
+          description: Авторизация подтверждена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      message:
+                        type: string
+                      auth_status:
+                        type: boolean
+                      subscription_info:
+                        $ref: '#/components/schemas/SourceSubscriptionInfo'
+                      cookies_updated:
+                        type: boolean
+                        description: Были ли обновлены куки
+              examples:
+                success:
+                  summary: Авторизация подтверждена
+                  value:
+                    code: 200
+                    status: "success"
+                    data:
+                      success: true
+                      message: "Авторизация подтверждена"
+                      auth_status: true
+                      subscription_info:
+                        tariff: "Премиум"
+                        expire_text: "До 18 февраля"
+                      cookies_updated: false
+                success_with_cookies:
+                  summary: Авторизация подтверждена, куки обновлены
+                  value:
+                    code: 200
+                    status: "success"
+                    data:
+                      success: true
+                      message: "Авторизация подтверждена"
+                      auth_status: true
+                      subscription_info:
+                        name: "Служба поддержки"
+                        balance: "657 ₽"
+                      cookies_updated: true
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                no_cookies:
+                  summary: Нет сохранённых кук
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Нет сохранённых кук для перепроверки"
+                    error: "no_cookies"
+                invalid_cookies:
+                  summary: Куки невалидны
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Куки недействительны или истекли"
+                    error: "invalid_cookies"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

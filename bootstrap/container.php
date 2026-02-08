@@ -13,6 +13,7 @@ use App\Services\UserService;
 use App\Services\ListingFilterService;
 use App\Services\PhotoTaskService;
 use App\Services\QrCodeService;
+use App\Services\SourceAuthService;
 use App\Controllers\AnalyticsController;
 use App\Controllers\AuthController;
 use App\Controllers\TelegramAuthController;
@@ -20,6 +21,7 @@ use App\Controllers\UserController;
 use App\Controllers\ListingController;
 use App\Controllers\FavoriteController;
 use App\Controllers\PhotoTaskController;
+use App\Controllers\SourceAuthController;
 use DI\ContainerBuilder;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
@@ -90,6 +92,10 @@ return function (array $config) {
             return new QrCodeService($c->get(LoggerInterface::class));
         }),
         
+        SourceAuthService::class => factory(function (ContainerInterface $c) {
+            return new SourceAuthService($c->get(LoggerInterface::class));
+        }),
+        
         /** Контроллеры */
         AuthController::class => factory(function (ContainerInterface $c) {
             return new AuthController($c);
@@ -121,6 +127,13 @@ return function (array $config) {
         
         AnalyticsController::class => factory(function (ContainerInterface $c) {
             return new AnalyticsController($c);
+        }),
+        
+        SourceAuthController::class => factory(function (ContainerInterface $c) {
+            return new SourceAuthController(
+                $c->get(SourceAuthService::class),
+                $c->get(LoggerInterface::class)
+            );
         }),
         
         /** Конфигурация */

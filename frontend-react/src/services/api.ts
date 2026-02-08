@@ -1067,4 +1067,75 @@ export const adminUsersApi = {
     api.post<ApiResponse<ImpersonateResponse>>('/admin/users/impersonate', { user_id: userId }),
 };
 
+// === SOURCE AUTH API (авторизация на источниках: CIAN, Avito) ===
+
+export interface SourceAuthStatus {
+  is_authorized: boolean;
+  has_cookies: boolean;
+  is_expired?: boolean;
+  last_validated_at?: string;
+  expires_at?: string;
+  subscription_info?: {
+    // Поля CIAN
+    status?: string;
+    tariff?: string;
+    expire_text?: string;
+    limit_info?: string;
+    phone?: string;
+    // Поля Avito
+    name?: string;
+    contact_name?: string;
+    position?: string;
+    balance?: string;
+    bonuses?: string;
+    listings_remaining?: string;
+    messages_count?: number;
+    rating?: number | null;
+  };
+}
+
+export interface SourceAuthStatusResponse {
+  cian: SourceAuthStatus;
+  avito: SourceAuthStatus;
+}
+
+export interface SaveCookiesResponse {
+  success: boolean;
+  message: string;
+  auth_status?: boolean;
+  subscription_info?: SourceAuthStatus['subscription_info'];
+}
+
+export const sourceAuthApi = {
+  /**
+   * Получить статус авторизации на источниках
+   * GET /api/v1/source-auth/status
+   */
+  getStatus: (source?: 'cian' | 'avito') => {
+    const params = source ? `?source=${source}` : '';
+    return api.get<ApiResponse<SourceAuthStatusResponse>>(`/source-auth/status${params}`);
+  },
+
+  /**
+   * Сохранить куки (ручной ввод)
+   * POST /api/v1/source-auth/cookies
+   */
+  saveCookies: (source: 'cian' | 'avito', cookies: string) =>
+    api.post<ApiResponse<SaveCookiesResponse>>('/source-auth/cookies', { source, cookies }),
+
+  /**
+   * Удалить куки (деавторизация)
+   * DELETE /api/v1/source-auth/cookies
+   */
+  deleteCookies: (source: 'cian' | 'avito') =>
+    api.delete<ApiResponse<{ success: boolean; message: string }>>(`/source-auth/cookies?source=${source}`),
+
+  /**
+   * Перепроверить авторизацию (валидация текущих кук)
+   * POST /api/v1/source-auth/revalidate
+   */
+  revalidate: (source: 'cian' | 'avito') =>
+    api.post<ApiResponse<SaveCookiesResponse>>('/source-auth/revalidate', { source }),
+};
+
 export default api;

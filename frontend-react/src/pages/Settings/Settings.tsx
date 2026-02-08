@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { settingsApi, polygonsApi, type LocationPolygon } from '../../services/api';
 import type { UserSettingsResponse } from '../../types';
 import { PolygonMap } from '../../components/Map';
+import { SourceAuth } from './SourceAuth';
 import './Settings.css';
 
-type TabType = 'main' | 'locations';
+type TabType = 'main' | 'locations' | 'sources';
 
 // Центры городов для карты
 const CITY_CENTERS: Record<string, [number, number]> = {
@@ -19,7 +20,7 @@ export const Settings = () => {
   // Восстанавливаем таб из localStorage или используем 'main' по умолчанию
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const saved = localStorage.getItem(TAB_STORAGE_KEY);
-    return (saved === 'main' || saved === 'locations') ? saved : 'main';
+    return (saved === 'main' || saved === 'locations' || saved === 'sources') ? saved : 'main';
   });
   const [settings, setSettings] = useState<UserSettingsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -301,6 +302,12 @@ export const Settings = () => {
         >
           Настройки локаций
         </button>
+        <button 
+          className={`settings-tab ${activeTab === 'sources' ? 'active' : ''}`}
+          onClick={() => setActiveTab('sources')}
+        >
+          Авторизация источников
+        </button>
       </div>
 
       {error && (
@@ -461,6 +468,10 @@ export const Settings = () => {
             </>
           )}
         </div>
+      )}
+
+      {activeTab === 'sources' && (
+        <SourceAuth onError={setError} />
       )}
     </div>
   );

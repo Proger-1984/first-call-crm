@@ -647,6 +647,38 @@
 
 ---
 
+### 26. user_source_cookies — Куки авторизации на источниках
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | BIGSERIAL PK | Первичный ключ |
+| `user_id` | BIGINT FK | Ссылка на users |
+| `source_type` | ENUM | Тип источника: `cian`, `avito` |
+| `cookies` | TEXT NULL | Строка с куками |
+| `is_valid` | BOOLEAN | Валидны ли куки |
+| `subscription_info` | JSONB NULL | Информация о подписке на источнике |
+| `last_validated_at` | TIMESTAMP NULL | Когда последний раз проверяли |
+| `expires_at` | TIMESTAMP NULL | Когда истекает подписка на источнике |
+| `created_at` | TIMESTAMP | Дата создания |
+| `updated_at` | TIMESTAMP | Дата обновления |
+
+**Формат subscription_info:**
+```json
+{
+  "status": "active",
+  "tariff": "Премиум",
+  "expire_text": "До 18 февраля",
+  "limit_info": "50 из 100 контактов",
+  "phone": "+7 999 123-45-67"
+}
+```
+
+**FK:** `user_id` → `users(id)` ON DELETE CASCADE
+
+**UNIQUE:** (`user_id`, `source_type`)
+
+---
+
 ## Миграции
 
 Миграции находятся в `db/migrations/` и запускаются через:
@@ -699,6 +731,8 @@ docker exec -it slim_php-cli php db/migrations/run.php
 39. `20260202000003` — move metro_info to listing_metro (distance)
 40. `20260206000001` — photo_tasks
 41. `20260208000001` — add notification tracking to user_subscriptions (notified_expiring_*, notified_expired_at)
+42. `20260208000002` — user_source_cookies (куки авторизации на источниках)
+43. `20260208100001` — drop bookmarklet_tokens (удалена неиспользуемая таблица)
 
 ---
 

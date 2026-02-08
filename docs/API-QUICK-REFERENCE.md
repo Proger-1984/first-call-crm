@@ -651,6 +651,79 @@ Response: ZIP файл (application/zip)
 
 ---
 
+## 🔐 Авторизация источников (CIAN, Avito)
+
+### Получить статус авторизации
+```http
+GET /api/v1/source-auth/status?source=cian
+Authorization: Bearer {access_token}
+
+Response: {
+  cian: {
+    is_authorized: true,
+    has_cookies: true,
+    is_expired: false,
+    last_validated_at: "2026-02-08T12:00:00Z",
+    expires_at: "2026-02-18T23:59:59Z",
+    subscription_info: {
+      status: "active",
+      tariff: "Премиум",
+      expire_text: "До 18 февраля",
+      limit_info: "50 из 100 контактов",
+      phone: "+7 999 123-45-67"
+    }
+  },
+  avito: { is_authorized: false, has_cookies: false }
+}
+```
+
+### Сохранить куки (ручной ввод)
+```http
+POST /api/v1/source-auth/cookies
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "source": "cian",
+  "cookies": "session_id=abc123; _CIAN_GK=xyz789; ..."
+}
+
+Response: {
+  success: true,
+  message: "Куки сохранены и проверены",
+  auth_status: true,
+  subscription_info: { tariff, expire_text, limit_info }
+}
+```
+
+### Удалить авторизацию
+```http
+DELETE /api/v1/source-auth/cookies?source=cian
+Authorization: Bearer {access_token}
+
+Response: { success: true, message: "Авторизация удалена" }
+```
+
+### Перепроверить авторизацию
+```http
+POST /api/v1/source-auth/revalidate
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{ "source": "cian" }  // или "avito"
+
+Response:
+{
+  success: true,
+  message: "Авторизация подтверждена",
+  auth_status: true,
+  subscription_info: { ... },
+  cookies_updated: false  // true если куки были обновлены
+}
+```
+
+---
+
 ## 📊 Коды ответов
 
 | Код | Описание | error |
