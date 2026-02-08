@@ -20,35 +20,106 @@ export interface User {
   created_at?: string;
 }
 
+// Источник объявления
+export interface ListingSource {
+  id: number;
+  name: string;
+}
+
+// Категория объявления
+export interface ListingCategory {
+  id: number;
+  name: string;
+}
+
+// Статус объявления
+export interface ListingStatusInfo {
+  id: number;
+  name: ListingStatusCode;
+}
+
+// Локация объявления
+export interface ListingLocation {
+  id: number;
+  name: string;
+}
+
+// Тип комнат
+export interface ListingRoom {
+  id: number;
+  name: string;
+  code: string;
+}
+
+// Станция метро
+export interface ListingMetro {
+  id: number;
+  name: string;
+  line: string | null;
+  color: string | null;
+  travel_time_min: number | null;
+  distance: string | null;  // Расстояние до метро ("900 м", "2,7 км")
+  travel_type: 'walk' | 'car' | 'public_transport';
+}
+
+// Задача обработки фото
+export interface PhotoTask {
+  id: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  photos_count: number | null;
+  error_message: string | null;
+}
+
+// Запись истории изменения цены
+export interface PriceHistoryEntry {
+  date: number;      // Unix timestamp
+  price: number;     // Цена на эту дату
+  diff: number;      // Изменение относительно предыдущей цены
+}
+
+// Объявление
 export interface Listing {
   id: number;
-  title: string;
-  description?: string;
-  price: number;
-  area: number;
-  rooms?: number;
-  floor?: number;
-  total_floors?: number;
-  building_type?: string;
-  building_year?: number;
+  external_id: string;
+  title: string | null;
+  description?: string | null;
+  price: number | null;
+  price_history?: PriceHistoryEntry[] | null;  // История изменения цен
+  square_meters: number | null;
+  floor?: number | null;
+  floors_total?: number | null;
+  phone: string | null;
+  phone_unavailable?: boolean;  // Телефон недоступен (только звонки через приложение)
   address: string;
-  source: 'avito' | 'cian' | 'yandex' | 'domofond' | 'ula';
-  source_url?: string;
-  phone: string;
-  status: ListingStatus;
-  duplicates?: Duplicate[];
-  is_favorite: boolean;
+  city?: string | null;
+  street?: string | null;
+  house?: string | null;
+  url?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  is_paid: boolean;
+  source: ListingSource;
+  category?: ListingCategory;
+  status: ListingStatusInfo;
+  location?: ListingLocation;
+  room?: ListingRoom;
+  metro?: ListingMetro[];
+  photo_task?: PhotoTask;  // Последняя задача обработки фото
   created_at: string;
   updated_at: string;
 }
 
-export type ListingStatus = 
+// Коды статусов объявлений
+export type ListingStatusCode = 
   | 'new'
   | 'our_apartment'
   | 'not_answered'
   | 'not_picked_up'
   | 'not_first'
   | 'agent';
+
+// Для обратной совместимости
+export type ListingStatus = ListingStatusCode;
 
 export interface Duplicate {
   id: number;
@@ -96,6 +167,7 @@ export interface Location {
 export interface TariffPrice {
   tariff_id: number;
   location_id: number;
+  category_id: number;
   price: number;
 }
 
@@ -160,20 +232,22 @@ export interface UserSubscriptionFull {
 export interface FilterParams {
   date_from?: string;
   date_to?: string;
-  listing_id?: string;
   phone?: string;
-  category?: string;
-  status?: ListingStatus;
-  location?: string;
-  metro?: string;
-  source?: string;
+  status?: ListingStatusCode;
+  source_id?: number;
+  category_id?: number;
+  location_id?: number;
+  metro_id?: number;
   price_from?: number;
   price_to?: number;
   area_from?: number;
   area_to?: number;
-  rooms?: number;
-  metro_time_from?: number;
-  metro_time_to?: number;
+  room_id?: number;
+}
+
+export interface SortParams {
+  sort?: 'created_at' | 'price' | 'square_meters' | 'updated_at' | 'source_id' | 'listing_status_id';
+  order?: 'asc' | 'desc';
 }
 
 export interface PaginationParams {
@@ -188,11 +262,48 @@ export interface ApiResponse<T> {
 }
 
 export interface PaginatedResponse<T> {
-  data: T[];
+  listings: T[];
+  pagination: {
+    total: number;
+    page: number;
+    per_page: number;
+    total_pages: number;
+  };
+  stats?: ListingsStats;  // Статистика для баннеров
+}
+
+// Тренды статистики (изменение в процентах относительно предыдущего периода)
+export interface ListingsStatsTrends {
   total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
+  our_apartments: number;
+  not_picked_up: number;
+  not_first: number;
+  not_answered: number;
+  agent: number;
+  new: number;
+  conversion: number;  // Абсолютное изменение конверсии (п.п.)
+}
+
+// Статистика по объявлениям
+export interface ListingsStats {
+  total: number;
+  our_apartments: number;
+  not_picked_up: number;
+  not_first: number;
+  not_answered: number;
+  agent: number;
+  new: number;
+  conversion: number;
+  trends?: ListingsStatsTrends;
+  period?: {
+    from: string;
+    to: string;
+    days: number;
+  };
+  prev_period?: {
+    from: string;
+    to: string;
+  };
 }
 
 // Типы для авторизации

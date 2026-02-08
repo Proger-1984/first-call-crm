@@ -9,6 +9,7 @@ use Illuminate\Database\Capsule\Manager as DB;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 /**
@@ -21,15 +22,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property int $category_id
  * @property int $listing_status_id
  * @property int|null $location_id
+ * @property int|null $room_id
  * @property string $external_id
  * @property string|null $title
  * @property string|null $description
- * @property int|null $rooms
  * @property float|null $price
  * @property float|null $square_meters
  * @property int|null $floor
  * @property int|null $floors_total
  * @property string|null $phone
+ * @property bool $phone_unavailable Телефон недоступен (только звонки через приложение)
+ * @property string|null $price_history JSON история изменения цен
  * @property string|null $city
  * @property string|null $street
  * @property string|null $house
@@ -41,10 +44,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * 
- * @property-read Source $source
- * @property-read Category $category
- * @property-read ListingStatus $listingStatus
- * @property-read Location|null $location
+* @property-read Source $source
+    * @property-read Category $category
+    * @property-read ListingStatus $listingStatus
+    * @property-read Location|null $location
+    * @property-read Room|null $room
+    * @property-read \Illuminate\Database\Eloquent\Collection|MetroStation[] $metroStations
+    * @property-read PhotoTask|null $photoTask Последняя задача обработки фото
  * 
  * @method static Builder|self where($column, $operator = null, $value = null)
  * @method static Builder|self whereIn($column, $values)
@@ -58,15 +64,17 @@ class Listing extends Model
         'category_id',
         'listing_status_id',
         'location_id',
+        'room_id',
         'external_id',
         'title',
         'description',
-        'rooms',
         'price',
+        'price_history',
         'square_meters',
         'floor',
         'floors_total',
         'phone',
+        'phone_unavailable',
         'city',
         'street',
         'house',
@@ -78,7 +86,7 @@ class Listing extends Model
     ];
 
     protected $casts = [
-        'rooms' => 'integer',
+        'room_id' => 'integer',
         'price' => 'float',
         'square_meters' => 'float',
         'floor' => 'integer',
@@ -86,6 +94,7 @@ class Listing extends Model
         'lat' => 'float',
         'lng' => 'float',
         'is_paid' => 'boolean',
+        'phone_unavailable' => 'boolean',
     ];
 
     /**
@@ -121,6 +130,34 @@ class Listing extends Model
     }
 
     /**
+     * Получить тип комнат
+     */
+    public function room(): BelongsTo
+    {
+        return $this->belongsTo(Room::class);
+    }
+
+    /**
+     * Получить станции метро рядом с объявлением
+     * 
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
+     */
+    public function metroStations(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(MetroStation::class, 'listing_metro', 'listing_id', 'metro_station_id')
+            ->withPivot(['travel_time_min', 'travel_type', 'distance'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Получить задачу обработки фото
+     */
+    public function photoTask(): HasOne
+    {
+        return $this->hasOne(PhotoTask::class);
+    }
+
+    /**
      * Scope для поиска объявлений в локации
      */
     public function scopeInLocation(Builder $query, int $locationId): Builder
@@ -130,16 +167,24 @@ class Listing extends Model
 
     /**
      * Получить полный адрес объявления
+     * 
+     * Приоритет: address (полный адрес) > city+street+house > 'Адрес не указан'
      */
     public function getFullAddress(): string
     {
+        // Сначала проверяем полное поле address
+        if (!empty($this->address)) {
+            return $this->address;
+        }
+        
+        // Собираем из частей
         $parts = array_filter([
             $this->city,
             $this->street,
             $this->house
         ]);
         
-        return implode(', ', $parts) ?: ($this->address ?: 'Адрес не указан');
+        return implode(', ', $parts) ?: 'Адрес не указан';
     }
 
     /**

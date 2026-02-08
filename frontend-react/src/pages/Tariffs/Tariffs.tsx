@@ -51,9 +51,11 @@ export const Tariffs = () => {
   };
 
   const getPrice = (tariffId: number): number => {
-    if (!selectedLocation) return 0;
+    if (!selectedLocation || !selectedCategory) return 0;
     const priceInfo = tariffPrices.find(
-      p => p.tariff_id === tariffId && p.location_id === selectedLocation
+      p => p.tariff_id === tariffId && 
+           p.location_id === selectedLocation && 
+           p.category_id === selectedCategory
     );
     return priceInfo?.price ?? 0;
   };
@@ -198,6 +200,7 @@ export const Tariffs = () => {
             </div>
             <div className="tariff-price">{formatPrice(getPrice(premiumTariff.id))}</div>
             <ul className="tariff-features">
+              <li><span className="material-icons">info</span>Стоимость одной учётной записи</li>
               <li><span className="material-icons">check</span>Мгновенные уведомления</li>
               <li><span className="material-icons">check</span>Автозвонок по объектам</li>
               <li><span className="material-icons">check</span>Настройка полигонов</li>
@@ -249,6 +252,14 @@ export const Tariffs = () => {
         <span><span className="material-icons">credit_card</span>Оплата после заявки</span>
         <span><span className="material-icons">autorenew</span>Без автопродления</span>
         <span><span className="material-icons">support</span>Поддержка 24/7</span>
+      </div>
+
+      {/* Информация о поддержке */}
+      <div className="tariffs-support-note">
+        <span className="material-icons">help_outline</span>
+        <span>
+          Нет нужной категории или локации? Напишите в <a href="https://t.me/firstcall_support" target="_blank" rel="noopener noreferrer">поддержку</a> — добавим!
+        </span>
       </div>
     </div>
   );

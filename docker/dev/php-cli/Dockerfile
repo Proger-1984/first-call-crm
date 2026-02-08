@@ -20,10 +20,16 @@ RUN apk add --no-cache \
     gcc \
     g++ \
     make \
-    supervisor
+    supervisor \
+    freetype-dev \
+    libjpeg-turbo-dev \
+    libpng-dev
 
-# Устанавливаем расширения PHP (PostgreSQL + MySQL)
-RUN docker-php-ext-install pdo pdo_pgsql pgsql pdo_mysql zip
+# Конфигурируем и устанавливаем GD
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg
+
+# Устанавливаем расширения PHP (PostgreSQL + MySQL + GD)
+RUN docker-php-ext-install pdo pdo_pgsql pgsql pdo_mysql zip gd
 
 # Устанавливаем расширение parallel
 RUN pecl install parallel && docker-php-ext-enable parallel

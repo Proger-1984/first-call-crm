@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { useUIStore } from '../../stores/uiStore';
 import { userApi } from '../../services/api';
+import { Tooltip } from '../UI/Tooltip';
 import './Header.css';
 
 export function Header() {
   const { user, logout, updateUser } = useAuthStore();
+  const { soundEnabled, toggleSound, playNotificationSound } = useUIStore();
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isPhoneDropdownOpen, setIsPhoneDropdownOpen] = useState(false);
@@ -80,7 +83,7 @@ export function Header() {
           <span>Поддержка</span>
         </a>
 
-        <button className="header-btn primary">
+        <button className="header-btn primary" onClick={() => navigate('/billing')}>
           <span className="material-icons">account_balance_wallet</span>
           <span>Биллинг</span>
         </button>
@@ -94,20 +97,73 @@ export function Header() {
           </div>
         )}
 
-        <div className="header-icon" title={user?.app_connected ? 'Приложение подключено' : 'Приложение не подключено'}>
-          <span className="material-icons">phonelink</span>
-          <span className={`connection-indicator ${user?.app_connected ? 'connected' : 'disconnected'}`}></span>
-        </div>
+        <Tooltip 
+          content={
+            <div className="header-tooltip">
+              <div className="header-tooltip-title">Мобильное приложение</div>
+              <div className="header-tooltip-status">
+                <span className={`status-dot ${user?.app_connected ? 'online' : 'offline'}`}></span>
+                <span>{user?.app_connected ? 'Подключено' : 'Не подключено'}</span>
+              </div>
+            </div>
+          }
+          position="bottom"
+        >
+          <div className="header-icon">
+            <span className="material-icons">phonelink</span>
+            <span className={`connection-indicator ${user?.app_connected ? 'connected' : 'disconnected'}`}></span>
+          </div>
+        </Tooltip>
+
+        <Tooltip 
+          content={
+            <div className="header-tooltip">
+              <div className="header-tooltip-title">Звуковые уведомления</div>
+              <div className="header-tooltip-status">
+                <span className={`status-dot ${soundEnabled ? 'online' : 'offline'}`}></span>
+                <span>{soundEnabled ? 'Включены' : 'Выключены'}</span>
+              </div>
+            </div>
+          }
+          position="bottom"
+        >
+          <div 
+            className={`header-icon sound-toggle ${soundEnabled ? 'enabled' : 'disabled'}`}
+            onClick={() => {
+              toggleSound();
+              // Проиграть звук при включении для демонстрации
+              if (!soundEnabled) {
+                setTimeout(() => playNotificationSound(), 100);
+              }
+            }}
+          >
+            <span className="material-icons">
+              {soundEnabled ? 'notifications_active' : 'notifications_off'}
+            </span>
+          </div>
+        </Tooltip>
 
         <div className="phone-status-wrapper">
-          <div
-            className="header-icon"
-            title={autoCallStatus === null ? 'Статус автозвонка' : autoCallStatus ? 'Готов' : 'Не беспокоить'}
-            onClick={() => setIsPhoneDropdownOpen(!isPhoneDropdownOpen)}
+          <Tooltip 
+            content={
+              <div className="header-tooltip">
+                <div className="header-tooltip-title">Автозвонок</div>
+                <div className="header-tooltip-status">
+                  <span className={`status-dot ${autoCallStatus === true ? 'online' : 'offline'}`}></span>
+                  <span>{autoCallStatus === null ? 'Не настроен' : autoCallStatus ? 'Готов к звонкам' : 'Не беспокоить'}</span>
+                </div>
+              </div>
+            }
+            position="bottom"
           >
-            <span className="material-icons">phone</span>
-            <span className={`phone-status-indicator ${autoCallStatus === true ? 'ready' : autoCallStatus === false ? 'busy' : ''}`}></span>
-          </div>
+            <div
+              className="header-icon"
+              onClick={() => setIsPhoneDropdownOpen(!isPhoneDropdownOpen)}
+            >
+              <span className="material-icons">phone</span>
+              <span className={`phone-status-indicator ${autoCallStatus === true ? 'ready' : autoCallStatus === false ? 'busy' : ''}`}></span>
+            </div>
+          </Tooltip>
 
           {isPhoneDropdownOpen && (
             <>
@@ -140,15 +196,24 @@ export function Header() {
         </div>
 
         <div className="user-profile">
-          <div
-            className="user-avatar-button"
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            title={user?.name || 'Профиль'}
+          <Tooltip 
+            content={
+              <div className="header-tooltip">
+                <div className="header-tooltip-title">{user?.name || 'Пользователь'}</div>
+                {user?.email && <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{user.email}</div>}
+              </div>
+            }
+            position="bottom"
           >
-            <div className="user-avatar">
-              {getInitials(user?.name)}
+            <div
+              className="user-avatar-button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <div className="user-avatar">
+                {getInitials(user?.name)}
+              </div>
             </div>
-          </div>
+          </Tooltip>
 
           {isDropdownOpen && (
             <>

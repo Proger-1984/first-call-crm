@@ -296,16 +296,23 @@ class SubscriptionController
                 ->sortBy('id')
                 ->values();
             
-            // 4. Получаем связку локация-тариф-цена для всех тарифов и локаций
+            // 4. Получаем связку локация-тариф-категория-цена для всех комбинаций
             $tariffPrices = [];
             foreach ($locations as $location) {
                 foreach ($tariffs as $tariff) {
-                    $price = $this->subscriptionService->getTariffPrice($tariff['id'], $location['id']);
-                    $tariffPrices[] = [
-                        'tariff_id' => $tariff['id'],
-                        'location_id' => $location['id'],
-                        'price' => $price
-                    ];
+                    foreach ($categories as $category) {
+                        $price = $this->subscriptionService->getTariffPrice(
+                            $tariff['id'], 
+                            $location['id'],
+                            $category->id
+                        );
+                        $tariffPrices[] = [
+                            'tariff_id' => $tariff['id'],
+                            'location_id' => $location['id'],
+                            'category_id' => $category->id,
+                            'price' => $price
+                        ];
+                    }
                 }
             }
             
@@ -339,27 +346,33 @@ class SubscriptionController
                 return $this->respondWithError($response, 'Необходимо указать ID подписки для продления', 'validation_error', 400);
             }
             
-            if (!isset($data['tariff_id']) || !is_numeric($data['tariff_id'])) {
-                return $this->respondWithError($response, 'Необходимо указать тариф для продления', 'validation_error', 400);
-            }
-            
             $subscriptionId = (int)$data['subscription_id'];
             
             // Проверяем наличие подписки и право пользователя на неё
             $subscription = UserSubscription::where('id', $subscriptionId)
                 ->where('user_id', $userId)
+                ->with('tariff')
                 ->first();
                 
             if (!$subscription) {
                 return $this->respondWithError($response, 'Подписка не найдена', 'not_found', 404);
             }
 
-            if ($subscription->status != 'active') {
+            if ($subscription->status === 'extend_pending') {
+                return $this->respondWithError($response, 'Заявка на продление уже отправлена и ожидает обработки', 'validation_error', 400);
+            }
+            
+            if ($subscription->status !== 'active') {
                 return $this->respondWithError($response, 'Продлить можно только активную подписку', 'validation_error', 400);
             }
             
+            // Используем текущий тариф подписки, если не указан другой
+            $tariffId = isset($data['tariff_id']) && is_numeric($data['tariff_id']) 
+                ? (int)$data['tariff_id'] 
+                : $subscription->tariff_id;
+            
             // Проверяем существование тарифа
-            $tariff = Tariff::find($data['tariff_id']);
+            $tariff = Tariff::find($tariffId);
             if (!$tariff || !$tariff->is_active) {
                 return $this->respondWithError($response, 'Указанный тариф не найден или неактивен', 'validation_error', 400);
             }
@@ -380,7 +393,12 @@ class SubscriptionController
                 $tariff
             );
             
-            // Добавляем запись в историю подписок - опционально, для отслеживания
+            // Меняем статус подписки на "ожидает продления"
+            // Подписка продолжает работать с этим статусом
+            $subscription->status = 'extend_pending';
+            $subscription->save();
+            
+            // Добавляем запись в историю подписок
             SubscriptionHistory::create([
                 'user_id' => $userId,
                 'subscription_id' => $subscriptionId,
@@ -398,7 +416,8 @@ class SubscriptionController
                 'status' => 'success',
                 'message' => 'Заявка на продление подписки успешно отправлена администратору',
                 'data' => [
-                    'subscription_id' => $subscriptionId
+                    'subscription_id' => $subscriptionId,
+                    'new_status' => 'extend_pending'
                 ]
             ], 200);
             

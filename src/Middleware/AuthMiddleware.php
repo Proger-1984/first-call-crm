@@ -83,14 +83,17 @@ class AuthMiddleware implements MiddlewareInterface
 
     private function getTokenFromHeader(Request $request): ?string
     {
+        // Сначала пробуем из заголовка Authorization
         $authHeader = $request->getHeaderLine('Authorization');
         
-        if (!$authHeader) {
-            return null;
+        if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
+            return substr($authHeader, 7);
         }
         
-        if (str_starts_with($authHeader, 'Bearer ')) {
-            return substr($authHeader, 7);
+        // Для скачивания файлов — токен может быть в query параметре
+        $queryParams = $request->getQueryParams();
+        if (!empty($queryParams['token'])) {
+            return $queryParams['token'];
         }
         
         return null;

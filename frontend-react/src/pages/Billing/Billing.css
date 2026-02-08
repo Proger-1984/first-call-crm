@@ -1,0 +1,819 @@
+/* ============================================
+   Billing Page - Мои подписки
+   Стили унифицированы с Favorites
+   ============================================ */
+
+.billing-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: relative;
+}
+
+/* Toast уведомление */
+.billing-toast {
+  position: fixed;
+  top: 80px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 2000;
+  animation: billing-toast-slide-in 0.3s ease-out;
+  max-width: 400px;
+}
+
+@keyframes billing-toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.billing-toast.success {
+  background: #dcfce7;
+  border: 1px solid #16a34a;
+  color: #166534;
+}
+
+.billing-toast.error {
+  background: #fee2e2;
+  border: 1px solid #dc2626;
+  color: #991b1b;
+}
+
+.billing-toast .material-icons {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.billing-toast-message {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.billing-toast-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.billing-toast-close:hover {
+  opacity: 1;
+}
+
+.billing-toast-close .material-icons {
+  font-size: 18px;
+}
+
+/* Заголовок */
+.billing-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.billing-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.billing-count {
+  font-size: 14px;
+  color: var(--text-muted);
+  background: var(--bg-main);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+/* Фильтры */
+.billing-filters {
+  padding: 16px 20px;
+}
+
+.billing-filters-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.billing-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.billing-filter-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.billing-filter-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  transition: all var(--transition-fast);
+}
+
+.billing-filter-input:hover {
+  border-color: var(--text-muted);
+}
+
+.billing-filter-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.billing-filter-input::placeholder {
+  color: var(--text-muted);
+}
+
+.billing-filter-small {
+  width: 80px;
+}
+
+/* DatePicker в фильтрах */
+.billing-filter-group .form-control {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  width: 130px;
+  transition: all var(--transition-fast);
+}
+
+.billing-filter-group .form-control:hover {
+  border-color: var(--text-muted);
+}
+
+.billing-filter-group .form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* Фильтр с кнопкой очистки */
+.billing-filter-with-clear {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.billing-filter-with-clear .billing-filter-input,
+.billing-filter-with-clear .form-control {
+  padding-right: 30px;
+}
+
+.billing-clear-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.billing-clear-btn:hover {
+  background: var(--text-muted);
+}
+
+.billing-clear-btn .material-icons {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.billing-clear-inline-btn {
+  margin-left: 6px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  vertical-align: middle;
+}
+
+.billing-clear-inline-btn:hover {
+  background: var(--text-muted);
+}
+
+.billing-clear-inline-btn .material-icons {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+/* Статус фильтры */
+.billing-status-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.billing-status-filter-btn {
+  padding: 6px 12px;
+  border: 2px solid;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--bg-card);
+  white-space: nowrap;
+}
+
+.billing-status-filter-btn:hover {
+  opacity: 0.85;
+}
+
+/* Кнопки действий фильтров */
+.billing-filter-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Карточка */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+/* Контейнер таблицы */
+.billing-table-container {
+  overflow-x: auto;
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+}
+
+/* Таблица */
+.billing-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.billing-table th,
+.billing-table td {
+  box-sizing: border-box;
+  padding: 12px 14px;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.billing-table th {
+  background: var(--bg-main);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.billing-table th.sortable,
+.billing-table .sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.billing-table th.sortable:hover,
+.billing-table .sortable:hover {
+  background: var(--border-light);
+  color: var(--primary);
+}
+
+.billing-table td {
+  font-size: 13px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.billing-table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.billing-table tbody tr:nth-child(even) {
+  background: rgba(236, 242, 244, 0.4);
+}
+
+.billing-table tbody tr:hover {
+  background: var(--primary-50);
+}
+
+.billing-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Иконка сортировки */
+.billing-sort-icon {
+  font-size: 14px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+.billing-sort-icon.inactive {
+  opacity: 0.45;
+}
+
+.billing-table th.sortable:hover .billing-sort-icon.inactive {
+  opacity: 0.7;
+}
+
+.billing-sort-icon.active {
+  opacity: 1;
+  color: var(--primary);
+}
+
+/* Ячейки таблицы */
+.billing-cell-id {
+  font-weight: 600;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.billing-cell-date {
+  white-space: nowrap;
+}
+
+.billing-cell-date .date {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.billing-cell-date .time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.billing-cell-tariff {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.billing-cell-category {
+  color: var(--text-secondary);
+}
+
+.billing-cell-location {
+  color: var(--text-secondary);
+  max-width: 200px;
+}
+
+.billing-cell-days {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.billing-cell-period {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.billing-cell-period .start {
+  color: var(--success);
+}
+
+.billing-cell-period .end {
+  color: var(--danger);
+}
+
+/* Статус бейдж */
+.billing-status-badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* Футер таблицы с пагинацией */
+.billing-table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-main);
+  border-top: 1px solid var(--border);
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.billing-pagination-info {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.billing-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.billing-pagination-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+}
+
+.billing-pagination-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.billing-pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.billing-pagination-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.billing-pagination-btn .material-icons {
+  font-size: 20px;
+}
+
+.billing-pagination-per-page {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.billing-pagination-per-page select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-card);
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.billing-pagination-per-page select:hover {
+  border-color: var(--primary);
+}
+
+/* Кнопки */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn .material-icons {
+  font-size: 18px;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+.btn-secondary {
+  background: var(--bg-main);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--border-light);
+}
+
+/* Состояния */
+.billing-loading,
+.billing-error,
+.billing-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.billing-loading .material-icons,
+.billing-error .material-icons,
+.billing-empty .material-icons {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.billing-loading .spinning {
+  animation: spin 1s linear infinite;
+}
+
+.billing-error .material-icons {
+  color: var(--danger);
+}
+
+.billing-empty h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.billing-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Кнопка действия */
+.billing-cell-actions {
+  white-space: nowrap;
+}
+
+.billing-action-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.billing-action-btn .material-icons {
+  font-size: 18px;
+}
+
+.billing-action-btn.extend {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.billing-action-btn.extend:hover {
+  background: var(--primary);
+  color: white;
+}
+
+/* Модальное окно */
+.billing-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.billing-modal {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.billing-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.billing-modal-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.billing-modal-header h2 .material-icons {
+  font-size: 24px;
+}
+
+.billing-modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius-sm);
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+}
+
+.billing-modal-close:hover {
+  background: var(--bg-main);
+  color: var(--text-primary);
+}
+
+.billing-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.billing-modal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.billing-modal-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.billing-modal-info-row .label {
+  font-size: 13px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.billing-modal-info-row .value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.billing-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.billing-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.billing-modal-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.billing-modal-input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  transition: all var(--transition-fast);
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.billing-modal-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+textarea.billing-modal-input {
+  min-height: 80px;
+  resize: vertical;
+  pointer-events: auto;
+  cursor: text;
+}
+
+.billing-modal-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 12px;
+  background: var(--bg-main);
+  border-radius: var(--border-radius-sm);
+}
+
+.billing-modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-main);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .billing-table-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .billing-pagination-controls {
+    order: -1;
+  }
+  
+  .billing-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .billing-filter-small {
+    width: 100%;
+  }
+}

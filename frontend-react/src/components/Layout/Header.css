@@ -156,6 +156,28 @@
     display: block;
 }
 
+/* Sound Toggle Button */
+.sound-toggle {
+    transition: all var(--transition-fast);
+}
+
+.sound-toggle.enabled {
+    color: var(--primary);
+}
+
+.sound-toggle.enabled:hover {
+    background: var(--primary-light);
+}
+
+.sound-toggle.disabled {
+    color: var(--text-muted);
+}
+
+.sound-toggle.disabled:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary);
+}
+
 /* Phone Status Dropdown */
 .phone-status-wrapper {
     position: relative;

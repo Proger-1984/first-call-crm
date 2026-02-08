@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Capsule\Manager as DB;
 use Carbon\Carbon;
+use JetBrains\PhpStorm\ArrayShape;
 
 class CianAuth extends Model
 {
@@ -62,17 +63,17 @@ class CianAuth extends Model
     public static function getRandomActiveAuthToken(): ?string
     {
         $auths = self::where('is_active', true)->get();
-        
+
         if ($auths->isEmpty()) {
             return null;
         }
-        
+
         $auth = $auths->random();
-        
+
         // Обновляем время последнего использования
         $auth->last_used_at = Carbon::now();
         $auth->save();
-        
+
         return $auth->auth_token;
     }
 
@@ -120,6 +121,7 @@ class CianAuth extends Model
      * Получает статистику использования токенов
      * @return array
      */
+    #[ArrayShape(['total' => "mixed", 'active' => "mixed", 'inactive' => "mixed", 'recently_used' => "mixed"])]
     public static function getUsageStats(): array
     {
         return [

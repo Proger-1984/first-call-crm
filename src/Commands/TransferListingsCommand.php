@@ -30,6 +30,9 @@ class TransferListingsCommand extends Command
     
     /** @var array<string, int> Кэш соответствия паттернов комнат к room_id */
     private array $roomPatterns = [];
+    
+    /** @var array<string, int> Кэш станций метро: "line_id:station_id" => id */
+    private array $metroStationsCache = [];
 
     private const COMMAND_NAME = 'transfer-listings';
     
@@ -85,6 +88,9 @@ class TransferListingsCommand extends Command
             
             // Загружаем паттерны комнат из БД
             $this->loadRoomPatterns();
+            
+            // Загружаем станции метро в кэш
+            $this->loadMetroStations();
             
             // Удаляем старые объявления
             $this->logger->info("Удаление старых объявлений...", [], self::COMMAND_NAME);
@@ -213,15 +219,18 @@ class TransferListingsCommand extends Command
     {
         $sql = /** @lang text */
             "SELECT 
-                    id, category_id, group_id, source_id, city_id, 
-                    title, address, price, url, lat, lng, phone, 
-                    metro_id, room_id, raised_id, created_at, 
-                    removed, is_paid, status_id, square_meters, 
-                    total_floors, floor, street, house 
-                FROM items 
-                WHERE (TIMESTAMPDIFF(SECOND, created_at, NOW()) > 2) 
-                  AND status_id != 2
-                ORDER BY created_at DESC 
+                    i.id, i.category_id, i.group_id, i.source_id, i.city_id, 
+                    i.title, i.address, i.price, i.url, i.lat, i.lng, i.phone, 
+                    i.metro_id, i.room_id, i.raised_id, i.created_at, 
+                    i.removed, i.is_paid, i.status_id, i.square_meters, 
+                    i.total_floors, i.floor, i.street, i.house, i.description, i.city_name,
+                    i.price_history, i.metro_distance, i.metro_walk_time, i.phone_unavailable,
+                    m.hh_line_id, m.hh_station_id
+                FROM items i
+                LEFT JOIN metro m ON i.metro_id = m.id
+                WHERE (TIMESTAMPDIFF(SECOND, i.created_at, NOW()) > 2) 
+                  AND i.status_id != 2
+                ORDER BY i.created_at DESC 
                 LIMIT $limit";
 
         $stmt = $this->remoteDb->query($sql);
@@ -275,9 +284,14 @@ class TransferListingsCommand extends Command
             $mapped = $this->mapItemToListing($item);
             $mappedItems[] = $mapped;
             
-            // Сохраняем связь с метро для последующей вставки
-            if (!empty($item['metro_id'])) {
-                $metroLinks[$item['id']] = $item['metro_id'];
+            // Сохраняем связь с метро для последующей вставки (по hh_line_id и hh_station_id)
+            if (!empty($item['hh_station_id']) && !empty($item['hh_line_id'])) {
+                $metroLinks[$item['id']] = [
+                    'line_id'    => $item['hh_line_id'],
+                    'station_id' => $item['hh_station_id'],
+                    'walk_time'  => $item['metro_walk_time'] ?? null,
+                    'distance'   => $item['metro_distance'] ?? null,
+                ];
             }
         }
 
@@ -285,7 +299,7 @@ class TransferListingsCommand extends Command
         DB::table('listings')->upsert(
             $mappedItems,
             ['source_id', 'external_id'],  // Уникальный ключ
-            ['phone', 'price', 'is_paid', 'updated_at']  // Поля для обновления
+            ['phone', 'phone_unavailable', 'price', 'price_history', 'is_paid', 'updated_at']  // Поля для обновления
         );
 
         // Вставляем связи с метро
@@ -315,18 +329,22 @@ class TransferListingsCommand extends Command
             'external_id'       => (string) $item['id'],
             'source_id'         => $item['source_id'],
             'category_id'       => self::DEFAULT_CATEGORY_ID,
-            'listing_status_id' => self::DEFAULT_LISTING_STATUS_ID,  // Всегда "Новое"
+            'listing_status_id' => $item['raised_id'],
             'location_id'       => self::DEFAULT_LOCATION_ID,        // Москва и область
             'title'             => $title,
             'address'           => $item['address'] ?? null,
             'price'             => $item['price'] ?? null,
             'phone'             => $item['phone'] ?? null,
+            'phone_unavailable' => (bool) ($item['phone_unavailable'] ?? false),
             'url'               => $url,
             'lat'               => $item['lat'] ?? null,
             'lng'               => $item['lng'] ?? null,
             'room_id'           => $roomId,
             'square_meters'     => $item['square_meters'] ?? null,
             'floors_total'      => $item['total_floors'] ?? null,
+            'description'       => $item['description'] ?? null,
+            'city'              => $item['city_name'] ?? null,
+            'price_history'     => $item['price_history'] ?? null,
             'floor'             => $item['floor'] ?? null,
             'street'            => $item['street'] ?? null,
             'house'             => $item['house'] ?? null,
@@ -337,50 +355,104 @@ class TransferListingsCommand extends Command
     }
 
     /**
-     * Вставка связей объявлений с метро
+     * Вставка связей объявлений с метро (batch)
+     * 
+     * @param array $metroLinks Массив [external_id => ['line_id' => string, 'station_id' => string, 'walk_time' => string|null, 'distance' => string|null]]
      */
     private function insertMetroLinks(array $metroLinks): void
     {
-        if (empty($metroLinks)) {
+        if (empty($metroLinks) || empty($this->metroStationsCache)) {
             return;
         }
 
-        foreach ($metroLinks as $externalId => $metroId) {
-            try {
-                // Находим listing_id по external_id
-                $listing = DB::table('listings')
-                    ->where('external_id', (string) $externalId)
-                    ->first(['id']);
-
-                if (!$listing) {
-                    continue;
-                }
-
-                // Проверяем, существует ли станция метро
-                $metroExists = DB::table('metro_stations')
-                    ->where('id', $metroId)
-                    ->exists();
-
-                if (!$metroExists) {
-                    continue;
-                }
-
-                // Генерируем случайное время пешком до метро (1-15 минут)
-                $travelTimeMin = random_int(1, 15);
-                
-                // Вставляем связь (игнорируем дубликаты)
-                DB::table('listing_metro')->insertOrIgnore([
-                    'listing_id'       => $listing->id,
-                    'metro_station_id' => $metroId,
-                    'travel_time_min'  => $travelTimeMin,
-                    'travel_type'      => 'walk',
-                    'created_at'       => Carbon::now(),
-                    'updated_at'       => Carbon::now(),
-                ]);
-            } catch (Throwable) {
-                // Игнорируем ошибки вставки метро
+        try {
+            // 1. Собираем все external_id для batch-запроса
+            $externalIds = array_map('strval', array_keys($metroLinks));
+            
+            // 2. Получаем все listing_id одним запросом
+            $listings = DB::table('listings')
+                ->whereIn('external_id', $externalIds)
+                ->pluck('id', 'external_id'); // ['external_id' => id]
+            
+            if ($listings->isEmpty()) {
+                return;
             }
+            
+            // 3. Формируем массив для batch-вставки
+            $insertData = [];
+            $now = Carbon::now();
+            
+            foreach ($metroLinks as $externalId => $metroData) {
+                $lineId = $metroData['line_id'];
+                $stationId = $metroData['station_id'];
+                
+                if (empty($lineId) || empty($stationId)) {
+                    continue;
+                }
+                
+                // Ищем станцию метро в кэше
+                $metroStationId = $this->findMetroStationId((string) $lineId, (string) $stationId);
+                if (!$metroStationId) {
+                    continue;
+                }
+                
+                // Ищем listing_id в результатах запроса
+                $listingId = $listings->get((string) $externalId);
+                if (!$listingId) {
+                    continue;
+                }
+                
+                $insertData[] = [
+                    'listing_id'       => $listingId,
+                    'metro_station_id' => $metroStationId,
+                    'travel_time_min'  => $this->parseWalkTime($metroData['walk_time'] ?? null),
+                    'distance'         => $metroData['distance'] ?? null,
+                    'travel_type'      => 'walk',
+                    'created_at'       => $now,
+                    'updated_at'       => $now,
+                ];
+            }
+            
+            // 4. Batch upsert всех связей одним запросом
+            if (!empty($insertData)) {
+                DB::table('listing_metro')->upsert(
+                    $insertData,
+                    ['listing_id', 'metro_station_id'],
+                    ['travel_time_min', 'distance', 'updated_at']
+                );
+            }
+        } catch (Throwable) {
+            // Игнорируем ошибки вставки метро
         }
+    }
+
+    /**
+     * Парсинг времени пешком из строки
+     * 
+     * Примеры: "11–15 мин." -> 13, "5 мин." -> 5, "20-25 мин" -> 22
+     * 
+     * @param string|null $walkTimeStr Строка с временем
+     * @return int|null Время в минутах или null
+     */
+    private function parseWalkTime(?string $walkTimeStr): ?int
+    {
+        if (empty($walkTimeStr)) {
+            return null;
+        }
+        
+        // Ищем диапазон: "11–15", "20-25" (разные виды тире)
+        if (preg_match('/(\d+)[–\-−](\d+)/', $walkTimeStr, $matches)) {
+            $min = (int) $matches[1];
+            $max = (int) $matches[2];
+            return (int) round(($min + $max) / 2); // Среднее значение
+        }
+        
+        // Ищем одиночное число: "5 мин"
+        if (preg_match('/(\d+)/', $walkTimeStr, $matches)) {
+            return (int) $matches[1];
+        }
+        
+        return null;
     }
 
     /**
@@ -506,6 +578,43 @@ class TransferListingsCommand extends Command
             $this->logger->warning('Не удалось загрузить паттерны комнат: ' . $e->getMessage(), [], self::COMMAND_NAME);
             // Продолжаем работу без паттернов — room_id будет null
         }
+    }
+
+    /**
+     * Загрузка станций метро в кэш
+     * Ключ: "line_id:station_id", значение: id станции в локальной БД
+     */
+    private function loadMetroStations(): void
+    {
+        try {
+            $stations = DB::table('metro_stations')
+                ->whereNotNull('line_id')
+                ->whereNotNull('station_id')
+                ->get(['id', 'line_id', 'station_id']);
+            
+            foreach ($stations as $station) {
+                $key = $station->line_id . ':' . $station->station_id;
+                $this->metroStationsCache[$key] = $station->id;
+            }
+            
+            $this->logger->info('Загружено станций метро в кэш: ' . count($this->metroStationsCache), [], self::COMMAND_NAME);
+        } catch (Throwable $e) {
+            $this->logger->warning('Не удалось загрузить станции метро: ' . $e->getMessage(), [], self::COMMAND_NAME);
+            // Продолжаем работу без кэша — связи с метро не будут создаваться
+        }
+    }
+
+    /**
+     * Поиск станции метро в кэше по line_id и station_id
+     * 
+     * @param string $lineId ID линии из API hh.ru
+     * @param string $stationId ID станции из API hh.ru
+     * @return int|null ID станции в локальной БД или null
+     */
+    private function findMetroStationId(string $lineId, string $stationId): ?int
+    {
+        $key = $lineId . ':' . $stationId;
+        return $this->metroStationsCache[$key] ?? null;
     }
 
     /**

@@ -30,17 +30,23 @@ class SubscriptionService
     }
     
     /**
-     * Получает цену тарифа для указанной локации
+     * Получает цену тарифа для указанной локации и категории
      * 
      * @param int $tariffId ID тарифа
      * @param int $locationId ID локации
+     * @param int|null $categoryId ID категории (опционально)
      * @return float|null Цена или null, если не найдена
      */
-    public function getTariffPrice(int $tariffId, int $locationId): ?float
+    public function getTariffPrice(int $tariffId, int $locationId, ?int $categoryId = null): ?float
     {
-        $priceRecord = TariffPrice::where('tariff_id', $tariffId)
-            ->where('location_id', $locationId)
-            ->first();
+        $query = TariffPrice::where('tariff_id', $tariffId)
+            ->where('location_id', $locationId);
+        
+        if ($categoryId !== null) {
+            $query->where('category_id', $categoryId);
+        }
+        
+        $priceRecord = $query->first();
         
         if ($priceRecord) {
             return (float)$priceRecord->price;

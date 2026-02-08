@@ -10,9 +10,16 @@ use App\Services\UserSettingsService;
 use App\Services\SubscriptionService;
 use App\Services\LogService;
 use App\Services\UserService;
+use App\Services\ListingFilterService;
+use App\Services\PhotoTaskService;
+use App\Services\QrCodeService;
+use App\Controllers\AnalyticsController;
 use App\Controllers\AuthController;
 use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
+use App\Controllers\ListingController;
+use App\Controllers\FavoriteController;
+use App\Controllers\PhotoTaskController;
 use DI\ContainerBuilder;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
@@ -71,6 +78,18 @@ return function (array $config) {
             return new UserService();
         }),
         
+        ListingFilterService::class => factory(function (ContainerInterface $c) {
+            return new ListingFilterService();
+        }),
+        
+        PhotoTaskService::class => factory(function (ContainerInterface $c) {
+            return new PhotoTaskService($c->get(LoggerInterface::class));
+        }),
+        
+        QrCodeService::class => factory(function (ContainerInterface $c) {
+            return new QrCodeService($c->get(LoggerInterface::class));
+        }),
+        
         /** Контроллеры */
         AuthController::class => factory(function (ContainerInterface $c) {
             return new AuthController($c);
@@ -82,6 +101,26 @@ return function (array $config) {
         
         UserController::class => factory(function (ContainerInterface $c) {
             return new UserController($c);
+        }),
+        
+        ListingController::class => factory(function (ContainerInterface $c) {
+            return new ListingController($c);
+        }),
+        
+        FavoriteController::class => factory(function (ContainerInterface $c) {
+            return new FavoriteController(
+                $c->get(ListingFilterService::class)
+            );
+        }),
+        
+        PhotoTaskController::class => factory(function (ContainerInterface $c) {
+            return new PhotoTaskController(
+                $c->get(PhotoTaskService::class)
+            );
+        }),
+        
+        AnalyticsController::class => factory(function (ContainerInterface $c) {
+            return new AnalyticsController($c);
         }),
         
         /** Конфигурация */

@@ -83,12 +83,16 @@ class MetroStationsParserCommand extends Command
 
                 foreach ($data['lines'] AS $line) {
                     $hex_color = $line['hex_color'];
-                    $name = $line['name'];
+                    $lineName = $line['name'];
+                    $lineId = $line['id'] ?? null; // ID линии из API hh.ru (например: 137)
+                    
                     foreach ($line['stations'] AS $station) {
                         $values = [
                             'location_id' => $location->id,
                             'name' => $station['name'],
-                            'line' => $name,
+                            'line' => $lineName,
+                            'line_id' => $lineId,
+                            'station_id' => $station['id'] ?? null, // ID станции из API hh.ru (например: 137.961)
                             'color' => $hex_color,
                             'lat' => $station['lat'],
                             'lng' => $station['lng'],
@@ -137,22 +141,16 @@ class MetroStationsParserCommand extends Command
         return $data[$cityName] ?? null;
     }
     
-    // Сохранение станции метро в базу данных
-    private function saveMetroStation(array $values)
+    // Сохранение станции метро в базу данных (upsert)
+    private function saveMetroStation(array $values): void
     {
-        // Проверяем, есть ли уже такая станция
-        $exists = Manager::table('metro_stations')
-            ->where('location_id', $values['location_id'])
-            ->where('name', $values['name'])
-            ->where('line', $values['line'])
-            ->exists();
-
-        if ($exists) {
-            return;
-        }
-
         try {
-            Manager::table('metro_stations')->insert($values);
+            // Используем upsert для вставки или обновления
+            Manager::table('metro_stations')->upsert(
+                [$values],
+                ['location_id', 'name', 'line'], // Уникальный ключ
+                ['line_id', 'station_id', 'color', 'lat', 'lng'] // Поля для обновления
+            );
 
         } catch (Exception $e) {
             $this->logger->error("Ошибка при сохранении станции {$values['name']}", [

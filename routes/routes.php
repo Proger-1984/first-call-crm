@@ -1,8 +1,14 @@
 <?php
 
 use App\Controllers\AdminSubscriptionController;
+use App\Controllers\AnalyticsController;
 use App\Controllers\AuthController;
+use App\Controllers\FavoriteController;
+use App\Controllers\FavoriteStatusController;
+use App\Controllers\FilterController;
+use App\Controllers\ListingController;
 use App\Controllers\LocationPolygonController;
+use App\Controllers\PhotoTaskController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
@@ -107,6 +113,7 @@ return function (App $app) {
          * Отмена подписки - cancelSubscription
          */
         $group->group('/admin/subscriptions', function (RouteCollectorProxy $group) use ($container) {
+            $group->post('/create', [AdminSubscriptionController::class, 'createSubscription']);
             $group->post('/activate', [AdminSubscriptionController::class, 'activateSubscription']);
             $group->post('/extend', [AdminSubscriptionController::class, 'extendSubscription']);
             $group->post('/cancel', [AdminSubscriptionController::class, 'cancelSubscription']);
@@ -126,6 +133,77 @@ return function (App $app) {
                 $group->post('/current-subscriptions', [BillingController::class, 'getCurrentSubscriptions']);
                 $group->post('/subscription-history', [BillingController::class, 'getSubscriptionHistory']);
             });
+        })->add(new AuthMiddleware($container));
+
+        /** Маршруты для аналитики (только для администраторов)
+         * Получение данных для графиков - getChartsData
+         * Получение сводной статистики - getSummary
+         */
+        $group->group('/admin/analytics', function (RouteCollectorProxy $group) {
+            $group->post('/charts', [AnalyticsController::class, 'getChartsData']);
+            $group->get('/summary', [AnalyticsController::class, 'getSummary']);
+        })->add(new AuthMiddleware($container));
+
+        /** Маршруты для получения данных фильтров
+         * Возвращает категории, локации, метро, комнаты, источники, статусы
+         * с учётом подписок пользователя
+         */
+        $group->group('/filters', function (RouteCollectorProxy $group) {
+            $group->get('', [FilterController::class, 'getFilters']);
+        })->add(new AuthMiddleware($container));
+
+        /** Маршруты для работы с объявлениями
+         * Получение списка объявлений с фильтрацией и пагинацией - getListings
+         * Получение статистики по объявлениям - getStats
+         * Получение одного объявления по ID - getListing
+         * Обновление статуса объявления - updateStatus
+         */
+        $group->group('/listings', function (RouteCollectorProxy $group) {
+            $group->post('', [ListingController::class, 'getListings']);
+            $group->get('/stats', [ListingController::class, 'getStats']);
+            $group->get('/{id:[0-9]+}', [ListingController::class, 'getListing']);
+            $group->patch('/{id:[0-9]+}/status', [ListingController::class, 'updateStatus']);
+        })->add(new AuthMiddleware($container));
+
+        /**
+         * Маршруты для обработки фото (удаление водяных знаков)
+         * Создать задачу - create
+         * Скачать архив - download
+         */
+        $group->group('/photo-tasks', function (RouteCollectorProxy $group) {
+            $group->post('', [PhotoTaskController::class, 'create']);
+            $group->get('/{id:[0-9]+}/download', [PhotoTaskController::class, 'download']);
+        })->add(new AuthMiddleware($container));
+
+        /** Маршруты для работы с избранным
+         * Получение списка избранных объявлений - index
+         * Добавить/удалить из избранного (toggle) - toggle
+         * Проверить, в избранном ли объявление - check
+         * Получить количество избранных - count
+         * Обновить комментарий - updateComment
+         * Обновить статус избранного - updateStatus
+         * 
+         * Управление пользовательскими статусами:
+         * Получить все статусы - FavoriteStatusController::index
+         * Создать статус - FavoriteStatusController::create
+         * Обновить статус - FavoriteStatusController::update
+         * Удалить статус - FavoriteStatusController::delete
+         * Изменить порядок статусов - FavoriteStatusController::reorder
+         */
+        $group->group('/favorites', function (RouteCollectorProxy $group) {
+            $group->get('', [FavoriteController::class, 'index']);
+            $group->post('/toggle', [FavoriteController::class, 'toggle']);
+            $group->get('/check/{id:[0-9]+}', [FavoriteController::class, 'check']);
+            $group->get('/count', [FavoriteController::class, 'count']);
+            $group->put('/comment', [FavoriteController::class, 'updateComment']);
+            $group->put('/status', [FavoriteController::class, 'updateStatus']);
+            
+            // Управление статусами
+            $group->get('/statuses', [FavoriteStatusController::class, 'index']);
+            $group->post('/statuses', [FavoriteStatusController::class, 'create']);
+            $group->put('/statuses/reorder', [FavoriteStatusController::class, 'reorder']);
+            $group->put('/statuses/{id:[0-9]+}', [FavoriteStatusController::class, 'update']);
+            $group->delete('/statuses/{id:[0-9]+}', [FavoriteStatusController::class, 'delete']);
         })->add(new AuthMiddleware($container));
 
     });

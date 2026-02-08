@@ -1,0 +1,181 @@
+/* Обёртка тултипа — не влияет на layout */
+.tooltip-wrapper {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Сам тултип */
+.custom-tooltip {
+    position: fixed;
+    z-index: 99999;
+    padding: 10px 14px;
+    background: #ffffff;
+    color: #333333;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
+    font-size: 13px;
+    line-height: 1.5;
+    pointer-events: none;
+    opacity: 0;
+    animation: customTooltipFadeIn 0.15s ease-out forwards;
+}
+
+@keyframes customTooltipFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Позиционирование относительно точки */
+.custom-tooltip-top {
+    transform: translate(-50%, -100%);
+}
+
+.custom-tooltip-bottom {
+    transform: translate(-50%, 0);
+}
+
+.custom-tooltip-left {
+    transform: translate(-100%, -50%);
+}
+
+.custom-tooltip-right {
+    transform: translate(0, -50%);
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tooltip-top {
+    animation: tooltipFadeInTop 0.15s ease-out;
+}
+
+.tooltip-bottom {
+    animation: tooltipFadeInBottom 0.15s ease-out;
+}
+
+@keyframes tooltipFadeInTop {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes tooltipFadeInBottom {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Стили для контента тултипа истории цен */
+.price-history-tooltip {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.price-history-tooltip-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 2px;
+}
+
+.price-history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.price-history-date {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.price-history-value {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.price-history-price {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.price-history-diff {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.price-history-diff.up {
+    color: #d32f2f;
+    background: rgba(211, 47, 47, 0.1);
+}
+
+.price-history-diff.down {
+    color: #2e7d32;
+    background: rgba(46, 125, 50, 0.1);
+}
+
+.price-history-diff.neutral {
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+}
+
+/* Тултип для иконок в хедере */
+.header-tooltip {
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.header-tooltip-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.header-tooltip-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.header-tooltip-status .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.header-tooltip-status .status-dot.online {
+    background: var(--success);
+}
+
+.header-tooltip-status .status-dot.offline {
+    background: var(--danger);
+}

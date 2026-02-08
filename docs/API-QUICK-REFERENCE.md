@@ -165,10 +165,14 @@ Content-Type: application/json
 
 {
   "subscription_id": 1,
-  "tariff_id": 2,
+  "tariff_id": 2,       // опционально, по умолчанию текущий тариф подписки
   "notes": "комментарий"
 }
+
+Response: { subscription_id, new_status: "extend_pending" }
 ```
+Примечание: После отправки заявки статус подписки меняется на `extend_pending`. 
+Подписка продолжает работать. Повторная заявка невозможна пока статус `extend_pending`.
 
 ## 📍 Локации (полигоны)
 
@@ -271,6 +275,143 @@ Content-Type: application/json
 }
 ```
 
+### Создать подписку для пользователя
+```http
+POST /api/v1/admin/subscriptions/create
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "user_id": 1,
+  "tariff_id": 2,
+  "category_id": 1,
+  "location_id": 1,
+  "payment_method": "card|cash|transfer",
+  "notes": "миграция со старой CRM",  // опционально
+  "duration_hours": 720,               // опционально, по умолчанию из тарифа
+  "price": 5000,                       // опционально, по умолчанию из тарифа
+  "auto_activate": true                // опционально, по умолчанию true
+}
+
+Response: { subscription_id, status, start_date, end_date }
+```
+Примечание: Используется для миграции пользователей со старой CRM или ручного создания подписок.
+
+## ⭐ Избранное
+
+### Получить список избранного
+```http
+GET /api/v1/favorites?page=1&per_page=20&order=desc&date_from=2026-01-01&date_to=2026-01-31&comment=текст&status_id=1
+Authorization: Bearer {access_token}
+
+Response: {
+  listings: [ { id, title, price, phone, address, comment, status, ... } ],
+  pagination: { page, per_page, total, total_pages }
+}
+```
+
+### Добавить/удалить из избранного (toggle)
+```http
+POST /api/v1/favorites/toggle
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{ "listing_id": 123 }
+
+Response: { is_favorite: true|false }
+```
+
+### Проверить, в избранном ли объявление
+```http
+GET /api/v1/favorites/check/{listing_id}
+Authorization: Bearer {access_token}
+
+Response: { is_favorite: true|false }
+```
+
+### Получить количество избранных
+```http
+GET /api/v1/favorites/count
+Authorization: Bearer {access_token}
+
+Response: { count: 15 }
+```
+
+### Обновить комментарий
+```http
+PUT /api/v1/favorites/comment
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{ "listing_id": 123, "comment": "Текст комментария (max 250)" }
+
+Response: { message: "Комментарий обновлён" }
+```
+
+### Обновить статус объявления
+```http
+PUT /api/v1/favorites/status
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{ "listing_id": 123, "status_id": 1 }  // status_id: null для сброса
+
+Response: { message: "Статус обновлён", status: { id, name, color } }
+```
+
+### Получить пользовательские статусы
+```http
+GET /api/v1/favorites/statuses
+Authorization: Bearer {access_token}
+
+Response: {
+  statuses: [ { id, name, color, sort_order, favorites_count } ]
+}
+```
+
+### Создать статус
+```http
+POST /api/v1/favorites/statuses
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{ "name": "Название", "color": "#FF5733" }
+
+Response: { status: { id, name, color, sort_order } }
+```
+
+### Обновить статус
+```http
+PUT /api/v1/favorites/statuses/{id}
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{ "name": "Новое название", "color": "#00FF00" }
+
+Response: { status: { id, name, color } }
+```
+
+### Удалить статус
+```http
+DELETE /api/v1/favorites/statuses/{id}
+Authorization: Bearer {access_token}
+
+Response: { message: "Статус удалён" }
+```
+
+### Изменить порядок статусов
+```http
+PUT /api/v1/favorites/statuses/reorder
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{ "order": [3, 1, 2] }  // массив ID в нужном порядке
+
+Response: { message: "Порядок обновлён" }
+```
+
+---
+
 ## 💰 Биллинг
 
 ### Получить подписки пользователя
@@ -310,6 +451,157 @@ Content-Type: application/json
   "date_to": "2024-12-31"
 }
 ```
+
+## 📊 Аналитика (только админ)
+
+### Получить данные для графиков
+```http
+POST /api/v1/admin/analytics/charts
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "period": "week|month|quarter|year",  // по умолчанию week
+  "date_from": "01.01.2026",            // опционально, формат DD.MM.YYYY
+  "date_to": "31.01.2026"               // опционально
+}
+
+Response: {
+  period: { from, to, group_by },
+  chart_data: [ { date, label, revenue, users, subscriptions } ],
+  totals: { revenue, users, subscriptions }
+}
+```
+Примечание: Данные админов исключены из статистики.
+
+### Получить сводную статистику
+```http
+GET /api/v1/admin/analytics/summary
+Authorization: Bearer {access_token}
+
+Response: {
+  revenue: { today, week, month },
+  users: { today, week, month, total },
+  subscriptions: { today, week, month, active }
+}
+```
+Примечание: Учитываются только активные подписки. Админы исключены из статистики.
+
+## 📋 Объявления
+
+### Получить список объявлений
+```http
+POST /api/v1/listings
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "page": 1,
+  "per_page": 10,
+  "sort": "created_at",
+  "order": "desc",
+  "date_from": "2026-01-01",
+  "date_to": "2026-01-31",
+  "status": "new",
+  "source_id": [1, 2],
+  "category_id": 1,
+  "location_id": [1, 2],
+  "price_from": 30000,
+  "price_to": 100000,
+  "room_id": [1, 2],
+  "metro_id": [1, 2, 3],
+  "phone": "79001234567",
+  "external_id": "123456",
+  "call_status_id": [0, 1]
+}
+
+Response: {
+  data: {
+    listings: [ { id, title, price, phone, address, ... } ],
+    pagination: { total, page, per_page, total_pages },
+    stats: { new_count, raised_count, ... }
+  }
+}
+```
+
+### Получить одно объявление
+```http
+GET /api/v1/listings/{id}
+Authorization: Bearer {access_token}
+
+Response: { data: { listing: { id, title, price, phone, address, metro, ... } } }
+```
+
+### Обновить статус объявления
+```http
+PATCH /api/v1/listings/{id}/status
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{ "status": "new" }
+
+Response: { message: "Статус объявления успешно обновлён", data: { listing } }
+```
+
+### Получить статистику объявлений
+```http
+GET /api/v1/listings/stats
+Authorization: Bearer {access_token}
+
+Response: { data: { new_count, raised_count, ... } }
+```
+
+---
+
+## 🔍 Фильтры
+
+### Получить данные для фильтров
+```http
+GET /api/v1/filters?category_id=1&location_id[]=1&location_id[]=2
+Authorization: Bearer {access_token}
+
+Response: {
+  data: {
+    categories: [ { id, name } ],
+    locations: [ { id, name } ],
+    metro: [ { id, name, line, color } ],
+    rooms: [ { id, name, code } ],
+    sources: [ { id, name } ],
+    call_statuses: [ { id, name, color } ],
+    meta: { is_admin, selected_category_id, selected_location_ids }
+  }
+}
+```
+Примечание: Обычный пользователь видит только категории/локации по своим подпискам. Админ видит всё.
+
+---
+
+## 📷 Обработка фото
+
+### Создать задачу на обработку фото
+```http
+POST /api/v1/photo-tasks
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{ "listing_id": 123 }
+
+Response: {
+  code: 201,
+  data: { id, listing_id, status, photos_count, archive_path }
+}
+```
+Примечание: Удаление водяных знаков с фото объявления. Одна задача на объявление.
+
+### Скачать архив с фото
+```http
+GET /api/v1/photo-tasks/{id}/download
+Authorization: Bearer {access_token}
+
+Response: ZIP файл (application/zip)
+```
+
+---
 
 ## 📊 Коды ответов
 
@@ -373,6 +665,7 @@ Authorization: Bearer {refresh_token}
 |--------|----------|
 | pending | Ожидает подтверждения администратором |
 | active | Активна, пользователь имеет доступ |
+| extend_pending | Ожидает продления (подписка работает, заявка отправлена) |
 | expired | Истекла |
 | cancelled | Отменена администратором или пользователем |
 

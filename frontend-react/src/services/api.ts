@@ -2,10 +2,11 @@ import axios, { AxiosError } from 'axios';
 import type { 
   User, 
   Listing, 
-  Stats, 
+  ListingsStats, 
   Tariff, 
   Subscription,
   FilterParams,
+  SortParams,
   PaginationParams,
   ApiResponse,
   PaginatedResponse,
@@ -14,7 +15,8 @@ import type {
   RefreshTokenResponse,
   UserSettingsResponse,
   UserSubscriptionFull,
-  TariffInfoResponse
+  TariffInfoResponse,
+  ListingStatusCode
 } from '../types';
 
 // Флаг для предотвращения множественных refresh запросов
@@ -72,7 +74,7 @@ api.interceptors.response.use(
     
     // Если уже идёт refresh - ждём его завершения
     if (isRefreshing) {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         subscribeTokenRefresh((token: string) => {
           originalRequest.headers.Authorization = `Bearer ${token}`;
           resolve(api(originalRequest));
@@ -89,21 +91,36 @@ api.interceptors.response.use(
         { withCredentials: true }
       );
       
-      const { access_token } = response.data;
+      // Поддержка и плоского ответа { access_token }, и обёртки { data: { access_token } }
+      const access_token =
+        response.data?.access_token ??
+        (response.data as any)?.data?.access_token;
+
+      if (!access_token) {
+        throw new Error('Refresh response missing access_token');
+      }
       
       // Сохраняем новый токен
       localStorage.setItem('access_token', access_token);
       
-      // Уведомляем всех ожидающих
+      // Обновляем заголовок для ТЕКУЩЕГО запроса
+      originalRequest.headers.Authorization = `Bearer ${access_token}`;
+      
+      // Уведомляем всех ожидающих (они тоже получат новый токен)
       onTokenRefreshed(access_token);
       
-      // Повторяем оригинальный запрос
-      originalRequest.headers.Authorization = `Bearer ${access_token}`;
+      // Сбрасываем флаг ПЕРЕД повторным запросом
+      isRefreshing = false;
+      
+      // Повторяем оригинальный запрос с новым токеном
       return api(originalRequest);
       
-    } catch (refreshError) {
-      // Refresh не удался - очищаем токен и редиректим на логин
+    } catch (refreshError: any) {
+      // Refresh не удался - полностью очищаем состояние авторизации
       localStorage.removeItem('access_token');
+      localStorage.removeItem('auth-storage'); // zustand persist, чтобы после редиректа не было «призрачной» авторизации
+      
+      isRefreshing = false;
       
       // Редирект только если мы не на странице логина
       if (!window.location.pathname.includes('/login')) {
@@ -111,8 +128,6 @@ api.interceptors.response.use(
       }
       
       return Promise.reject(refreshError);
-    } finally {
-      isRefreshing = false;
     }
   }
 );
@@ -172,22 +187,33 @@ export const authApi = {
 
 // === LISTINGS ===
 export const listingsApi = {
-  getAll: (filters?: FilterParams, pagination?: PaginationParams) =>
-    api.get<ApiResponse<PaginatedResponse<Listing>>>('/listings', { 
-      params: { ...filters, ...pagination } 
-    }),
+  /**
+   * Получить список объявлений с фильтрацией, сортировкой и пагинацией
+   * POST /api/v1/listings
+   */
+  getAll: (params?: FilterParams & SortParams & PaginationParams) =>
+    api.post<ApiResponse<PaginatedResponse<Listing>>>('/listings', params),
   
+  /**
+   * Получить одно объявление по ID
+   * GET /api/v1/listings/{id}
+   */
   getById: (id: number) =>
-    api.get<ApiResponse<Listing>>(`/listings/${id}`),
+    api.get<ApiResponse<{ listing: Listing }>>(`/listings/${id}`),
   
-  updateStatus: (id: number, status: string) =>
-    api.patch<ApiResponse<Listing>>(`/listings/${id}/status`, { status }),
+  /**
+   * Обновить статус объявления
+   * PATCH /api/v1/listings/{id}/status
+   */
+  updateStatus: (id: number, status: ListingStatusCode) =>
+    api.patch<ApiResponse<{ listing: Listing }>>(`/listings/${id}/status`, { status }),
   
-  toggleFavorite: (id: number) =>
-    api.post<ApiResponse<Listing>>(`/listings/${id}/favorite`),
-  
+  /**
+   * Получить статистику по объявлениям
+   * GET /api/v1/listings/stats
+   */
   getStats: () =>
-    api.get<ApiResponse<Stats>>('/listings/stats'),
+    api.get<ApiResponse<ListingsStats>>('/listings/stats'),
 };
 
 // === USER ===
@@ -251,40 +277,10 @@ export const profileApi = {
   /**
    * Скачать приложение для Android
    * GET /api/v1/me/download/android
-   * Возвращает файл APK
+   * Возвращает файл APK как blob
    */
-  downloadAndroidApp: () => {
-    const token = localStorage.getItem('access_token');
-    const baseUrl = import.meta.env.VITE_API_URL || '/api/v1';
-    
-    // Создаём скрытую ссылку для скачивания с токеном
-    const link = document.createElement('a');
-    link.href = `${baseUrl}/me/download/android`;
-    link.download = 'FirstCall.apk';
-    
-    // Для авторизованного скачивания используем fetch + blob
-    return fetch(`${baseUrl}/me/download/android`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Ошибка скачивания');
-      }
-      return response.blob();
-    })
-    .then(blob => {
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'FirstCall.apk';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    });
-  },
+  downloadAndroidApp: () =>
+    api.get('/me/download/android', { responseType: 'blob' }),
   
   /**
    * Перепривязка Telegram аккаунта
@@ -414,6 +410,54 @@ export const tariffsApi = {
     api.get<ApiResponse<Tariff>>(`/tariffs/${id}`),
 };
 
+// === FILTERS ===
+export interface FilterOption {
+  id: number;
+  name: string;
+  code?: string;
+  line?: string;
+  color?: string;
+}
+
+export interface FiltersData {
+  categories: FilterOption[];
+  locations: FilterOption[];
+  metro: FilterOption[];
+  rooms: FilterOption[];
+  sources: FilterOption[];
+  call_statuses: FilterOption[];
+  meta: {
+    is_admin: boolean;
+    selected_category_id: number | null;
+    selected_location_ids: number[] | null;
+  };
+}
+
+export const filtersApi = {
+  /**
+   * Получить данные для фильтров
+   * GET /api/v1/filters
+   * 
+   * Возвращает категории, локации, метро, комнаты, источники, статусы
+   * с учётом подписок пользователя
+   * 
+   * @param categoryId - выбранная категория (для фильтрации локаций)
+   * @param locationIds - выбранные локации (для фильтрации метро), может быть массивом
+   */
+  getFilters: (categoryId?: number, locationIds?: number[]) => {
+    const params = new URLSearchParams();
+    if (categoryId) params.append('category_id', categoryId.toString());
+    
+    // Поддержка массива локаций
+    if (locationIds && locationIds.length > 0) {
+      locationIds.forEach(id => params.append('location_id[]', id.toString()));
+    }
+    
+    const queryString = params.toString();
+    return api.get<ApiResponse<FiltersData>>(`/filters${queryString ? `?${queryString}` : ''}`);
+  },
+};
+
 // === LOCATION POLYGONS ===
 export interface LocationPolygon {
   id: number;
@@ -470,6 +514,490 @@ export const polygonsApi = {
    */
   delete: (id: number) =>
     api.delete<ApiResponse<{ message: string }>>(`/location-polygons/${id}`),
+};
+
+// === FAVORITES ===
+export interface FavoriteStatus {
+  id: number;
+  name: string;
+  color: string;
+  sort_order?: number;
+  favorites_count?: number;
+}
+
+export interface FavoriteListing {
+  id: number;
+  external_id: string;
+  title: string;
+  description?: string;
+  price: number | null;
+  square_meters: number | null;
+  floor: number | null;
+  floors_total: number | null;
+  phone: string | null;
+  address: string;
+  city: string | null;
+  street: string | null;
+  house: string | null;
+  url: string | null;
+  is_paid: boolean;
+  status: FavoriteStatus | null;
+  created_at: string;
+  favorited_at: string;
+  is_favorite: boolean;
+  comment: string | null;
+  source?: { id: number; name: string };
+  category?: { id: number; name: string };
+  listing_status?: { id: number; name: string };
+  location?: { id: number; name: string };
+  room?: { id: number; name: string; code: string };
+  metro?: Array<{
+    id: number;
+    name: string;
+    line: string;
+    color: string;
+    travel_time_min: number | null;
+    travel_type: string;
+  }>;
+}
+
+export interface FavoritesResponse {
+  listings: FavoriteListing[];
+  pagination: {
+    page: number;
+    per_page: number;
+    total: number;
+    total_pages: number;
+  };
+}
+
+export interface ToggleFavoriteResponse {
+  listing_id: number;
+  is_favorite: boolean;
+  message: string;
+}
+
+export interface FavoritesFilters {
+  page?: number;
+  perPage?: number;
+  sortBy?: 'created_at' | 'source' | 'price' | 'status';
+  order?: 'asc' | 'desc';
+  dateFrom?: string;
+  dateTo?: string;
+  comment?: string;
+  statusId?: number | 'none';
+}
+
+export const favoritesApi = {
+  /**
+   * Получить список избранных объявлений
+   * GET /api/v1/favorites
+   */
+  getList: (filters: FavoritesFilters = {}) => {
+    const params = new URLSearchParams();
+    params.append('page', String(filters.page || 1));
+    params.append('per_page', String(filters.perPage || 20));
+    if (filters.sortBy) params.append('sort_by', filters.sortBy);
+    if (filters.order) params.append('order', filters.order);
+    if (filters.dateFrom) params.append('date_from', filters.dateFrom);
+    if (filters.dateTo) params.append('date_to', filters.dateTo);
+    if (filters.comment) params.append('comment', filters.comment);
+    if (filters.statusId !== undefined) params.append('status_id', String(filters.statusId));
+    return api.get<ApiResponse<FavoritesResponse>>(`/favorites?${params.toString()}`);
+  },
+  
+  /**
+   * Добавить/удалить из избранного (toggle)
+   * POST /api/v1/favorites/toggle
+   */
+  toggle: (listingId: number) =>
+    api.post<ApiResponse<ToggleFavoriteResponse>>('/favorites/toggle', { listing_id: listingId }),
+  
+  /**
+   * Проверить, в избранном ли объявление
+   * GET /api/v1/favorites/check/{id}
+   */
+  check: (listingId: number) =>
+    api.get<ApiResponse<{ listing_id: number; is_favorite: boolean }>>(`/favorites/check/${listingId}`),
+  
+  /**
+   * Получить количество избранных
+   * GET /api/v1/favorites/count
+   */
+  getCount: () =>
+    api.get<ApiResponse<{ count: number }>>('/favorites/count'),
+  
+  /**
+   * Обновить комментарий к избранному
+   * PUT /api/v1/favorites/comment
+   */
+  updateComment: (listingId: number, comment: string | null) =>
+    api.put<ApiResponse<{ listing_id: number; comment: string | null; message: string }>>('/favorites/comment', { 
+      listing_id: listingId, 
+      comment 
+    }),
+  
+  /**
+   * Обновить статус избранного
+   * PUT /api/v1/favorites/status
+   */
+  updateStatus: (listingId: number, statusId: number | null) =>
+    api.put<ApiResponse<{ listing_id: number; status: FavoriteStatus | null; message: string }>>('/favorites/status', { 
+      listing_id: listingId, 
+      status_id: statusId 
+    }),
+  
+  // === Управление статусами ===
+  
+  /**
+   * Получить все статусы пользователя
+   * GET /api/v1/favorites/statuses
+   */
+  getStatuses: () =>
+    api.get<ApiResponse<{ statuses: FavoriteStatus[] }>>('/favorites/statuses'),
+  
+  /**
+   * Создать новый статус
+   * POST /api/v1/favorites/statuses
+   */
+  createStatus: (name: string, color: string = '#808080') =>
+    api.post<ApiResponse<{ status: FavoriteStatus; message: string }>>('/favorites/statuses', { name, color }),
+  
+  /**
+   * Обновить статус
+   * PUT /api/v1/favorites/statuses/{id}
+   */
+  updateStatusInfo: (statusId: number, data: { name?: string; color?: string }) =>
+    api.put<ApiResponse<{ status: FavoriteStatus; message: string }>>(`/favorites/statuses/${statusId}`, data),
+  
+  /**
+   * Удалить статус
+   * DELETE /api/v1/favorites/statuses/{id}
+   */
+  deleteStatus: (statusId: number) =>
+    api.delete<ApiResponse<{ message: string }>>(`/favorites/statuses/${statusId}`),
+  
+  /**
+   * Изменить порядок статусов
+   * PUT /api/v1/favorites/statuses/reorder
+   */
+  reorderStatuses: (order: number[]) =>
+    api.put<ApiResponse<{ message: string }>>('/favorites/statuses/reorder', { order }),
+};
+
+// ============================================================================
+// Photo Tasks API (обработка фото - удаление водяных знаков)
+// ============================================================================
+
+export interface PhotoTask {
+  id: number;
+  listing_id: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  photos_count: number;
+  error_message: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export const photoTasksApi = {
+  /**
+   * Создать задачу на обработку фото
+   * POST /api/v1/photo-tasks
+   */
+  create: (listingId: number) =>
+    api.post<ApiResponse<PhotoTask>>('/photo-tasks', { listing_id: listingId }),
+
+  /**
+   * Получить URL для скачивания архива
+   * GET /api/v1/photo-tasks/{id}/download
+   */
+  getDownloadUrl: (taskId: number) =>
+    `${api.defaults.baseURL}/photo-tasks/${taskId}/download`,
+};
+
+// ============================================================================
+// Billing API (биллинг - подписки пользователя)
+// ============================================================================
+
+export interface BillingSubscription {
+  id: number;
+  created_at: string;
+  tariff_info: string;
+  status: 'active' | 'pending' | 'expired' | 'cancelled' | 'extend_pending';
+  days_left: string;
+  start_date: string | null;
+  end_date: string | null;
+}
+
+export interface BillingMeta {
+  total: number;
+  per_page: number;
+  current_page: number;
+  total_pages: number;
+  from: number;
+  to: number;
+}
+
+export interface BillingFilters {
+  page?: number;
+  per_page?: number;
+  filters?: {
+    subscription_id?: number;
+    status?: string[];
+    created_at?: {
+      from?: string;
+      to?: string;
+    };
+  };
+  sorting?: Record<string, 'asc' | 'desc'>;
+}
+
+export const billingApi = {
+  /**
+   * Получить подписки текущего пользователя
+   * POST /api/v1/billing/user-subscriptions
+   */
+  getUserSubscriptions: (filters: BillingFilters = {}) =>
+    api.post<ApiResponse<{ meta: BillingMeta; data: BillingSubscription[] }>>('/billing/user-subscriptions', filters),
+};
+
+// ============================================================================
+// Admin Billing API (биллинг - административная панель)
+// ============================================================================
+
+export interface AdminSubscription {
+  id: number;
+  created_at: string;
+  tariff_info: string;
+  telegram: string;
+  status: string;
+  payment_method: string | null;
+  admin_notes: string | null;
+  days_left: string;
+  start_date: string | null;
+  end_date: string | null;
+  user_id: number;
+  price_paid: number | null;
+}
+
+export interface SubscriptionHistoryItem {
+  id: number;
+  subscription_id: number;
+  user_id: number;
+  tariff_info: string;
+  old_status: string;
+  new_status: string;
+  price: number | null;
+  action_date: string;
+  notes: string | null;
+}
+
+export interface AdminBillingFilters {
+  page?: number;
+  per_page?: number;
+  filters?: {
+    subscription_id?: number;
+    user_id?: number;
+    tariff_id?: number;
+    status?: string[];
+    days_left_min?: number;
+    days_left_max?: number;
+    created_at?: {
+      from?: string;
+      to?: string;
+    };
+    action?: string[];
+    action_date?: {
+      from?: string;
+      to?: string;
+    };
+  };
+  sorting?: Record<string, 'asc' | 'desc'>;
+}
+
+export const adminBillingApi = {
+  /**
+   * Получить текущие подписки всех пользователей (админ)
+   * POST /api/v1/billing/admin/current-subscriptions
+   */
+  getCurrentSubscriptions: (filters: AdminBillingFilters = {}) =>
+    api.post<ApiResponse<{ meta: BillingMeta; data: AdminSubscription[] }>>('/billing/admin/current-subscriptions', filters),
+
+  /**
+   * Получить историю подписок (админ)
+   * POST /api/v1/billing/admin/subscription-history
+   */
+  getSubscriptionHistory: (filters: AdminBillingFilters = {}) =>
+    api.post<ApiResponse<{ meta: BillingMeta; data: SubscriptionHistoryItem[] }>>('/billing/admin/subscription-history', filters),
+
+  /**
+   * Активировать подписку (админ)
+   * POST /api/v1/admin/subscriptions/activate
+   * 
+   * @param subscriptionId - ID подписки для активации
+   * @param paymentMethod - Метод оплаты (обязательно)
+   * @param notes - Примечания администратора (опционально)
+   * @param durationHours - Продолжительность в часах (опционально, по умолчанию из тарифа)
+   */
+  activateSubscription: (
+    subscriptionId: number,
+    paymentMethod: string,
+    notes?: string,
+    durationHours?: number
+  ) =>
+    api.post<ApiResponse<{ activated_subscription: { id: number; start_date: string; end_date: string } }>>('/admin/subscriptions/activate', {
+      subscription_id: subscriptionId,
+      payment_method: paymentMethod,
+      notes,
+      duration_hours: durationHours,
+    }),
+
+  /**
+   * Продлить подписку (админ)
+   * POST /api/v1/admin/subscriptions/extend
+   * 
+   * @param subscriptionId - ID подписки для продления
+   * @param paymentMethod - Метод оплаты (обязательно)
+   * @param price - Цена продления (опционально)
+   * @param notes - Примечания администратора (опционально)
+   * @param durationHours - Продолжительность продления в часах (опционально)
+   */
+  extendSubscription: (
+    subscriptionId: number,
+    paymentMethod: string,
+    price?: number,
+    notes?: string,
+    durationHours?: number
+  ) =>
+    api.post<ApiResponse<{ message: string }>>('/admin/subscriptions/extend', {
+      subscription_id: subscriptionId,
+      payment_method: paymentMethod,
+      price,
+      notes,
+      duration_hours: durationHours,
+    }),
+
+  /**
+   * Отменить подписку (админ)
+   * POST /api/v1/admin/subscriptions/cancel
+   * 
+   * @param subscriptionId - ID подписки для отмены
+   * @param reason - Причина отмены (опционально)
+   */
+  cancelSubscription: (subscriptionId: number, reason?: string) =>
+    api.post<ApiResponse<{ message: string }>>('/admin/subscriptions/cancel', {
+      subscription_id: subscriptionId,
+      reason,
+    }),
+
+  /**
+   * Создать подписку для пользователя (админ)
+   * POST /api/v1/admin/subscriptions/create
+   * 
+   * Используется для миграции пользователей со старой CRM
+   * 
+   * @param userId - ID пользователя
+   * @param tariffId - ID тарифа
+   * @param categoryId - ID категории
+   * @param locationId - ID локации
+   * @param paymentMethod - Метод оплаты
+   * @param options - Дополнительные параметры
+   */
+  createSubscription: (
+    userId: number,
+    tariffId: number,
+    categoryId: number,
+    locationId: number,
+    paymentMethod: string,
+    options?: {
+      notes?: string;
+      durationHours?: number;
+      price?: number;
+      autoActivate?: boolean;
+    }
+  ) =>
+    api.post<ApiResponse<{ 
+      subscription_id: number; 
+      status: string; 
+      start_date: string | null; 
+      end_date: string | null;
+    }>>('/admin/subscriptions/create', {
+      user_id: userId,
+      tariff_id: tariffId,
+      category_id: categoryId,
+      location_id: locationId,
+      payment_method: paymentMethod,
+      notes: options?.notes,
+      duration_hours: options?.durationHours,
+      price: options?.price,
+      auto_activate: options?.autoActivate ?? true,
+    }),
+};
+
+// === ANALYTICS API (только для админов) ===
+
+export interface AnalyticsChartDataPoint {
+  date: string;
+  label: string;
+  revenue: number;
+  users: number;
+  subscriptions: number;
+}
+
+export interface AnalyticsChartsResponse {
+  period: {
+    from: string;
+    to: string;
+    group_by: 'day' | 'month';
+  };
+  chart_data: AnalyticsChartDataPoint[];
+  totals: {
+    revenue: number;
+    users: number;
+    subscriptions: number;
+  };
+}
+
+export interface AnalyticsSummaryResponse {
+  revenue: {
+    today: number;
+    week: number;
+    month: number;
+  };
+  users: {
+    today: number;
+    week: number;
+    month: number;
+    total: number;
+  };
+  subscriptions: {
+    today: number;
+    week: number;
+    month: number;
+    active: number;
+  };
+}
+
+export interface AnalyticsChartsParams {
+  period?: 'week' | 'month' | 'quarter' | 'year';
+  date_from?: string;
+  date_to?: string;
+}
+
+export const analyticsApi = {
+  /**
+   * Получить данные для графиков
+   * POST /api/v1/admin/analytics/charts
+   */
+  getChartsData: (params: AnalyticsChartsParams = {}) =>
+    api.post<ApiResponse<AnalyticsChartsResponse>>('/admin/analytics/charts', params),
+
+  /**
+   * Получить сводную статистику
+   * GET /api/v1/admin/analytics/summary
+   */
+  getSummary: () =>
+    api.get<ApiResponse<AnalyticsSummaryResponse>>('/admin/analytics/summary'),
 };
 
 export default api;

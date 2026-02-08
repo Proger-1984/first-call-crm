@@ -15,6 +15,7 @@ use Exception;
 use App\Models\Tariff;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
+use Psr\Log\LoggerInterface;
 
 class TelegramService
 {
@@ -22,6 +23,8 @@ class TelegramService
     private string $apiUrl = 'https://api.telegram.org/bot';
     private string $adminChatId;
     private SubscriptionService $subscriptionService;
+    private QrCodeService $qrCodeService;
+    private LoggerInterface $logger;
     private Client $httpClient;
 
     /**
@@ -34,6 +37,8 @@ class TelegramService
         $this->botToken = $config['telegram']['bot_token'] ?? '';
         $this->adminChatId = $config['telegram']['admin_chat_id'] ?? '';
         $this->subscriptionService = $container->get(SubscriptionService::class);
+        $this->qrCodeService = $container->get(QrCodeService::class);
+        $this->logger = $container->get(LoggerInterface::class);
         $this->httpClient = new Client(['timeout' => 10.0]);
     }
 
@@ -136,6 +141,67 @@ class TelegramService
     }
 
     /**
+     * Отправляет фото с подписью через Telegram
+     * 
+     * @param string $chatId ID чата пользователя
+     * @param string $photoBase64 Base64-encoded изображение
+     * @param string $caption Подпись к фото
+     * @return array Результат отправки
+     * @throws GuzzleException
+     */
+    public function sendPhoto(string $chatId, string $photoBase64, string $caption): array
+    {
+        if (empty($this->botToken)) {
+            return ['success' => false, 'error' => 'Bot token is empty', 'blocked' => false];
+        }
+
+        $url = $this->apiUrl . $this->botToken . '/sendPhoto';
+        
+        try {
+            $response = $this->httpClient->post($url, [
+                'multipart' => [
+                    [
+                        'name' => 'chat_id',
+                        'contents' => $chatId
+                    ],
+                    [
+                        'name' => 'photo',
+                        'contents' => base64_decode($photoBase64),
+                        'filename' => 'qr_payment.png'
+                    ],
+                    [
+                        'name' => 'caption',
+                        'contents' => $caption
+                    ],
+                    [
+                        'name' => 'parse_mode',
+                        'contents' => 'HTML'
+                    ]
+                ],
+                'http_errors' => false
+            ]);
+            
+            $statusCode = $response->getStatusCode();
+            $responseBody = json_decode($response->getBody()->getContents(), true);
+            
+            $isBlocked = $statusCode === 403;
+            
+            if ($statusCode !== 200 || !isset($responseBody['ok']) || $responseBody['ok'] !== true) {
+                return [
+                    'success' => false,
+                    'error' => $responseBody['description'] ?? "HTTP Error: $statusCode",
+                    'blocked' => $isBlocked
+                ];
+            }
+            
+            return ['success' => true, 'error' => null, 'blocked' => false];
+            
+        } catch (Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'blocked' => false];
+        }
+    }
+
+    /**
      * Отправляет сообщение пользователю через Telegram
      * Уведомление о активации демо-подписки
      *
@@ -209,20 +275,28 @@ class TelegramService
      */
     public function notifyPremiumSubscriptionRequested(User $user, UserSubscription $subscription): bool
     {
+        $price = (float) $subscription->price_paid;
+        $subscriptionId = $subscription->id;
+        $userId = $user->id;
+        
+        $cardNumber = $this->qrCodeService->getCardNumber();
+        $cardHolder = $this->qrCodeService->getCardHolder();
+        $paymentPurpose = $this->qrCodeService->buildPaymentPurpose($subscriptionId, $userId);
+        
         $message = "📝 <b>Заявка на подписку создана</b>\n\n" .
-            "Ваша заявка на подписку <b>{$subscription->tariff->name}</b> для категории <b>{$subscription->category->name}</b> " .
-            "и локации <b>{$subscription->location->getFullName()}</b> успешно создана и ожидает подтверждения.\n\n" .
-            "💳 <b>ДЛЯ АКТИВАЦИИ НЕОБХОДИМО:</b>\n" .
-            "1️⃣ Оплатить по реквизитам:\n" .
-            "• Карта Сбербанк: <code>2202203203273984</code>\n" .
-            "• Получатель: Александр А.\n" .
-            "• Сумма к оплате: <b>$subscription->price_paid ₽</b>\n\n" .
-            "2️⃣ Прислать скриншот чека в <a href='https://t.me/firstcall_support'>службу поддержки</a>\n" .
-            "3️⃣ Обязательно укажите ID заявки: <code>$subscription->id</code>\n\n" .
-
-            "После подтверждения оплаты подписка будет активирована, и вы получите уведомление.\n\n" .
-            "По всем вопросам обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
-
+            "Подписка: <b>{$subscription->tariff->name}</b>\n" .
+            "Категория: <b>{$subscription->category->name}</b>\n" .
+            "Локация: <b>{$subscription->location->getFullName()}</b>\n\n" .
+            "💳 <b>ДЛЯ ОПЛАТЫ ПЕРЕВЕДИТЕ НА КАРТУ:</b>\n" .
+            "• Карта Сбербанк: <code>" . str_replace(' ', '', $cardNumber) . "</code>\n" .
+            "• Получатель: $cardHolder\n" .
+            "• Сумма: <b>" . number_format($price, 0, ',', ' ') . " ₽</b>\n\n" .
+            "📋 <b>В комментарии к переводу укажите:</b>\n" .
+            "<code>$paymentPurpose</code>\n\n" .
+            "✅ <b>ПОСЛЕ ОПЛАТЫ:</b>\n" .
+            "Отправьте скриншот чека в <a href='https://t.me/firstcall_support'>поддержку</a>\n\n" .
+            "После подтверждения оплаты подписка будет активирована.";
+        
         $result = $this->sendMessage($user->telegram_id, $message);
         
         // Обновляем статус блокировки бота
@@ -237,7 +311,7 @@ class TelegramService
 
     /**
      * Отправляет сообщение пользователю через Telegram
-     * Уведомление о создании заявки на продление подписки
+     * Уведомление о создании заявки на продление подписки с QR-кодом для оплаты
      *
      * @param User $user
      * @param UserSubscription $subscription
@@ -250,21 +324,28 @@ class TelegramService
         $tariffName = $tariff->name;
         $categoryName = $subscription->category->name;
         $locationName = $subscription->location->getFullName();
-        $price = $this->subscriptionService->getTariffPrice($tariff->id, $subscription->location_id);
+        $price = (float) $this->subscriptionService->getTariffPrice($tariff->id, $subscription->location_id, $subscription->category_id);
+        $subscriptionId = $subscription->id;
+        $userId = $user->id;
 
-        $message = "📝 <b>Заявка на продление подписки создана</b>\n\n" .
-            "Ваша заявка на продление подписки <b>$tariffName</b> для категории <b>$categoryName</b> " .
-            "и локации <b>$locationName</b> успешно создана и ожидает подтверждения.\n\n" .
-            "💳 <b>ДЛЯ АКТИВАЦИИ НЕОБХОДИМО:</b>\n" .
-            "1️⃣ Оплатить по реквизитам:\n" .
-            "• Карта Сбербанк: <code>2202203203273984</code>\n" .
-            "• Получатель: Александр А.\n" .
-            "• Сумма к оплате: <b>$price ₽</b>\n\n" .
-            "2️⃣ Прислать скриншот чека в <a href='https://t.me/firstcall_support'>службу поддержки</a>\n" .
-            "3️⃣ Обязательно укажите ID подписки: <code>$subscription->id</code>\n\n" .
-            "После подтверждения оплаты подписка будет продлена, и вы получите уведомление.\n\n" .
-            "По всем вопросам обращайтесь в <a href='https://t.me/firstcall_support'>службу поддержки</a>.";
-
+        $cardNumber = $this->qrCodeService->getCardNumber();
+        $cardHolder = $this->qrCodeService->getCardHolder();
+        $paymentPurpose = $this->qrCodeService->buildPaymentPurpose($subscriptionId, $userId);
+        
+        $message = "🔄 <b>Заявка на продление подписки создана</b>\n\n" .
+            "Подписка: <b>$tariffName</b>\n" .
+            "Категория: <b>$categoryName</b>\n" .
+            "Локация: <b>$locationName</b>\n\n" .
+            "💳 <b>ДЛЯ ОПЛАТЫ ПЕРЕВЕДИТЕ НА КАРТУ:</b>\n" .
+            "• Карта Сбербанк: <code>" . str_replace(' ', '', $cardNumber) . "</code>\n" .
+            "• Получатель: $cardHolder\n" .
+            "• Сумма: <b>" . number_format($price, 0, ',', ' ') . " ₽</b>\n\n" .
+            "📋 <b>В комментарии к переводу укажите:</b>\n" .
+            "<code>$paymentPurpose</code>\n\n" .
+            "✅ <b>ПОСЛЕ ОПЛАТЫ:</b>\n" .
+            "Отправьте скриншот чека в <a href='https://t.me/firstcall_support'>поддержку</a>\n\n" .
+            "После подтверждения оплаты подписка будет продлена.";
+        
         $result = $this->sendMessage($user->telegram_id, $message);
         
         // Обновляем статус блокировки бота
@@ -355,6 +436,7 @@ class TelegramService
         $location = $subscription->location->getFullName();
         $tariff = $subscription->tariff->name;
         $price = $subscription->price_paid;
+        $paymentPurpose = $this->qrCodeService->buildPaymentPurpose($subId, $userId);
         
         $message = "🆕 <b>Новая заявка на подписку #$subId</b>\n\n" .
             "👤 Пользователь: <b>$userName</b> (ID: $userId)\n" .
@@ -362,6 +444,7 @@ class TelegramService
             "📋 Категория: <b>$category</b>\n" .
             "📍 Локация: <b>$location</b>\n" .
             "💰 Сумма: <b>$price руб.</b>\n\n" .
+            "📋 Ожидаемое назначение платежа:\n<code>$paymentPurpose</code>\n\n" .
             "Для обработки заявки перейдите в <a href='https://realtor.first-call.ru/subscriptions/pending'>панель администратора</a>.";
             
         $result = $this->sendMessage($this->adminChatId, $message);
@@ -388,7 +471,8 @@ class TelegramService
         $location = $subscription->location->getFullName();
         $currentTariff = $subscription->tariff->name;
         $newTariff = $tariff->name;
-        $price = $this->subscriptionService->getTariffPrice($tariff->id, $subscription->location_id);
+        $price = $this->subscriptionService->getTariffPrice($tariff->id, $subscription->location_id, $subscription->category_id);
+        $paymentPurpose = $this->qrCodeService->buildPaymentPurpose($subId, $userId);
         
         $message = "🔄 <b>Запрос на продление подписки #$subId</b>\n\n" .
             "👤 Пользователь: <b>$userName</b> (ID: $userId)\n" .
@@ -402,6 +486,7 @@ class TelegramService
             $message .= "📝 Комментарий: <i>$notes</i>\n";
         }
         
+        $message .= "\n📋 Ожидаемое назначение платежа:\n<code>$paymentPurpose</code>\n";
         $message .= "\nДля обработки заявки перейдите в <a href='https://realtor.first-call.ru/subscriptions/pending'>панель администратора</a>.";
             
         $result = $this->sendMessage($this->adminChatId, $message);

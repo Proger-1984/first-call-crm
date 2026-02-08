@@ -133,7 +133,8 @@ class UserSubscription extends Model
      */
     public function isActive(): bool
     {
-        return $this->status === 'active' && 
+        // extend_pending тоже считается активной (ожидает продления, но работает)
+        return in_array($this->status, ['active', 'extend_pending']) && 
                $this->start_date && 
                $this->end_date && 
                Carbon::now()->isBetween($this->start_date, $this->end_date);

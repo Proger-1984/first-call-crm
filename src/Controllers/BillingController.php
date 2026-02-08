@@ -75,11 +75,11 @@ class BillingController
             if (!empty($filters['filters']['created_at'])) {
                 if (!empty($filters['filters']['created_at']['from'])) {
                     $fromDate = $this->convertToIsoDate($filters['filters']['created_at']['from']);
-                    $query->whereDate('created_at', '>=', $fromDate);
+                    $query->whereDate('user_subscriptions.created_at', '>=', $fromDate);
                 }
                 if (!empty($filters['filters']['created_at']['to'])) {
                     $toDate = $this->convertToIsoDate($filters['filters']['created_at']['to']);
-                    $query->whereDate('created_at', '<=', $toDate);
+                    $query->whereDate('user_subscriptions.created_at', '<=', $toDate);
                 }
             }
 
@@ -87,9 +87,25 @@ class BillingController
             if (!empty($filters['sorting'])) {
                 $sortField = array_key_first($filters['sorting']);
                 $sortDir = $filters['sorting'][$sortField];
-                $query->orderBy($sortField, $sortDir);
+                
+                // Маппинг полей для сортировки по связанным таблицам
+                if ($sortField === 'category_name') {
+                    $query->join('categories', 'user_subscriptions.category_id', '=', 'categories.id')
+                          ->orderBy('categories.name', $sortDir)
+                          ->select('user_subscriptions.*');
+                } elseif ($sortField === 'location_name') {
+                    $query->leftJoin('locations', 'user_subscriptions.location_id', '=', 'locations.id')
+                          ->orderBy('locations.city', $sortDir)
+                          ->select('user_subscriptions.*');
+                } elseif ($sortField === 'days_left') {
+                    // Сортируем по дате окончания (чем раньше заканчивается, тем меньше осталось)
+                    $query->orderBy('user_subscriptions.end_date', $sortDir);
+                } else {
+                    // Для стандартных полей добавляем префикс таблицы
+                    $query->orderBy('user_subscriptions.' . $sortField, $sortDir);
+                }
             } else {
-                $query->orderBy('created_at', 'desc');
+                $query->orderBy('user_subscriptions.created_at', 'desc');
             }
             
             // Получаем общее количество записей
@@ -124,16 +140,18 @@ class BillingController
                     }
                 }
                 
+                // Формируем название локации
+                $locationName = $subscription->location?->city ?? 'Не указан';
+                if ($subscription->location?->region && $subscription->location->region !== $subscription->location->city) {
+                    $locationName .= ' и ' . $subscription->location->region;
+                }
+                
                 return [
                     'id' => $subscription->id,
                     'created_at' => $subscription->created_at->format('Y-m-d H:i:s'),
-                    'tariff_info' => sprintf('%s, %s, %s',
-                        str_starts_with($subscription->tariff->name, 'Премиум') ? 'Премиум' : $subscription->tariff->name,
-                        $subscription->category->name,
-                        sprintf('%s и %s',
-                            $subscription->location?->city ?? 'Не указан',
-                            $subscription->location?->region ?? ''),
-                    ),
+                    'tariff_name' => $subscription->tariff->name,
+                    'category_name' => $subscription->category->name,
+                    'location_name' => $locationName,
                     'status' => $subscription->status,
                     'days_left' => $daysLeft,
                     'start_date' => $subscription->start_date?->format('Y-m-d H:i:s'),
@@ -232,7 +250,14 @@ class BillingController
             if (!empty($filters['sorting'])) {
                 $sortField = array_key_first($filters['sorting']);
                 $sortDir = $filters['sorting'][$sortField];
-                $query->orderBy($sortField, $sortDir);
+                
+                // Маппинг полей для сортировки
+                if ($sortField === 'days_left') {
+                    // Сортируем по дате окончания (чем раньше заканчивается, тем меньше осталось)
+                    $query->orderBy('end_date', $sortDir);
+                } else {
+                    $query->orderBy($sortField, $sortDir);
+                }
             } else {
                 $query->orderBy('created_at', 'desc');
             }
@@ -364,7 +389,13 @@ class BillingController
             if (!empty($filters['sorting'])) {
                 $sortField = array_key_first($filters['sorting']);
                 $sortDir = $filters['sorting'][$sortField];
-                $query->orderBy($sortField, $sortDir);
+                
+                // Маппинг полей для сортировки
+                if ($sortField === 'price') {
+                    $query->orderBy('price_paid', $sortDir);
+                } else {
+                    $query->orderBy($sortField, $sortDir);
+                }
             } else {
                 $query->orderBy('action_date', 'desc');
             }

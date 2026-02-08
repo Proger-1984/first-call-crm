@@ -34,8 +34,13 @@ export function DatePicker({ placeholder = 'дд.мм.гггг', value, onChange
   }, [onChange]);
 
   useEffect(() => {
-    if (fpRef.current && value) {
-      fpRef.current.setDate(value, false);
+    if (fpRef.current) {
+      if (value) {
+        fpRef.current.setDate(value, false);
+      } else {
+        // Очищаем дату при пустом значении
+        fpRef.current.clear();
+      }
     }
   }, [value]);
 

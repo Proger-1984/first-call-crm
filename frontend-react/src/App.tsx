@@ -7,20 +7,12 @@ import { Login, LoginTest } from './pages/Login';
 import { Profile } from './pages/Profile';
 import { Settings } from './pages/Settings';
 import { Tariffs } from './pages/Tariffs';
+import { Favorites } from './pages/Favorites';
+import { Billing } from './pages/Billing';
+import { AdminBilling } from './pages/AdminBilling';
+import { Analytics } from './pages/Analytics';
 import { ProtectedRoute } from './components/Auth';
 import { useAuthStore } from './stores/authStore';
-
-function Favorites() {
-  return (
-    <div>
-      <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
-        <span className="material-icons" style={{ color: 'var(--primary)' }}>star</span>
-        Избранное
-      </h1>
-      <p style={{ color: 'var(--text-secondary)' }}>Страница в разработке...</p>
-    </div>
-  );
-}
 
 function History() {
   return (
@@ -28,18 +20,6 @@ function History() {
       <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
         <span className="material-icons" style={{ color: 'var(--primary)' }}>history</span>
         История
-      </h1>
-      <p style={{ color: 'var(--text-secondary)' }}>Страница в разработке...</p>
-    </div>
-  );
-}
-
-function Analytics() {
-  return (
-    <div>
-      <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
-        <span className="material-icons" style={{ color: 'var(--primary)' }}>analytics</span>
-        Аналитика
       </h1>
       <p style={{ color: 'var(--text-secondary)' }}>Страница в разработке...</p>
     </div>
@@ -84,8 +64,10 @@ function AppContent() {
         <Route path="settings" element={<Settings />} />
         <Route path="tariffs" element={<Tariffs />} />
         <Route path="favorites" element={<Favorites />} />
+        <Route path="billing" element={<Billing />} />
+        <Route path="admin/billing" element={<AdminBilling />} />
+        <Route path="admin/analytics" element={<Analytics />} />
         <Route path="history" element={<History />} />
-        <Route path="analytics" element={<Analytics />} />
       </Route>
       
       {/* Редирект на главную для несуществующих маршрутов */}

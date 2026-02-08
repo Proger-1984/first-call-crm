@@ -75,10 +75,15 @@
     gap: 9px;
     cursor: pointer;
     transition: background var(--transition-fast);
+    user-select: none;
 }
 
 .multiselect-option:hover {
     background: var(--bg-main);
+}
+
+.multiselect-option.selected {
+    background: var(--primary-light);
 }
 
 .multiselect-option input[type="checkbox"] {
@@ -87,11 +92,79 @@
     accent-color: var(--primary);
     cursor: pointer;
     flex-shrink: 0;
+    pointer-events: none; /* Клик обрабатывается на div */
 }
 
-.multiselect-option label {
+.multiselect-option .option-label {
     font-size: 13px;
     cursor: pointer;
     flex: 1;
     color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.multiselect-option .option-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.multiselect-option .option-sublabel {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* Поле поиска */
+.multiselect-search {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    background: var(--bg-card);
+    z-index: 1;
+}
+
+.multiselect-search .material-icons {
+    font-size: 18px;
+    color: var(--text-muted);
+}
+
+.multiselect-search input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 13px;
+    color: var(--text-primary);
+    background: transparent;
+}
+
+.multiselect-search input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Контейнер опций */
+.multiselect-options {
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+/* Пустой результат поиска */
+.multiselect-empty {
+    padding: 12px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+/* Цветная точка для метро */
+.option-color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
 }

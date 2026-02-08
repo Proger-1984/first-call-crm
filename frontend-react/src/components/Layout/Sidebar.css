@@ -142,6 +142,22 @@
     visibility: visible;
 }
 
+/* Админский пункт меню */
+.menu-item.admin-item {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.menu-item.admin-item .material-icons {
+    color: #f59e0b;
+}
+
+.menu-item.admin-item.active .material-icons,
+.menu-item.admin-item:hover .material-icons {
+    color: #fbbf24;
+}
+
 @media (max-width: 992px) {
     .sidebar {
         transform: translateX(-100%);

@@ -40,6 +40,14 @@ tags:
     description: Методы для администраторов системы
   - name: Billing
     description: Методы для управления биллингом подписок
+  - name: Избранное
+    description: Методы для работы с избранными объявлениями
+  - name: Объявления
+    description: Методы для работы с объявлениями недвижимости
+  - name: Фильтры
+    description: Методы для получения данных фильтров
+  - name: Обработка фото
+    description: Методы для обработки фото (удаление водяных знаков)
 
 servers:
   - url: http://localhost:8080
@@ -1658,7 +1666,7 @@ paths:
                             status:
                               type: string
                               description: Статус подписки
-                              enum: [active, pending, expired, cancelled]
+                              enum: [active, pending, extend_pending, expired, cancelled]
                               example: "active"
                             start_date:
                               type: string
@@ -3573,8 +3581,11 @@ paths:
       description: |
         Создает заявку на продление подписки пользователя.
         
-        После создания заявки администратор получает уведомление и принимает
-        решение о продлении. Подписка может быть продлена только после оплаты.
+        После создания заявки:
+        - Статус подписки меняется на `extend_pending`
+        - Подписка продолжает работать
+        - Администратор получает уведомление
+        - Повторная заявка невозможна пока статус `extend_pending`
         
         Требуется аутентификация с помощью JWT токена.
       security:
@@ -3587,7 +3598,6 @@ paths:
               type: object
               required:
                 - subscription_id
-                - tariff_id
               properties:
                 subscription_id:
                   type: integer
@@ -3595,7 +3605,7 @@ paths:
                   example: 5
                 tariff_id:
                   type: integer
-                  description: ID тарифа для продления (может совпадать или отличаться от текущего)
+                  description: ID тарифа для продления (опционально, по умолчанию текущий тариф подписки)
                   example: 3
                 notes:
                   type: string
@@ -3603,7 +3613,6 @@ paths:
                   example: "Хочу продлить на месяц"
             example:
               subscription_id: 5
-              tariff_id: 3
               notes: "Хочу продлить на месяц"
       responses:
         '200':
@@ -3632,12 +3641,17 @@ paths:
                         type: integer
                         description: ID подписки
                         example: 5
+                      new_status:
+                        type: string
+                        description: Новый статус подписки
+                        example: "extend_pending"
               example:
                 code: 200
                 status: success
                 message: "Заявка на продление подписки успешно отправлена администратору"
                 data:
                   subscription_id: 5
+                  new_status: "extend_pending"
         '400':
           description: Ошибка валидации
           content:
@@ -3809,6 +3823,643 @@ paths:
                 message: "Внутренняя ошибка сервера"
                 error: "internal_error"
 
+  /api/v1/admin/subscriptions/create:
+    post:
+      tags:
+        - Администрирование
+      summary: Создание подписки для пользователя
+      description: |
+        Создаёт подписку для указанного пользователя.
+        
+        ## Права доступа
+        Только для администраторов.
+        
+        ## Валидация полей
+        - `user_id` — обязательно, должен существовать
+        - `tariff_id` — обязательно, должен существовать
+        - `category_id` — обязательно, должен существовать
+        - `location_id` — обязательно, должен существовать
+        - `payment_method` — обязательно, одно из: card, sbp, cash, crypto, other
+        
+        ## Особенности
+        - По умолчанию подписка сразу активируется (auto_activate: true)
+        - Используется для миграции пользователей со старой CRM
+        - Нельзя создать дубликат подписки для той же категории и локации
+        
+        ## Возможные ошибки
+        - 400: Отсутствует обязательное поле
+        - 401: Токен отсутствует или истёк
+        - 403: Пользователь не является администратором
+        - 404: Пользователь/тариф/категория/локация не найдены
+        - 409: У пользователя уже есть активная подписка для этой категории и локации
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - tariff_id
+                - category_id
+                - location_id
+                - payment_method
+              properties:
+                user_id:
+                  type: integer
+                  description: ID пользователя
+                  example: 1
+                tariff_id:
+                  type: integer
+                  description: ID тарифа
+                  example: 2
+                category_id:
+                  type: integer
+                  description: ID категории
+                  example: 1
+                location_id:
+                  type: integer
+                  description: ID локации
+                  example: 1
+                payment_method:
+                  type: string
+                  description: Метод оплаты
+                  enum: [card, sbp, cash, crypto, other]
+                  example: "card"
+                notes:
+                  type: string
+                  description: Примечание администратора
+                  example: "Миграция со старой CRM"
+                duration_hours:
+                  type: integer
+                  description: Длительность в часах (по умолчанию из тарифа)
+                  example: 720
+                price:
+                  type: number
+                  description: Цена (по умолчанию из тарифа)
+                  example: 5000
+                auto_activate:
+                  type: boolean
+                  description: Сразу активировать подписку
+                  default: true
+                  example: true
+            examples:
+              with_auto_activate:
+                summary: Создание с автоактивацией
+                value:
+                  user_id: 1
+                  tariff_id: 2
+                  category_id: 1
+                  location_id: 1
+                  payment_method: "card"
+                  notes: "Миграция со старой CRM"
+                  auto_activate: true
+              without_auto_activate:
+                summary: Создание без автоактивации (статус pending)
+                value:
+                  user_id: 1
+                  tariff_id: 2
+                  category_id: 1
+                  location_id: 1
+                  payment_method: "cash"
+                  auto_activate: false
+              custom_duration:
+                summary: С кастомной длительностью и ценой
+                value:
+                  user_id: 1
+                  tariff_id: 2
+                  category_id: 1
+                  location_id: 1
+                  payment_method: "sbp"
+                  duration_hours: 1440
+                  price: 8000
+                  notes: "Скидка 20%"
+      responses:
+        '200':
+          description: Подписка успешно создана
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  message:
+                    type: string
+                    example: "Подписка создана и активирована"
+                  data:
+                    type: object
+                    properties:
+                      subscription_id:
+                        type: integer
+                        description: ID созданной подписки
+                        example: 15
+                      status:
+                        type: string
+                        description: Статус подписки
+                        example: "active"
+                      start_date:
+                        type: string
+                        format: date-time
+                        description: Дата начала подписки
+                        example: "2026-02-08 12:00:00"
+                      end_date:
+                        type: string
+                        format: date-time
+                        description: Дата окончания подписки
+                        example: "2026-03-10 12:00:00"
+              example:
+                code: 200
+                status: "success"
+                message: "Подписка создана и активирована"
+                data:
+                  subscription_id: 15
+                  status: "active"
+                  start_date: "2026-02-08 12:00:00"
+                  end_date: "2026-03-10 12:00:00"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_user_id:
+                  summary: Отсутствует user_id
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Необходимо указать user_id"
+                    error: "validation_error"
+                missing_tariff_id:
+                  summary: Отсутствует tariff_id
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Необходимо указать tariff_id"
+                    error: "validation_error"
+                missing_payment_method:
+                  summary: Отсутствует payment_method
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Необходимо указать payment_method"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: "error"
+                message: "Недостаточно прав для выполнения операции"
+                error: "access_denied"
+        '404':
+          description: Ресурс не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                user_not_found:
+                  summary: Пользователь не найден
+                  value:
+                    code: 404
+                    status: "error"
+                    message: "Пользователь не найден"
+                    error: "not_found"
+                tariff_not_found:
+                  summary: Тариф не найден
+                  value:
+                    code: 404
+                    status: "error"
+                    message: "Тариф не найден"
+                    error: "not_found"
+                category_not_found:
+                  summary: Категория не найдена
+                  value:
+                    code: 404
+                    status: "error"
+                    message: "Категория не найдена"
+                    error: "not_found"
+                location_not_found:
+                  summary: Локация не найдена
+                  value:
+                    code: 404
+                    status: "error"
+                    message: "Локация не найдена"
+                    error: "not_found"
+        '409':
+          description: Конфликт — подписка уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 409
+                status: "error"
+                message: "У пользователя уже есть активная подписка для этой категории и локации"
+                error: "validation_error"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/admin/analytics/charts:
+    post:
+      tags:
+        - Администрирование
+      summary: Получение данных для графиков аналитики
+      description: |
+        Возвращает данные о доходе, новых пользователях и подписках за указанный период.
+        
+        ## Права доступа
+        Только для администраторов.
+        
+        ## Особенности
+        - Данные админов исключены из статистики
+        - Учитываются только активные подписки
+        - Группировка: по дням (week/month) или по месяцам (quarter/year)
+        
+        ## Возможные ошибки
+        - 401: Токен отсутствует или истёк
+        - 403: Пользователь не является администратором
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                period:
+                  type: string
+                  description: Период для выборки (week, month, quarter, year)
+                  enum: [week, month, quarter, year]
+                  default: week
+                  example: "week"
+                date_from:
+                  type: string
+                  description: Дата начала (формат DD.MM.YYYY)
+                  example: "01.02.2026"
+                date_to:
+                  type: string
+                  description: Дата окончания (формат DD.MM.YYYY)
+                  example: "08.02.2026"
+            examples:
+              week_period:
+                summary: Статистика за неделю
+                value:
+                  period: "week"
+              month_period:
+                summary: Статистика за месяц
+                value:
+                  period: "month"
+              custom_dates:
+                summary: Произвольный период
+                value:
+                  date_from: "01.01.2026"
+                  date_to: "31.01.2026"
+      responses:
+        '200':
+          description: Данные аналитики успешно получены
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      period:
+                        type: object
+                        properties:
+                          from:
+                            type: string
+                            format: date
+                            description: Дата начала периода
+                            example: "2026-02-01"
+                          to:
+                            type: string
+                            format: date
+                            description: Дата окончания периода
+                            example: "2026-02-08"
+                          group_by:
+                            type: string
+                            enum: [day, month]
+                            description: Группировка данных
+                            example: "day"
+                      chart_data:
+                        type: array
+                        description: Данные для построения графиков
+                        items:
+                          type: object
+                          properties:
+                            date:
+                              type: string
+                              description: Дата в формате YYYY-MM-DD
+                              example: "2026-02-01"
+                            label:
+                              type: string
+                              description: Метка для отображения на графике
+                              example: "01 Фев"
+                            revenue:
+                              type: number
+                              description: Доход за период
+                              example: 15000
+                            users:
+                              type: integer
+                              description: Новых пользователей
+                              example: 5
+                            subscriptions:
+                              type: integer
+                              description: Новых подписок
+                              example: 3
+                      totals:
+                        type: object
+                        description: Итоговые значения за весь период
+                        properties:
+                          revenue:
+                            type: number
+                            description: Общий доход
+                            example: 75000
+                          users:
+                            type: integer
+                            description: Всего новых пользователей
+                            example: 25
+                          subscriptions:
+                            type: integer
+                            description: Всего новых подписок
+                            example: 18
+              example:
+                code: 200
+                status: "success"
+                data:
+                  period:
+                    from: "2026-02-01"
+                    to: "2026-02-08"
+                    group_by: "day"
+                  chart_data:
+                    - date: "2026-02-01"
+                      label: "01 Фев"
+                      revenue: 15000
+                      users: 5
+                      subscriptions: 3
+                    - date: "2026-02-02"
+                      label: "02 Фев"
+                      revenue: 10000
+                      users: 3
+                      subscriptions: 2
+                  totals:
+                    revenue: 75000
+                    users: 25
+                    subscriptions: 18
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: "error"
+                message: "Недостаточно прав для выполнения операции"
+                error: "access_denied"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/admin/analytics/summary:
+    get:
+      tags:
+        - Администрирование
+      summary: Получение сводной статистики
+      description: |
+        Возвращает сводную статистику по доходу, пользователям и подпискам.
+        
+        ## Права доступа
+        Только для администраторов.
+        
+        ## Особенности
+        - Данные админов исключены из статистики
+        - Учитываются только активные подписки
+        - Возвращает данные за сегодня, неделю, месяц и общие итоги
+        
+        ## Возможные ошибки
+        - 401: Токен отсутствует или истёк
+        - 403: Пользователь не является администратором
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Сводная статистика успешно получена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      revenue:
+                        type: object
+                        description: Статистика по доходу
+                        properties:
+                          today:
+                            type: number
+                            description: Доход за сегодня
+                            example: 5000
+                          week:
+                            type: number
+                            description: Доход за неделю
+                            example: 25000
+                          month:
+                            type: number
+                            description: Доход за месяц
+                            example: 100000
+                      users:
+                        type: object
+                        description: Статистика по пользователям
+                        properties:
+                          today:
+                            type: integer
+                            description: Новых пользователей за сегодня
+                            example: 2
+                          week:
+                            type: integer
+                            description: Новых пользователей за неделю
+                            example: 10
+                          month:
+                            type: integer
+                            description: Новых пользователей за месяц
+                            example: 35
+                          total:
+                            type: integer
+                            description: Всего пользователей
+                            example: 150
+                      subscriptions:
+                        type: object
+                        description: Статистика по подпискам
+                        properties:
+                          today:
+                            type: integer
+                            description: Новых подписок за сегодня
+                            example: 1
+                          week:
+                            type: integer
+                            description: Новых подписок за неделю
+                            example: 5
+                          month:
+                            type: integer
+                            description: Новых подписок за месяц
+                            example: 20
+                          active:
+                            type: integer
+                            description: Всего активных подписок
+                            example: 45
+              example:
+                code: 200
+                status: "success"
+                data:
+                  revenue:
+                    today: 5000
+                    week: 25000
+                    month: 100000
+                  users:
+                    today: 2
+                    week: 10
+                    month: 35
+                    total: 150
+                  subscriptions:
+                    today: 1
+                    week: 5
+                    month: 20
+                    active: 45
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: "error"
+                message: "Недостаточно прав для выполнения операции"
+                error: "access_denied"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
   /api/admin/subscriptions:
     post:
       summary: Получение текущих подписок (административная панель)
@@ -3876,7 +4527,7 @@ paths:
                       description: Статусы подписок для фильтрации
                       items:
                         type: string
-                        enum: [active, pending, cancelled, expired]
+                        enum: [active, pending, extend_pending, cancelled, expired]
                       example: ["active", "pending"]
                     days_left_min:
                       type: integer
@@ -3963,7 +4614,7 @@ paths:
                         status:
                           type: string
                           description: Статус подписки
-                          enum: [active, pending, cancelled, expired]
+                          enum: [active, pending, extend_pending, cancelled, expired]
                           example: "active"
                         payment_method:
                           type: string
@@ -4115,7 +4766,7 @@ paths:
                       description: Статусы подписок для фильтрации
                       items:
                         type: string
-                        enum: [active, pending, cancelled, expired]
+                        enum: [active, pending, extend_pending, cancelled, expired]
                       example: ["active", "pending"]
             example:
               page: 1
@@ -4186,7 +4837,7 @@ paths:
                         status:
                           type: string
                           description: Статус подписки
-                          enum: [active, pending, cancelled, expired]
+                          enum: [active, pending, extend_pending, cancelled, expired]
                           example: "active"
                         days_left:
                           type: string
@@ -4467,4 +5118,1717 @@ paths:
                 code: 500
                 status: error
                 message: "Ошибка при получении данных"
+  # ==================== ИЗБРАННОЕ ====================
+
+  /api/v1/favorites:
+    get:
+      summary: Получить список избранных объявлений
+      description: |
+        Возвращает список избранных объявлений пользователя с пагинацией и фильтрами.
+        
+        ## Фильтры
+        - `date_from`, `date_to` — фильтр по дате добавления (формат: yyyy-mm-dd)
+        - `comment` — поиск по комментарию (ILIKE)
+        - `status_id` — фильтр по статусу (ID или "none")
+      tags:
+        - Избранное
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: comment
+          in: query
+          schema:
+            type: string
+        - name: status_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Успешный ответ
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                data:
+                  listings: []
+                  pagination:
+                    page: 1
+                    per_page: 20
+                    total: 0
+                    total_pages: 0
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Токен не найден"
+                    error: "token_not_found"
+                token_expired:
+                  value:
+                    code: 401
+                    status: error
+                    message: "Токен истёк"
+                    error: "token_expired"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: error
+                message: "Ошибка при получении избранного"
+                error: "internal_error"
+
+  /api/v1/favorites/toggle:
+    post:
+      summary: Добавить/удалить из избранного
+      tags:
+        - Избранное
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - listing_id
+              properties:
+                listing_id:
+                  type: integer
+      responses:
+        "200":
+          description: Успешный ответ
+          content:
+            application/json:
+              examples:
+                added:
+                  value:
+                    code: 200
+                    status: success
+                    message: "Объявление добавлено в избранное"
+                    data:
+                      is_favorite: true
+                removed:
+                  value:
+                    code: 200
+                    status: success
+                    message: "Объявление удалено из избранного"
+                    data:
+                      is_favorite: false
+        "400":
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: error
+                message: "Не указан ID объявления"
+                error: "validation_error"
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Объявление не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Объявление не найдено"
+                error: "not_found"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/favorites/comment:
+    put:
+      summary: Обновить комментарий к избранному
+      tags:
+        - Избранное
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - listing_id
+              properties:
+                listing_id:
+                  type: integer
+                comment:
+                  type: string
+                  maxLength: 250
+                  nullable: true
+      responses:
+        "200":
+          description: Комментарий обновлён
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                message: "Комментарий обновлён"
+        "400":
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_listing_id:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указан ID объявления"
+                    error: "validation_error"
+                comment_too_long:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Комментарий не может быть длиннее 250 символов"
+                    error: "validation_error"
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Объявление не в избранном
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Объявление не найдено в избранном"
+                error: "not_found"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/favorites/status:
+    put:
+      summary: Обновить статус избранного объявления
+      tags:
+        - Избранное
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - listing_id
+              properties:
+                listing_id:
+                  type: integer
+                status_id:
+                  type: integer
+                  nullable: true
+      responses:
+        "200":
+          description: Статус обновлён
+        "400":
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Объявление или статус не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                listing_not_found:
+                  value:
+                    code: 404
+                    status: error
+                    message: "Объявление не найдено в избранном"
+                    error: "not_found"
+                status_not_found:
+                  value:
+                    code: 404
+                    status: error
+                    message: "Статус не найден"
+                    error: "not_found"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/favorites/statuses:
+    get:
+      summary: Получить пользовательские статусы
+      tags:
+        - Избранное
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Список статусов
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                data:
+                  statuses:
+                    - id: 1
+                      name: "Новый"
+                      color: "#4CAF50"
+                      sort_order: 0
+                      favorites_count: 5
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Создать статус
+      tags:
+        - Избранное
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  maxLength: 50
+                color:
+                  type: string
+                  default: "#808080"
+      responses:
+        "201":
+          description: Статус создан
+        "400":
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_name:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указано название статуса"
+                    error: "validation_error"
+                name_too_long:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Название не может быть длиннее 50 символов"
+                    error: "validation_error"
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "409":
+          description: Статус с таким именем уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 409
+                status: error
+                message: "Статус с таким названием уже существует"
+                error: "conflict"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/favorites/statuses/{id}:
+    put:
+      summary: Обновить статус
+      tags:
+        - Избранное
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 50
+                color:
+                  type: string
+      responses:
+        "200":
+          description: Статус обновлён
+        "400":
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Статус не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Статус не найден"
+                error: "not_found"
+        "409":
+          description: Статус с таким именем уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Удалить статус
+      description: Объявления с этим статусом останутся без статуса
+      tags:
+        - Избранное
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Статус удалён
+          content:
+            application/json:
+              example:
+                code: 200
+                status: success
+                message: "Статус удалён"
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Статус не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: error
+                message: "Статус не найден"
+                error: "not_found"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/favorites/statuses/reorder:
+    put:
+      summary: Изменить порядок статусов
+      tags:
+        - Избранное
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - order
+              properties:
+                order:
+                  type: array
+                  items:
+                    type: integer
+                  example: [3, 1, 2]
+      responses:
+        "200":
+          description: Порядок обновлён
+        "400":
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: error
+                message: "Не указан порядок статусов"
+                error: "validation_error"
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ==================== Объявления ====================
+
+  /api/v1/listings:
+    post:
+      tags:
+        - Объявления
+      summary: Получение списка объявлений
+      description: |
+        Возвращает список объявлений с фильтрацией, сортировкой и пагинацией.
+        
+        ## Фильтрация
+        Фильтры поддерживают как одиночные значения, так и массивы для множественного выбора.
+        
+        ## Сортировка
+        Доступные поля: created_at, price, square_meters, updated_at, source_id, listing_status_id
+        
+        ## Пагинация
+        - page: номер страницы (по умолчанию 1)
+        - per_page: записей на странице (по умолчанию 10, максимум 100)
+        
+        ## Возможные ошибки
+        - 401: Токен отсутствует или истёк
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                page:
+                  type: integer
+                  default: 1
+                  description: Номер страницы
+                  example: 1
+                per_page:
+                  type: integer
+                  default: 10
+                  maximum: 100
+                  description: Записей на странице
+                  example: 10
+                sort:
+                  type: string
+                  default: created_at
+                  enum: [created_at, price, square_meters, updated_at, source_id, listing_status_id]
+                  description: Поле сортировки
+                  example: "created_at"
+                order:
+                  type: string
+                  default: desc
+                  enum: [asc, desc]
+                  description: Направление сортировки
+                  example: "desc"
+                date_from:
+                  type: string
+                  format: date
+                  description: Дата создания от (Y-m-d)
+                  example: "2026-02-01"
+                date_to:
+                  type: string
+                  format: date
+                  description: Дата создания до (Y-m-d)
+                  example: "2026-02-08"
+                status:
+                  type: string
+                  description: Код статуса объявления
+                  example: "new"
+                source_id:
+                  oneOf:
+                    - type: integer
+                    - type: array
+                      items:
+                        type: integer
+                  description: ID источника (или массив)
+                  example: [1, 2]
+                category_id:
+                  oneOf:
+                    - type: integer
+                    - type: array
+                      items:
+                        type: integer
+                  description: ID категории (или массив)
+                  example: 1
+                location_id:
+                  oneOf:
+                    - type: integer
+                    - type: array
+                      items:
+                        type: integer
+                  description: ID локации (или массив)
+                  example: [1, 2]
+                price_from:
+                  type: number
+                  description: Цена от
+                  example: 30000
+                price_to:
+                  type: number
+                  description: Цена до
+                  example: 100000
+                area_from:
+                  type: number
+                  description: Площадь от (кв.м)
+                  example: 30
+                area_to:
+                  type: number
+                  description: Площадь до (кв.м)
+                  example: 80
+                room_id:
+                  oneOf:
+                    - type: integer
+                    - type: array
+                      items:
+                        type: integer
+                  description: ID типа комнат (или массив)
+                  example: [1, 2]
+                metro_id:
+                  oneOf:
+                    - type: integer
+                    - type: array
+                      items:
+                        type: integer
+                  description: ID станции метро (или массив)
+                  example: [1, 2, 3]
+                phone:
+                  type: string
+                  description: Поиск по телефону (только цифры)
+                  example: "79001234567"
+                external_id:
+                  type: string
+                  description: Поиск по номеру объявления
+                  example: "123456"
+                call_status_id:
+                  oneOf:
+                    - type: integer
+                    - type: array
+                      items:
+                        type: integer
+                  description: ID статуса звонка (0 = Новое)
+                  example: [0, 1]
+            examples:
+              basic:
+                summary: Базовый запрос
+                value:
+                  page: 1
+                  per_page: 10
+              with_filters:
+                summary: С фильтрами
+                value:
+                  page: 1
+                  per_page: 20
+                  category_id: 1
+                  location_id: [1, 2]
+                  price_from: 30000
+                  price_to: 100000
+              search_by_phone:
+                summary: Поиск по телефону
+                value:
+                  phone: "79001234567"
+      responses:
+        '200':
+          description: Список объявлений успешно получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      listings:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 123
+                            external_id:
+                              type: string
+                              example: "456789"
+                            title:
+                              type: string
+                              example: "2-комн. квартира, 55 м²"
+                            price:
+                              type: number
+                              example: 50000
+                            phone:
+                              type: string
+                              example: "+7 900 123-45-67"
+                            address:
+                              type: string
+                              example: "Москва, ул. Пушкина, д. 10"
+                            source:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                  example: 1
+                                name:
+                                  type: string
+                                  example: "Авито"
+                            category:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                  example: 1
+                                name:
+                                  type: string
+                                  example: "Аренда жилая"
+                            status:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                  example: 1
+                                name:
+                                  type: string
+                                  example: "Новое"
+                            metro:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  id:
+                                    type: integer
+                                  name:
+                                    type: string
+                                  line:
+                                    type: string
+                                  color:
+                                    type: string
+                      pagination:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                            example: 150
+                          page:
+                            type: integer
+                            example: 1
+                          per_page:
+                            type: integer
+                            example: 10
+                          total_pages:
+                            type: integer
+                            example: 15
+                      stats:
+                        type: object
+                        description: Статистика по объявлениям
+              example:
+                code: 200
+                status: "success"
+                data:
+                  listings:
+                    - id: 123
+                      external_id: "456789"
+                      title: "2-комн. квартира, 55 м²"
+                      price: 50000
+                      phone: "+7 900 123-45-67"
+                      address: "Москва, ул. Пушкина, д. 10"
+                      source:
+                        id: 1
+                        name: "Авито"
+                      category:
+                        id: 1
+                        name: "Аренда жилая"
+                      status:
+                        id: 1
+                        name: "Новое"
+                  pagination:
+                    total: 150
+                    page: 1
+                    per_page: 10
+                    total_pages: 15
+                  stats:
+                    new_count: 50
+                    raised_count: 20
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/listings/{id}:
+    get:
+      tags:
+        - Объявления
+      summary: Получение одного объявления
+      description: |
+        Возвращает полную информацию об объявлении по ID.
+        
+        ## Возможные ошибки
+        - 401: Токен отсутствует или истёк
+        - 404: Объявление не найдено
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объявления
+          example: 123
+      responses:
+        '200':
+          description: Данные объявления
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      listing:
+                        type: object
+                        description: Полные данные объявления
+              example:
+                code: 200
+                status: "success"
+                data:
+                  listing:
+                    id: 123
+                    external_id: "456789"
+                    title: "2-комн. квартира, 55 м²"
+                    description: "Сдаётся уютная квартира..."
+                    price: 50000
+                    square_meters: 55
+                    floor: 5
+                    floors_total: 9
+                    phone: "+7 900 123-45-67"
+                    address: "Москва, ул. Пушкина, д. 10"
+                    url: "https://avito.ru/..."
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '404':
+          description: Объявление не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: "error"
+                message: "Объявление не найдено"
+                error: "not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/listings/{id}/status:
+    patch:
+      tags:
+        - Объявления
+      summary: Обновление статуса объявления
+      description: |
+        Обновляет статус объявления.
+        
+        ## Валидация полей
+        - `status` — обязательно, должен существовать в системе
+        
+        ## Возможные ошибки
+        - 400: Статус не указан или не найден
+        - 401: Токен отсутствует или истёк
+        - 404: Объявление не найдено
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объявления
+          example: 123
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  description: Код статуса
+                  example: "new"
+            examples:
+              set_new:
+                summary: Установить статус "Новое"
+                value:
+                  status: "new"
+              set_raised:
+                summary: Установить статус "Поднятое"
+                value:
+                  status: "raised"
+      responses:
+        '200':
+          description: Статус успешно обновлён
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  message:
+                    type: string
+                    example: "Статус объявления успешно обновлён"
+                  data:
+                    type: object
+                    properties:
+                      listing:
+                        type: object
+              example:
+                code: 200
+                status: "success"
+                message: "Статус объявления успешно обновлён"
+                data:
+                  listing:
+                    id: 123
+                    status:
+                      id: 1
+                      name: "Новое"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_status:
+                  summary: Статус не указан
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Статус обязателен для заполнения"
+                    error: "validation_error"
+                invalid_status:
+                  summary: Статус не найден
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Указанный статус не найден"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '404':
+          description: Объявление не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: "error"
+                message: "Объявление не найдено"
+                error: "not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  /api/v1/listings/stats:
+    get:
+      tags:
+        - Объявления
+      summary: Получение статистики по объявлениям
+      description: |
+        Возвращает количество объявлений по статусам.
+        
+        ## Возможные ошибки
+        - 401: Токен отсутствует или истёк
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Статистика успешно получена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    description: Статистика по статусам
+              example:
+                code: 200
+                status: "success"
+                data:
+                  new_count: 50
+                  raised_count: 20
+                  total_count: 150
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  # ==================== Фильтры ====================
+
+  /api/v1/filters:
+    get:
+      tags:
+        - Фильтры
+      summary: Получение данных для фильтров
+      description: |
+        Возвращает данные для фильтров с учётом подписок пользователя.
+        
+        ## Права доступа
+        - Обычный пользователь видит только свои оплаченные категории/локации
+        - Админ видит всё
+        
+        ## Связи фильтров
+        - Локации зависят от выбранной категории
+        - Метро зависит от выбранных локаций
+        - Комнаты зависят от выбранной категории
+        
+        ## Возможные ошибки
+        - 401: Токен отсутствует или истёк
+        - 404: Пользователь не найден
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+          description: Выбранная категория (для фильтрации локаций)
+          example: 1
+        - name: location_id
+          in: query
+          schema:
+            oneOf:
+              - type: integer
+              - type: array
+                items:
+                  type: integer
+          description: Выбранная локация (для фильтрации метро)
+          example: 1
+      responses:
+        '200':
+          description: Данные фильтров успешно получены
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      categories:
+                        type: array
+                        description: Доступные категории
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 1
+                            name:
+                              type: string
+                              example: "Аренда жилая"
+                      locations:
+                        type: array
+                        description: Доступные локации
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 1
+                            name:
+                              type: string
+                              example: "Москва"
+                      metro:
+                        type: array
+                        description: Станции метро
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 1
+                            name:
+                              type: string
+                              example: "Арбатская"
+                            line:
+                              type: string
+                              example: "Арбатско-Покровская"
+                            color:
+                              type: string
+                              example: "#0078BE"
+                      rooms:
+                        type: array
+                        description: Типы комнат
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 1
+                            name:
+                              type: string
+                              example: "1-комнатная"
+                            code:
+                              type: string
+                              example: "1"
+                      sources:
+                        type: array
+                        description: Источники объявлений
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 1
+                            name:
+                              type: string
+                              example: "Авито"
+                      call_statuses:
+                        type: array
+                        description: Статусы звонков
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 0
+                            name:
+                              type: string
+                              example: "Новое"
+                            color:
+                              type: string
+                              example: "#4CAF50"
+                      meta:
+                        type: object
+                        description: Мета-информация
+                        properties:
+                          is_admin:
+                            type: boolean
+                            example: false
+                          selected_category_id:
+                            type: integer
+                            nullable: true
+                            example: 1
+                          selected_location_ids:
+                            type: array
+                            items:
+                              type: integer
+                            nullable: true
+                            example: [1, 2]
+              example:
+                code: 200
+                status: "success"
+                data:
+                  categories:
+                    - id: 1
+                      name: "Аренда жилая"
+                    - id: 2
+                      name: "Продажа жилая"
+                  locations:
+                    - id: 1
+                      name: "Москва"
+                    - id: 2
+                      name: "Санкт-Петербург"
+                  metro:
+                    - id: 1
+                      name: "Арбатская"
+                      line: "Арбатско-Покровская"
+                      color: "#0078BE"
+                  rooms:
+                    - id: 1
+                      name: "1-комнатная"
+                      code: "1"
+                  sources:
+                    - id: 1
+                      name: "Авито"
+                    - id: 2
+                      name: "Циан"
+                  call_statuses:
+                    - id: 0
+                      name: "Новое"
+                      color: "#4CAF50"
+                    - id: 1
+                      name: "Наша квартира"
+                      color: "#4CAF50"
+                  meta:
+                    is_admin: false
+                    selected_category_id: 1
+                    selected_location_ids: [1]
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: "error"
+                message: "Пользователь не найден"
+                error: "not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Внутренняя ошибка сервера"
+                error: "internal_error"
+
+  # ==================== Обработка фото ====================
+
+  /api/v1/photo-tasks:
+    post:
+      tags:
+        - Обработка фото
+      summary: Создание задачи на обработку фото
+      description: |
+        Создаёт задачу на удаление водяных знаков с фото объявления.
+        
+        ## Особенности
+        - Одна задача на объявление
+        - Если задача уже существует — возвращает её текущий статус (код 200)
+        - Новая задача возвращает код 201
+        
+        ## Валидация полей
+        - `listing_id` — обязательно, должно быть положительным числом
+        
+        ## Возможные ошибки
+        - 400: listing_id не указан или некорректен
+        - 401: Токен отсутствует или истёк
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - listing_id
+              properties:
+                listing_id:
+                  type: integer
+                  description: ID объявления
+                  example: 123
+            examples:
+              create_task:
+                summary: Создание задачи
+                value:
+                  listing_id: 123
+      responses:
+        '201':
+          description: Задача успешно создана
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 201
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        description: ID задачи
+                        example: 1
+                      listing_id:
+                        type: integer
+                        description: ID объявления
+                        example: 123
+                      status:
+                        type: string
+                        enum: [pending, processing, completed, failed]
+                        description: Статус задачи
+                        example: "pending"
+                      photos_count:
+                        type: integer
+                        description: Количество обработанных фото
+                        example: 0
+                      archive_path:
+                        type: string
+                        nullable: true
+                        description: Путь к архиву (после завершения)
+                        example: null
+              example:
+                code: 201
+                status: "success"
+                data:
+                  id: 1
+                  listing_id: 123
+                  status: "pending"
+                  photos_count: 0
+                  archive_path: null
+        '200':
+          description: Задача уже существует (возвращает текущий статус)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+              example:
+                code: 200
+                status: "success"
+                data:
+                  id: 1
+                  listing_id: 123
+                  status: "completed"
+                  photos_count: 5
+                  archive_path: "/storage/photo-tasks/123.zip"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_listing_id:
+                  summary: listing_id не указан
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Не указан listing_id"
+                    error: "validation_error"
+                invalid_listing_id:
+                  summary: Некорректный listing_id
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "listing_id должен быть положительным числом"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Ошибка создания задачи"
+                error: "internal_error"
+
+  /api/v1/photo-tasks/{id}/download:
+    get:
+      tags:
+        - Обработка фото
+      summary: Скачивание архива с обработанными фото
+      description: |
+        Возвращает ZIP архив с фото без водяных знаков.
+        
+        ## Особенности
+        - Архив доступен только после завершения задачи (status = completed)
+        - Файл отдаётся с заголовками для скачивания
+        
+        ## Возможные ошибки
+        - 400: Неверный ID задачи
+        - 401: Токен отсутствует или истёк
+        - 404: Архив не найден или задача не завершена
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID задачи
+          example: 1
+      responses:
+        '200':
+          description: ZIP архив с фото
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Неверный ID задачи
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 400
+                status: "error"
+                message: "Неверный id задачи"
+                error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '404':
+          description: Архив не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_completed:
+                  summary: Задача не завершена
+                  value:
+                    code: 404
+                    status: "error"
+                    message: "Архив не найден или задача не завершена"
+                    error: "not_found"
+                task_not_found:
+                  summary: Задача не найдена
+                  value:
+                    code: 404
+                    status: "error"
+                    message: "Задача не найдена"
+                    error: "not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Ошибка скачивания"
                 error: "internal_error"

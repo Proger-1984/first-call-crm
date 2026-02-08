@@ -7,10 +7,16 @@ RUN apk add --no-cache \
     zip \
     unzip \
     git \
-    curl
+    curl \
+    freetype-dev \
+    libjpeg-turbo-dev \
+    libpng-dev
+
+# Конфигурируем и устанавливаем GD
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg
 
 # Устанавливаем расширения PHP
-RUN docker-php-ext-install pdo pdo_pgsql pgsql zip
+RUN docker-php-ext-install pdo pdo_pgsql pgsql zip gd
 
 # Устанавливаем composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer

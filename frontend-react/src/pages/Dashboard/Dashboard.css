@@ -79,6 +79,13 @@
 .compact-stat-content {
     display: flex;
     flex-direction: column;
+    min-width: 0;
+}
+
+.compact-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .compact-stat-value {
@@ -86,6 +93,31 @@
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1.2;
+}
+
+.compact-stat-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 4px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.compact-stat-trend .material-icons {
+    font-size: 12px;
+}
+
+.compact-stat-trend.up {
+    color: #2e7d32;
+    background: rgba(46, 125, 50, 0.1);
+}
+
+.compact-stat-trend.down {
+    color: #d32f2f;
+    background: rgba(211, 47, 47, 0.1);
 }
 
 .compact-stat-title {
@@ -151,6 +183,14 @@
     font-size: 18px;
 }
 
+/* Группа кнопок в заголовке фильтров */
+.filter-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
 .filter-toggle-btn {
     display: flex;
     align-items: center;
@@ -197,6 +237,41 @@
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.3px;
+}
+
+.filter-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.filter-label-row .filter-label {
+    margin-bottom: 0;
+}
+
+.filter-reset-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    background: var(--bg-secondary);
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+
+.filter-reset-btn:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.filter-reset-btn .material-icons {
+    font-size: 14px;
 }
 
 .filter-row {
@@ -269,6 +344,8 @@
 }
 
 .btn-primary:hover {
+    background: linear-gradient(135deg, #6b7f5c 0%, #8a9f78 100%) !important;
+    color: white !important;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(132, 152, 115, 0.35);
 }
@@ -298,10 +375,59 @@
     border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
 }
 
+/* Заголовок таблицы с кнопкой настройки столбцов */
+.table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-card);
+}
+
+.table-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.table-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .table-actions {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+/* Подсветка поднятых объявлений (listing_status_id = 2) — перенесено вниз файла */
+
+/* Индикатор поднятого объявления — жёлтая полоска слева */
+.data-table tbody tr.row-raised td:first-child {
+    position: relative;
+}
+
+.data-table tbody tr.row-raised td:first-child::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--warning);
+}
+
+/* Ячейка категории */
+.category-cell {
+    font-size: 12px;
+    color: var(--text-secondary);
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .btn-sm {
@@ -362,7 +488,6 @@
 
 .data-table td {
     padding: 14px;
-    border-bottom: 1px solid var(--border-light);
     font-size: 13px;
     vertical-align: middle;
 }
@@ -378,12 +503,8 @@
     font-size: 12px;
 }
 
-.density-compact .listing-info h4 {
+.density-compact .listing-title h4 {
     font-size: 12px;
-}
-
-.density-compact .listing-meta {
-    font-size: 10px;
 }
 
 .density-compact .listing-action {
@@ -457,6 +578,24 @@
     font-weight: 500;
 }
 
+.metro-line {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.metro-details {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.metro-distance {
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
 .metro-time {
     font-size: 10px;
     color: var(--text-muted);
@@ -472,6 +611,14 @@
     font-size: 11px;
 }
 
+.density-compact .metro-line {
+    font-size: 9px;
+}
+
+.density-compact .metro-distance {
+    font-size: 9px;
+}
+
 .density-compact .metro-time {
     font-size: 9px;
 }
@@ -479,22 +626,54 @@
 /* Ячейка телефона */
 .phone-cell {
     white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.phone-paid-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #856404;
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
+    width: fit-content;
 }
 
 .phone-link {
     color: var(--text-primary);
-    text-decoration: none;
+    text-decoration: none !important;
     font-weight: 600;
     font-size: 13px;
     transition: color var(--transition-fast);
 }
 
-.phone-link:hover {
+.phone-link:hover,
+.phone-link:visited,
+.phone-link:active {
     color: var(--primary);
+    text-decoration: none !important;
+}
+
+.phone-empty {
+    color: var(--text-muted);
+}
+
+.phone-unavailable {
+    color: var(--warning);
+    font-size: 11px;
+    font-weight: 500;
 }
 
 .density-compact .phone-link {
     font-size: 12px;
+}
+
+.density-compact .phone-paid-label {
+    font-size: 9px;
+    padding: 1px 4px;
 }
 
 /* Ячейка площади */
@@ -557,20 +736,22 @@
 .listing-preview {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
     min-width: 180px;
 }
 
-.listing-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.listing-title h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.3;
 }
 
 .listing-actions {
     display: flex;
     gap: 2px;
-    opacity: 0.6;
+    opacity: 0.5;
     transition: opacity var(--transition-fast);
 }
 
@@ -579,8 +760,8 @@ tr:hover .listing-actions {
 }
 
 .listing-action {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     border-radius: 4px;
     display: flex;
     align-items: center;
@@ -596,25 +777,62 @@ tr:hover .listing-actions {
 }
 
 .listing-action.favorite.active {
-    color: var(--accent);
+    color: #e53935;
+    background: #ffebee;
+}
+
+.listing-action.favorite:hover {
+    color: #e53935;
+    background: #ffebee;
+}
+
+/* Кнопка обработки фото */
+.listing-action.photo-task {
+    color: var(--text-muted);
+}
+
+.listing-action.photo-task:hover {
+    color: var(--primary);
+    background: var(--primary-light);
+}
+
+.listing-action.photo-task.pending {
+    color: var(--warning);
+    background: var(--warning-bg);
+}
+
+.listing-action.photo-task.processing {
+    color: var(--info);
+    background: var(--info-bg);
+}
+
+.listing-action.photo-task.completed {
+    color: var(--success);
+    background: var(--success-bg);
+}
+
+.listing-action.photo-task.completed:hover {
+    background: var(--success);
+    color: white;
+}
+
+.listing-action.photo-task.failed {
+    color: var(--danger);
+    background: var(--danger-bg);
+}
+
+/* Анимация вращения для processing */
+.listing-action .material-icons.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .listing-action .material-icons {
-    font-size: 14px;
-}
-
-.listing-info h4 {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-    white-space: nowrap;
-}
-
-.listing-meta {
-    font-size: 10px;
-    color: var(--text-secondary);
-    line-height: 1.3;
+    font-size: 16px;
 }
 
 /* Ячейка статуса */
@@ -757,4 +975,266 @@ tr:hover .listing-actions {
         flex-direction: column;
         gap: 14px;
     }
+}
+
+/* ===== Модальное окно настройки столбцов ===== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal {
+    background: var(--bg-card);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
+    max-width: 400px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--border-radius-sm);
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+
+.modal-close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 16px 0;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-light);
+}
+
+/* Список столбцов */
+.columns-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.column-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    cursor: grab;
+    transition: all var(--transition-fast);
+    border: 1px solid transparent;
+}
+
+.column-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-light);
+}
+
+.column-item.dragging {
+    opacity: 0.5;
+    background: var(--primary-light);
+    border-color: var(--primary);
+}
+
+.drag-handle {
+    color: var(--text-muted);
+    font-size: 18px;
+    cursor: grab;
+}
+
+.column-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.column-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+/* Скрытие стандартного чекбокса и кастомный стиль */
+.column-checkbox input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-card);
+    cursor: pointer;
+    position: relative;
+    transition: all var(--transition-fast);
+}
+
+.column-checkbox input[type="checkbox"]:checked {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.column-checkbox input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 5px;
+    height: 9px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.column-checkbox input[type="checkbox"]:hover {
+    border-color: var(--primary);
+}
+
+/* Модальное окно описания */
+.description-modal {
+    max-width: 700px;
+    width: 90%;
+}
+
+.description-modal .modal-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.description-content {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.description-content p {
+    margin: 0 0 8px 0;
+}
+
+.description-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Ячейка с ценой и историей изменений */
+.price-cell {
+    white-space: nowrap;
+}
+
+.price-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.price-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 1px 4px;
+    border-radius: 4px;
+    cursor: help;
+}
+
+.price-change .material-icons {
+    font-size: 12px;
+}
+
+/* Цвета с точки зрения покупателя/арендатора */
+.price-change.up {
+    color: #d32f2f;  /* Красный — цена выросла (плохо) */
+    background: rgba(211, 47, 47, 0.1);
+}
+
+.price-change.down {
+    color: #2e7d32;  /* Зелёный — цена снизилась (хорошо) */
+    background: rgba(46, 125, 50, 0.1);
+}
+
+.price-diff {
+    font-size: 10px;
+}
+
+/* =====================================================
+   Подсветка поднятых объявлений (listing_status_id = 2)
+   Размещено в конце файла для правильного каскада CSS
+   ===================================================== */
+.data-table tbody tr.row-raised,
+.data-table tbody tr.row-raised:nth-child(even),
+.data-table tbody tr.row-raised:nth-child(odd) {
+    background: linear-gradient(90deg, rgba(255, 243, 205, 0.6) 0%, rgba(255, 243, 205, 0.3) 100%) !important;
+}
+
+.data-table tbody tr.row-raised:hover {
+    background: linear-gradient(90deg, rgba(255, 243, 205, 0.8) 0%, rgba(255, 243, 205, 0.5) 100%) !important;
 }

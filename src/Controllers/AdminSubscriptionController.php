@@ -264,6 +264,127 @@ class AdminSubscriptionController
     }
     
     /**
+     * Создание подписки администратором для пользователя
+     * Используется для миграции пользователей со старой CRM
+     */
+    public function createSubscription(Request $request, Response $response): Response
+    {
+        // Проверка прав администратора
+        if ($adminCheck = $this->checkAdminAccess($request, $response)) {
+            return $adminCheck;
+        }
+        
+        try {
+            $adminId = $request->getAttribute('userId');
+            $data = $request->getParsedBody();
+            
+            // Валидация обязательных полей
+            $requiredFields = ['user_id', 'tariff_id', 'category_id', 'location_id', 'payment_method'];
+            foreach ($requiredFields as $field) {
+                if (!isset($data[$field]) || empty($data[$field])) {
+                    return $this->respondWithError($response, "Отсутствует обязательное поле: {$field}", 'validation_error', 400);
+                }
+            }
+            
+            $userId = (int)$data['user_id'];
+            $tariffId = (int)$data['tariff_id'];
+            $categoryId = (int)$data['category_id'];
+            $locationId = (int)$data['location_id'];
+            $paymentMethod = $data['payment_method'];
+            $notes = $data['notes'] ?? 'Создано администратором';
+            $durationHours = isset($data['duration_hours']) && $data['duration_hours'] > 0 
+                ? (int)$data['duration_hours'] 
+                : null;
+            $price = isset($data['price']) ? (float)$data['price'] : null;
+            $autoActivate = isset($data['auto_activate']) ? (bool)$data['auto_activate'] : true;
+            
+            // Проверяем существование пользователя
+            $user = User::find($userId);
+            if (!$user) {
+                return $this->respondWithError($response, 'Пользователь не найден', 'not_found', 404);
+            }
+            
+            // Проверяем существование тарифа
+            $tariff = \App\Models\Tariff::find($tariffId);
+            if (!$tariff || !$tariff->is_active) {
+                return $this->respondWithError($response, 'Тариф не найден или неактивен', 'not_found', 404);
+            }
+            
+            // Проверяем существование категории
+            $category = \App\Models\Category::find($categoryId);
+            if (!$category) {
+                return $this->respondWithError($response, 'Категория не найдена', 'not_found', 404);
+            }
+            
+            // Проверяем существование локации
+            $location = \App\Models\Location::find($locationId);
+            if (!$location) {
+                return $this->respondWithError($response, 'Локация не найдена', 'not_found', 404);
+            }
+            
+            // Проверяем, нет ли уже активной подписки для этой категории и локации
+            $existingSubscription = UserSubscription::where('user_id', $userId)
+                ->where('category_id', $categoryId)
+                ->where('location_id', $locationId)
+                ->where('status', 'active')
+                ->first();
+                
+            if ($existingSubscription) {
+                return $this->respondWithError(
+                    $response, 
+                    'У пользователя уже есть активная подписка для этой категории и локации', 
+                    'subscription_exists', 
+                    409
+                );
+            }
+            
+            // Определяем цену
+            $finalPrice = $price ?? $this->subscriptionService->getPriceForTariff($tariff, $location);
+            
+            // Создаём подписку
+            $subscription = new UserSubscription();
+            $subscription->user_id = $userId;
+            $subscription->tariff_id = $tariffId;
+            $subscription->category_id = $categoryId;
+            $subscription->location_id = $locationId;
+            $subscription->price_paid = $finalPrice;
+            $subscription->payment_method = $paymentMethod;
+            $subscription->admin_notes = $notes;
+            $subscription->status = 'pending';
+            $subscription->save();
+            
+            // Если нужно сразу активировать
+            if ($autoActivate) {
+                $subscription->activate($adminId, $paymentMethod, $notes, $durationHours);
+                $subscription->refresh();
+                
+                // Отправляем уведомление пользователю
+                try {
+                    $subscription->load(['category', 'location', 'tariff']);
+                    $this->telegramService->notifyPremiumSubscriptionActivated($user, $subscription);
+                } catch (\Exception $e) {
+                    error_log('Ошибка при отправке уведомления: ' . $e->getMessage());
+                }
+            }
+            
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'message' => $autoActivate ? 'Подписка создана и активирована' : 'Подписка создана',
+                'data' => [
+                    'subscription_id' => $subscription->id,
+                    'status' => $subscription->status,
+                    'start_date' => $subscription->start_date?->format('Y-m-d H:i:s'),
+                    'end_date' => $subscription->end_date?->format('Y-m-d H:i:s'),
+                ]
+            ], 200);
+            
+        } catch (\Exception $e) {
+            return $this->respondWithError($response, $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
      * Отмена подписки администратором
      */
     public function cancelSubscription(Request $request, Response $response): Response

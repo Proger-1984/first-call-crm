@@ -1,0 +1,457 @@
+/* ============================================
+   Analytics Page - Страница аналитики
+   ============================================ */
+
+.analytics-page {
+  padding: 16px 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Header */
+.analytics-header {
+  margin-bottom: 20px;
+}
+
+.analytics-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.analytics-header h1 .material-icons {
+  font-size: 28px;
+  color: var(--primary);
+}
+
+/* Summary Cards */
+.analytics-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.analytics-summary-card {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.analytics-summary-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.analytics-summary-icon .material-icons {
+  font-size: 28px;
+  color: #fff;
+}
+
+.analytics-summary-card.revenue .analytics-summary-icon {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+}
+
+.analytics-summary-card.users .analytics-summary-icon {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.analytics-summary-card.subscriptions .analytics-summary-icon {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.analytics-summary-content {
+  flex: 1;
+}
+
+.analytics-summary-content h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.analytics-summary-values {
+  display: flex;
+  gap: 20px;
+}
+
+.analytics-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.analytics-summary-item .label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.analytics-summary-item .value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.analytics-summary-card.revenue .analytics-summary-item .value {
+  color: #16a34a;
+}
+
+.analytics-summary-card.users .analytics-summary-item .value {
+  color: #3b82f6;
+}
+
+.analytics-summary-card.subscriptions .analytics-summary-item .value {
+  color: #f59e0b;
+}
+
+/* Filters */
+.analytics-filters {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.analytics-filters-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.analytics-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.analytics-filter-group > label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Period Buttons */
+.analytics-period-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.analytics-period-btn {
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.analytics-period-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.analytics-period-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* Custom Dates */
+.analytics-custom-dates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analytics-custom-dates .form-control,
+.analytics-custom-dates .datepicker-input {
+  width: 110px;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  font-size: 12px;
+  height: 32px;
+}
+
+.analytics-date-sep {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.analytics-apply-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 5px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  align-self: flex-end;
+  height: 32px;
+}
+
+.analytics-apply-btn:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.analytics-apply-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Chart Type Buttons */
+.analytics-chart-type-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.analytics-type-btn {
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.analytics-type-btn:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.analytics-type-btn.active {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: var(--text-primary);
+}
+
+.analytics-type-btn.revenue.active {
+  background: #dcfce7;
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+.analytics-type-btn.users.active {
+  background: #dbeafe;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.analytics-type-btn.subscriptions.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #d97706;
+}
+
+/* View Buttons */
+.analytics-view-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.analytics-view-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.analytics-view-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.analytics-view-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.analytics-view-btn .material-icons {
+  font-size: 18px;
+}
+
+/* Totals */
+.analytics-totals {
+  display: flex;
+  gap: 24px;
+  padding: 14px 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.analytics-total-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.analytics-total-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.analytics-total-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.analytics-total-item.revenue .analytics-total-value {
+  color: #16a34a;
+}
+
+.analytics-total-item.users .analytics-total-value {
+  color: #3b82f6;
+}
+
+.analytics-total-item.subscriptions .analytics-total-value {
+  color: #f59e0b;
+}
+
+/* Chart Container */
+.analytics-chart-container {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.analytics-chart-loading,
+.analytics-chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: var(--text-muted);
+}
+
+.analytics-chart-loading .material-icons,
+.analytics-chart-empty .material-icons {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.analytics-chart-loading p,
+.analytics-chart-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Tooltip */
+.analytics-tooltip {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.analytics-tooltip-label {
+  margin: 0 0 8px 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 6px;
+}
+
+.analytics-tooltip p {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+/* Spinning animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .analytics-filters-row {
+    gap: 16px;
+  }
+  
+  .analytics-totals {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .analytics-page {
+    padding: 12px 16px;
+  }
+  
+  .analytics-summary {
+    grid-template-columns: 1fr;
+  }
+  
+  .analytics-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .analytics-period-buttons,
+  .analytics-chart-type-buttons {
+    flex-wrap: wrap;
+  }
+  
+  .analytics-custom-dates {
+    flex-wrap: wrap;
+  }
+  
+  .analytics-totals {
+    flex-direction: column;
+    gap: 12px;
+  }
+}

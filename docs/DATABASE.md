@@ -1,6 +1,6 @@
 # Схема базы данных First Call
 
-**Дата обновления:** 25 января 2026
+**Дата обновления:** 8 февраля 2026
 
 ## Обзор
 
@@ -49,16 +49,17 @@
          │     └─────────────────┘
          │
          │     ┌─────────────────┐     ┌─────────────────┐
-         └────<│ agent_listings  │>───<│    listings     │
-               └─────────────────┘     └────────┬────────┘
-                                                │
-                                       ┌────────┴────────┐
-                                       │  listing_metro  │>──┐
-                                       └─────────────────┘   │
-                                                             │
-                                       ┌─────────────────┐   │
-                                       │ metro_stations  │<──┘
-                                       └─────────────────┘
+         ├────<│ agent_listings  │>───<│    listings     │
+         │     └─────────────────┘     └────────┬────────┘
+         │                                      │
+         │     ┌─────────────────┐     ┌────────┴────────┐
+         ├────<│ user_favorites  │>────│  listing_metro  │>──┐
+         │     └────────┬────────┘     └─────────────────┘   │
+         │              │                                    │
+         │     ┌────────┴────────┐     ┌─────────────────┐   │
+         └────<│user_favorite_   │     │ metro_stations  │<──┘
+               │   statuses      │     └─────────────────┘
+               └─────────────────┘
 ```
 
 ---
@@ -218,22 +219,26 @@
 
 ---
 
-### 9. tariff_prices — Цены тарифов по локациям
+### 9. tariff_prices — Цены тарифов по локациям и категориям
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
 | `tariff_id` | INT FK | Ссылка на tariffs |
 | `location_id` | INT FK | Ссылка на locations |
-| `price` | DECIMAL(10,2) | Цена для локации |
+| `category_id` | INT FK NULL | Ссылка на categories |
+| `price` | DECIMAL(10,2) | Цена для комбинации |
 | `created_at` | TIMESTAMP | Дата создания |
 | `updated_at` | TIMESTAMP | Дата обновления |
 
 **FK:**
 - `tariff_id` → `tariffs(id)` ON DELETE CASCADE
 - `location_id` → `locations(id)` ON DELETE CASCADE
+- `category_id` → `categories(id)` ON DELETE CASCADE
 
-**UNIQUE:** (`tariff_id`, `location_id`)
+**UNIQUE:** (`tariff_id`, `location_id`, `category_id`)
+
+**Примечание:** Цена зависит от комбинации тариф + локация + категория. Например, Москва + Аренда жилая = 10000₽, остальные = 5000₽.
 
 ---
 
@@ -249,7 +254,7 @@
 | `price_paid` | DECIMAL(10,2) | Уплаченная цена |
 | `start_date` | TIMESTAMP NULL | Дата начала |
 | `end_date` | TIMESTAMP NULL | Дата окончания |
-| `status` | VARCHAR | Статус: `pending`, `active`, `expired`, `cancelled` |
+| `status` | VARCHAR | Статус: `pending`, `active`, `extend_pending`, `expired`, `cancelled` |
 | `is_enabled` | BOOLEAN | Временно отключена |
 | `payment_method` | VARCHAR NULL | Способ оплаты |
 | `admin_notes` | VARCHAR NULL | Заметки админа |
@@ -257,6 +262,13 @@
 | `approved_at` | TIMESTAMP NULL | Дата одобрения |
 | `created_at` | TIMESTAMP | Дата создания |
 | `updated_at` | TIMESTAMP | Дата обновления |
+
+**Статусы:**
+- `pending` — ожидает подтверждения админом
+- `active` — активна, пользователь имеет доступ
+- `extend_pending` — ожидает продления (подписка работает, заявка отправлена)
+- `expired` — истекла
+- `cancelled` — отменена
 
 **FK:**
 - `user_id` → `users(id)` ON DELETE CASCADE
@@ -376,6 +388,8 @@
 | `location_id` | INT FK | Ссылка на locations (город) |
 | `name` | VARCHAR(100) | Название станции |
 | `line` | VARCHAR(100) NULL | Линия метро |
+| `line_id` | VARCHAR(20) NULL | ID линии из API hh.ru |
+| `station_id` | VARCHAR(20) NULL | ID станции из API hh.ru |
 | `color` | VARCHAR(20) NULL | Цвет линии |
 | `lat` | DECIMAL(10,8) | Широта |
 | `lng` | DECIMAL(11,8) | Долгота |
@@ -383,6 +397,8 @@
 **FK:** `location_id` → `locations(id)` ON DELETE CASCADE
 
 **UNIQUE:** (`location_id`, `name`, `line`)
+
+**Индексы:** `station_id`
 
 ---
 
@@ -400,10 +416,12 @@
 | `description` | TEXT NULL | Описание |
 | `rooms` | SMALLINT NULL | Количество комнат |
 | `price` | DECIMAL(12,2) NULL | Цена |
+| `price_history` | JSONB NULL | История изменения цен |
 | `square_meters` | DECIMAL(8,2) NULL | Площадь |
 | `floor` | SMALLINT NULL | Этаж |
 | `floors_total` | SMALLINT NULL | Всего этажей |
 | `phone` | VARCHAR(20) NULL | Телефон |
+| `phone_unavailable` | BOOLEAN | Телефон недоступен (только звонки через приложение) |
 | `city` | VARCHAR(100) NULL | Город (текст) |
 | `street` | VARCHAR(150) NULL | Улица |
 | `building` | VARCHAR(20) NULL | Номер дома |
@@ -418,6 +436,14 @@
 | `created_at` | TIMESTAMP | Дата создания |
 | `updated_at` | TIMESTAMP | Дата обновления |
 | `deleted_at` | TIMESTAMP NULL | Soft delete |
+
+**Формат price_history:**
+```json
+[
+  {"price": 50000, "date": "2026-02-01"},
+  {"price": 45000, "date": "2026-02-05"}
+]
+```
 
 **FK:**
 - `source_id` → `sources(id)`
@@ -444,6 +470,7 @@
 | `listing_id` | INT FK | Ссылка на listings |
 | `metro_station_id` | INT FK | Ссылка на metro_stations |
 | `travel_time_min` | SMALLINT NULL | Время до метро (мин) |
+| `distance` | VARCHAR(50) NULL | Расстояние до метро ("900 м", "2,7 км") |
 | `travel_type` | VARCHAR(20) | Тип: `walk`, `car`, `public_transport` |
 | `created_at` | TIMESTAMP | Дата создания |
 | `updated_at` | TIMESTAMP | Дата обновления |
@@ -456,7 +483,52 @@
 
 ---
 
-### 19. agent_listings — Объявления агентов
+### 19. user_favorites — Избранные объявления пользователей
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `user_id` | INT FK | Ссылка на users |
+| `listing_id` | INT FK | Ссылка на listings |
+| `comment` | VARCHAR(250) NULL | Комментарий пользователя |
+| `status_id` | INT FK NULL | Ссылка на user_favorite_statuses |
+| `created_at` | TIMESTAMP | Дата добавления в избранное |
+
+**FK:**
+- `user_id` → `users(id)` ON DELETE CASCADE
+- `listing_id` → `listings(id)` ON DELETE CASCADE
+- `status_id` → `user_favorite_statuses(id)` ON DELETE SET NULL
+
+**UNIQUE:** (`user_id`, `listing_id`)
+
+**Индексы:**
+- `user_id`
+- `listing_id`
+- `status_id`
+
+---
+
+### 20. user_favorite_statuses — Пользовательские статусы избранного
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `user_id` | INT FK | Ссылка на users |
+| `name` | VARCHAR(50) | Название статуса |
+| `color` | VARCHAR(7) | Цвет в HEX формате (#RRGGBB) |
+| `sort_order` | SMALLINT | Порядок сортировки |
+| `created_at` | TIMESTAMP | Дата создания |
+| `updated_at` | TIMESTAMP | Дата обновления |
+
+**FK:** `user_id` → `users(id)` ON DELETE CASCADE
+
+**UNIQUE:** (`user_id`, `name`)
+
+**Индексы:** `user_id`
+
+---
+
+### 21. agent_listings — Объявления агентов
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
@@ -481,7 +553,7 @@
 
 ---
 
-### 20. listing_photo_tasks — Задачи парсинга фото
+### 22. listing_photo_tasks — Задачи парсинга фото (устаревшая)
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
@@ -500,7 +572,29 @@
 
 ---
 
-### 21. location_proxies — Прокси для парсинга
+### 23. photo_tasks — Задачи обработки фото (удаление водяных знаков)
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | BIGSERIAL PK | Первичный ключ |
+| `listing_id` | BIGINT FK UNIQUE | Ссылка на listings (одна задача на объявление) |
+| `source_id` | TINYINT | ID источника |
+| `external_id` | VARCHAR(50) | ID объявления на источнике |
+| `url` | VARCHAR(500) | URL объявления |
+| `status` | ENUM | Статус: `pending`, `processing`, `completed`, `failed` |
+| `error_message` | VARCHAR(500) NULL | Сообщение об ошибке |
+| `photos_count` | SMALLINT | Количество обработанных фото |
+| `archive_path` | VARCHAR(255) NULL | Путь к архиву с фото |
+| `created_at` | TIMESTAMP | Дата создания |
+| `updated_at` | TIMESTAMP | Дата обновления |
+
+**FK:** `listing_id` → `listings(id)` ON DELETE CASCADE
+
+**Индексы:** (`status`, `created_at`)
+
+---
+
+### 24. location_proxies — Прокси для парсинга
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
@@ -521,7 +615,7 @@
 
 ---
 
-### 22. cian_auth — Авторизация ЦИАН
+### 25. cian_auth — Авторизация ЦИАН
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
@@ -586,6 +680,16 @@ docker exec -it slim_php-cli php db/migrations/run.php
 28. `20241201000003` — fill cities
 29. `20241201000004` — location_proxies
 30. `20241201000005` — cian_auth
+31. `20260128000001` — user_favorites
+32. `20260128000002` — add comment to user_favorites
+33. `20260128000003` — user_favorite_statuses
+34. `20260128000004` — add status_id to user_favorites
+35. `20260128000005` — add category_id to tariff_prices
+36. `20260201000001` — add price_history to listings
+37. `20260202000001` — add hh_ids to metro_stations
+38. `20260202000002` — add metro_fields to listings (phone_unavailable)
+39. `20260202000003` — move metro_info to listing_metro (distance)
+40. `20260206000001` — photo_tasks
 
 ---
 

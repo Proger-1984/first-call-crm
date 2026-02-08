@@ -45,6 +45,18 @@
     border-color: #cfd5e0;
 }
 
+.badge-calling {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-color: #a5d6a7;
+}
+
+.badge-new {
+    background: #f5f5f5;
+    color: #757575;
+    border-color: #e0e0e0;
+}
+
 /* Source Badges */
 .source-badge {
     display: inline-flex;
@@ -128,4 +140,9 @@
 .duplicates-list {
     display: flex;
     gap: 5px;
+}
+
+.duplicates-list a {
+    text-decoration: none;
+    display: inline-flex;
 }
