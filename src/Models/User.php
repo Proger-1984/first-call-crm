@@ -397,6 +397,11 @@ class User extends Model
         // Получаем тариф и проверяем доступность
         $tariff = Tariff::findOrFail($tariffId);
 
+        // Проверяем, не использовал ли пользователь демо-тариф ранее
+        if ($tariff->isDemo() && $this->is_trial_used) {
+            throw new \Exception('Вы уже использовали демо-тариф ранее');
+        }
+
         // Если пользователь запрашивает премиум-тариф, отмечаем демо как использованное
         if ($tariff->isPremium() && !$this->is_trial_used) {
             $this->is_trial_used = true;

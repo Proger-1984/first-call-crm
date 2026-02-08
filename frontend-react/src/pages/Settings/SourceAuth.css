@@ -1,259 +1,323 @@
-/* Контейнер авторизации источников */
-.source-auth-container {
+/* Страница авторизации источников */
+.source-auth-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
-.source-auth-description {
+.source-auth-hint {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
   background: var(--bg-secondary);
   border-radius: 8px;
-  border-left: 4px solid var(--primary);
+  border-left: 3px solid var(--primary);
 }
 
-.source-auth-description .material-icons {
+.source-auth-hint .material-icons {
   color: var(--primary);
-  flex-shrink: 0;
+  font-size: 20px;
 }
 
-.source-auth-description p {
+.source-auth-hint p {
   margin: 0;
-  color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* Сетка карточек — две в ряд */
+.source-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  align-items: start; /* Карточки не растягиваются по высоте соседа */
+}
+
+@media (max-width: 900px) {
+  .source-cards-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Карточка источника */
-.source-auth-card {
+.source-card {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  overflow: hidden;
-  transition: border-color 0.2s;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.source-auth-card.authorized {
+.source-card:hover {
+  border-color: var(--border-hover, #ccc);
+}
+
+.source-card.authorized {
   border-color: var(--success);
-}
-
-.source-auth-card:hover {
-  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--success);
 }
 
 /* Заголовок карточки */
-.source-auth-header {
+.source-card-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  cursor: pointer;
-  user-select: none;
+  align-items: center;
 }
 
-.source-auth-header:hover {
-  background: var(--bg-secondary);
-}
-
-.source-auth-info {
+.source-card-title {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
 }
 
-.source-icon {
-  font-size: 32px;
+.source-card-title .material-icons {
+  font-size: 28px;
 }
 
-.source-auth-title h3 {
-  margin: 0 0 4px 0;
-  font-size: 18px;
+.source-name {
+  font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.source-auth-status {
+/* Бейдж статуса */
+.source-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
   font-size: 13px;
   font-weight: 500;
 }
 
-.source-auth-status.active {
+.source-badge .material-icons {
+  font-size: 16px;
+}
+
+.source-badge.success {
+  background: rgba(76, 175, 80, 0.1);
   color: var(--success);
 }
 
-.source-auth-status.inactive {
-  color: var(--text-muted);
-}
-
-.expand-icon {
-  color: var(--text-muted);
-  transition: transform 0.2s;
-}
-
-.expand-icon.expanded {
-  transform: rotate(180deg);
-}
-
-/* Информация о подписке */
-.source-subscription-info {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  padding: 12px 20px;
+.source-badge.inactive {
   background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
+  color: var(--text-muted);
 }
 
-.subscription-item {
+/* Сетка информации о подписке */
+.source-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Кнопки действий */
+.source-card-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.subscription-item .material-icons {
-  font-size: 18px;
-  color: var(--text-muted);
-}
-
-/* Контент карточки */
-.source-auth-content {
-  padding: 20px;
+  padding-top: 8px;
   border-top: 1px solid var(--border-color);
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
   background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--bg-tertiary, #e0e0e0);
+  color: var(--text-primary);
+}
+
+.btn-icon.danger:hover:not(:disabled) {
+  background: rgba(244, 67, 54, 0.1);
+  color: var(--danger);
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-icon .material-icons {
+  font-size: 20px;
+}
+
+.btn-expand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-expand:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.btn-expand.expanded {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.btn-expand .material-icons {
+  font-size: 18px;
+}
+
+/* Развёрнутая форма */
+.source-card-expanded {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Инструкции */
-.source-auth-instructions {
-  margin-bottom: 24px;
-}
-
-.source-auth-instructions h4 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.source-auth-instructions ol {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.source-auth-instructions li {
-  margin-bottom: 8px;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-/* Методы авторизации */
-.source-auth-method {
-  margin-bottom: 24px;
-  padding: 16px;
-  background: var(--bg-primary);
+.cookie-instructions {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-secondary);
   border-radius: 8px;
-  border: 1px solid var(--border-color);
 }
 
-.source-auth-method:last-of-type {
-  margin-bottom: 0;
-}
-
-.source-auth-method h4 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 8px 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.source-auth-method h4 .material-icons {
+.cookie-instructions .material-icons {
+  color: var(--text-muted);
   font-size: 20px;
-  color: var(--primary);
+  flex-shrink: 0;
 }
 
-.method-description {
-  margin: 0 0 16px 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-/* Bookmarklet результат */
-.bookmarklet-result {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.bookmarklet-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.bookmarklet-link {
-  text-decoration: none;
-  cursor: grab;
-}
-
-.bookmarklet-link:active {
-  cursor: grabbing;
-}
-
-.bookmarklet-hint {
+.cookie-instructions ol {
   margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
-  font-style: italic;
+  padding-left: 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
 
-/* Ручной ввод */
-.manual-input-group {
+.cookie-instructions li {
+  margin-bottom: 2px;
+}
+
+/* Поле ввода кук */
+.cookie-input-wrapper {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.manual-input-group textarea {
+.cookie-input-wrapper textarea {
   width: 100%;
   padding: 12px;
-  font-family: monospace;
-  font-size: 13px;
   border: 2px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-primary);
   color: var(--text-primary);
+  font-family: monospace;
+  font-size: 12px;
   resize: vertical;
-  min-height: 100px;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+  min-height: 80px;
+  transition: border-color 0.2s;
 }
 
-.manual-input-group textarea:focus {
+.cookie-input-wrapper textarea:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(var(--primary-rgb, 76, 175, 80), 0.15);
 }
 
-.manual-input-group textarea::placeholder {
+.cookie-input-wrapper textarea::placeholder {
   color: var(--text-muted);
-  font-style: italic;
 }
 
-/* Действия */
-.source-auth-actions {
+.btn-save {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-color);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  align-self: flex-start;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-save .material-icons {
+  font-size: 18px;
 }
 
 /* Загрузка */
@@ -262,63 +326,12 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 48px;
+  padding: 60px;
   color: var(--text-muted);
 }
 
-/* Кнопки */
-.source-auth-container .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  font-size: 14px;
-  font-weight: 500;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.source-auth-container .btn .material-icons {
-  font-size: 18px;
-}
-
-.source-auth-container .btn-primary {
-  background: var(--primary);
-  color: white;
-}
-
-.source-auth-container .btn-primary:hover:not(:disabled) {
-  background: var(--primary-hover);
-}
-
-.source-auth-container .btn-secondary {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.source-auth-container .btn-secondary:hover:not(:disabled) {
-  background: var(--bg-tertiary);
-}
-
-.source-auth-container .btn-danger {
-  background: var(--danger);
-  color: white;
-}
-
-.source-auth-container .btn-danger:hover:not(:disabled) {
-  background: #c82333;
-}
-
-.source-auth-container .btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 /* Анимация вращения */
-.source-auth-container .spinning {
+.spinning {
   animation: spin 1s linear infinite;
 }
 
@@ -328,33 +341,29 @@
 }
 
 /* Адаптивность */
-@media (max-width: 768px) {
-  .source-auth-header {
-    padding: 12px 16px;
-  }
-
-  .source-icon {
-    font-size: 28px;
-  }
-
-  .source-auth-title h3 {
-    font-size: 16px;
-  }
-
-  .source-subscription-info {
-    padding: 10px 16px;
-  }
-
-  .source-auth-content {
+@media (max-width: 600px) {
+  .source-card {
     padding: 16px;
   }
 
-  .bookmarklet-actions {
+  .source-card-header {
     flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
 
-  .bookmarklet-actions .btn {
+  .source-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .source-card-actions {
+    flex-wrap: wrap;
+  }
+
+  .btn-expand {
     width: 100%;
     justify-content: center;
+    margin-left: 0;
+    margin-top: 8px;
   }
 }
