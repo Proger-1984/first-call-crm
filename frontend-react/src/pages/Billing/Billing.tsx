@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { billingApi, subscriptionsApi, type BillingFilters } from '../../services/api';
 import { DatePicker } from '../../components/UI/DatePicker';
 import { Tooltip } from '../../components/UI/Tooltip';
+import { Pagination } from '../../components/UI/Pagination';
 import './Billing.css';
 
 // Тип подписки для биллинга (обновлённый)
@@ -191,8 +192,6 @@ export function Billing() {
     queryFn: () => billingApi.getUserSubscriptions(buildFilters()),
     staleTime: 0,
     gcTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: false,
   });
 
   // response.data = { meta, data } - сервер возвращает напрямую без обёртки
@@ -204,14 +203,14 @@ export function Billing() {
   // Применение фильтров
   const handleApplyFilters = () => {
     setPage(1);
-    // Добавляем timestamp для принудительного обновления
     setAppliedFilters({
       dateFrom,
       dateTo,
       status: statusFilter,
       subscriptionId: subscriptionIdFilter,
-      _ts: Date.now(),
     });
+    // Принудительно обновляем данные
+    refetch();
   };
 
   // Сброс всех фильтров
@@ -226,8 +225,9 @@ export function Billing() {
       dateTo: '',
       status: [],
       subscriptionId: '',
-      _ts: Date.now(),
     });
+    // Принудительно обновляем данные
+    refetch();
   };
 
   // Одиночные сбросы фильтров
@@ -475,15 +475,20 @@ export function Billing() {
                         ) : '—'}
                       </td>
                       <td className="billing-cell-actions">
-                        {sub.status === 'active' && (
-                          <Tooltip content="Продлить подписку" position="top">
-                            <button
-                              className="billing-action-btn extend"
-                              onClick={() => openExtendModal(sub)}
-                            >
-                              <span className="material-icons">update</span>
-                            </button>
-                          </Tooltip>
+                        {/* Для демо-подписок не показываем действия */}
+                        {sub.tariff_name?.toLowerCase().includes('демо') || sub.tariff_name?.toLowerCase().includes('demo') ? (
+                          <span className="billing-no-actions">—</span>
+                        ) : (
+                          sub.status === 'active' && (
+                            <Tooltip content="Продлить подписку" position="top">
+                              <button
+                                className="billing-action-btn extend"
+                                onClick={() => openExtendModal(sub)}
+                              >
+                                <span className="material-icons">update</span>
+                              </button>
+                            </Tooltip>
+                          )
                         )}
                       </td>
                     </tr>
@@ -493,38 +498,15 @@ export function Billing() {
             </div>
             
             {/* Футер таблицы */}
-            <div className="billing-table-footer">
-              <div className="billing-pagination-info">
-                {meta?.from || 1}–{meta?.to || subscriptions.length} из {total}
-              </div>
-              
-              {totalPages > 1 && (
-                <div className="billing-pagination-controls">
-                  <button className="billing-pagination-btn" disabled={page === 1} onClick={() => setPage(1)}>
-                    <span className="material-icons">first_page</span>
-                  </button>
-                  <button className="billing-pagination-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-                    <span className="material-icons">chevron_left</span>
-                  </button>
-                  <button className="billing-pagination-btn active">{page}</button>
-                  <button className="billing-pagination-btn" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
-                    <span className="material-icons">chevron_right</span>
-                  </button>
-                  <button className="billing-pagination-btn" disabled={page === totalPages} onClick={() => setPage(totalPages)}>
-                    <span className="material-icons">last_page</span>
-                  </button>
-                </div>
-              )}
-              
-              <div className="billing-pagination-per-page">
-                <span>Строк:</span>
-                <select value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              </div>
-            </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              perPage={perPage}
+              total={total}
+              onPageChange={setPage}
+              onPerPageChange={(newPerPage) => { setPerPage(newPerPage); setPage(1); }}
+              perPageOptions={[10, 20, 50]}
+            />
           </>
         )}
       </div>

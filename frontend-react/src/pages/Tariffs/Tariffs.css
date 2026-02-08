@@ -26,21 +26,7 @@
   gap: 10px;
 }
 
-.tariffs-selectors select {
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--text-primary);
-  background: var(--bg-card);
-  cursor: pointer;
-  min-width: 140px;
-}
-
-.tariffs-selectors select:focus {
-  outline: none;
-  border-color: var(--primary);
-}
+/* Стили для селектов определены глобально в index.css (.tariffs-select) */
 
 /* Сообщения */
 .tariffs-message {

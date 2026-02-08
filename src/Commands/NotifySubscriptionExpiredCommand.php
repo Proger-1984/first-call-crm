@@ -56,8 +56,10 @@ class NotifySubscriptionExpiredCommand extends Command
             
             // Находим активные подписки, которые истекли в указанном интервале
             // Исключаем пользователей, у которых заблокирован бот
+            // Исключаем подписки, для которых уже отправлено уведомление
             $expiredSubscriptions = UserSubscription::where('status', 'active')
                 ->whereBetween('end_date', [$startDate, $now])
+                ->whereNull('notified_expired_at')
                 ->whereHas('user', function($query) {
                     $query->where('telegram_bot_blocked', false);
                 })
@@ -69,6 +71,18 @@ class NotifySubscriptionExpiredCommand extends Command
             
             foreach ($expiredSubscriptions as $subscription) {
                 try {
+                    // Атомарно помечаем подписку как "в процессе отправки" чтобы избежать дубликатов
+                    $updated = UserSubscription::where('id', $subscription->id)
+                        ->whereNull('notified_expired_at')
+                        ->update(['notified_expired_at' => Carbon::now()]);
+                    
+                    // Если не удалось обновить — значит другой процесс уже обработал эту подписку
+                    if ($updated === 0) {
+                        $this->logger->info("Подписка уже обрабатывается другим процессом", 
+                            ['subscription_id' => $subscription->id], 'subscription-expired');
+                        continue;
+                    }
+                    
                     $user = User::find($subscription->user_id);
                     
                     if (!$user || empty($user->telegram_id)) {

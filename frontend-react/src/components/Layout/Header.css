@@ -34,6 +34,7 @@
     display: flex;
     align-items: center;
     gap: 14px;
+    flex-shrink: 0;
 }
 
 .header-btn {
@@ -50,6 +51,11 @@
     gap: 7px;
     transition: all var(--transition-fast);
     text-decoration: none;
+    min-width: 110px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    height: 38px;
+    box-sizing: border-box;
 }
 
 .header-btn:hover {
@@ -73,6 +79,9 @@
 
 .header-btn .material-icons {
     font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
 .access-info {
@@ -80,6 +89,8 @@
     padding: 0 14px;
     border-left: 1px solid var(--border-light);
     border-right: 1px solid var(--border-light);
+    min-width: 130px;
+    flex-shrink: 0;
 }
 
 .access-date {
@@ -391,6 +402,60 @@
     color: var(--text-muted);
 }
 
+/* Режим имперсонации */
+.header.impersonating {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-bottom: 2px solid #f59e0b;
+}
+
+.impersonation-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    background: rgba(245, 158, 11, 0.15);
+    border-radius: 8px;
+    margin-left: 16px;
+}
+
+.impersonation-banner > .material-icons {
+    font-size: 20px;
+    color: #b45309;
+}
+
+.impersonation-text {
+    font-size: 13px;
+    color: #92400e;
+}
+
+.impersonation-text strong {
+    font-weight: 600;
+}
+
+.impersonation-exit-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #b45309;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-left: 8px;
+}
+
+.impersonation-exit-btn:hover {
+    background: #92400e;
+}
+
+.impersonation-exit-btn .material-icons {
+    font-size: 16px;
+}
+
 @media (max-width: 768px) {
     .header {
         padding: 0 14px;
@@ -403,5 +468,12 @@
     .access-info {
         display: none;
     }
-
+    
+    .impersonation-text {
+        display: none;
+    }
+    
+    .impersonation-banner {
+        padding: 6px 10px;
+    }
 }

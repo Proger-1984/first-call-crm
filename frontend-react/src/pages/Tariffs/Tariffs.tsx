@@ -5,7 +5,7 @@ import { useAuthStore } from '../../stores/authStore';
 import './Tariffs.css';
 
 export const Tariffs = () => {
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -105,6 +105,11 @@ export const Tariffs = () => {
         location_id: selectedLocation,
       });
       
+      // Если это демо-тариф, обновляем флаг is_trial_used в store
+      if (isDemo(tariff!) && user) {
+        updateUser({ ...user, is_trial_used: true });
+      }
+      
       setMessage({ 
         type: 'success', 
         text: isDemo(tariff!) 
@@ -155,6 +160,7 @@ export const Tariffs = () => {
         <h1 className="tariffs-title">Тарифы</h1>
         <div className="tariffs-selectors">
           <select
+            className="tariffs-select"
             value={selectedCategory || ''}
             onChange={(e) => setSelectedCategory(Number(e.target.value))}
           >
@@ -163,6 +169,7 @@ export const Tariffs = () => {
             ))}
           </select>
           <select
+            className="tariffs-select"
             value={selectedLocation || ''}
             onChange={(e) => setSelectedLocation(Number(e.target.value))}
           >

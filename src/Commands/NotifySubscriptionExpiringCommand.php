@@ -86,10 +86,15 @@ class NotifySubscriptionExpiringCommand extends Command
         $startDate = Carbon::now()->addDays($days)->startOfDay();
         $endDate = Carbon::now()->addDays($days)->endOfDay();
         
+        // Определяем поле для проверки отправки уведомления
+        $notifiedField = $days === 3 ? 'notified_expiring_3d_at' : 'notified_expiring_1d_at';
+        
         // Находим активные подписки, которые истекают в этом интервале
         // Исключаем пользователей, у которых заблокирован бот
+        // Исключаем подписки, для которых уже отправлено уведомление
         $expiringSubscriptions = UserSubscription::where('status', 'active')
             ->whereBetween('end_date', [$startDate, $endDate])
+            ->whereNull($notifiedField)
             ->whereHas('user', function($query) {
                 $query->where('telegram_bot_blocked', false);
             })
@@ -99,6 +104,19 @@ class NotifySubscriptionExpiringCommand extends Command
         
         foreach ($expiringSubscriptions as $subscription) {
             try {
+                // Атомарно помечаем подписку как "в процессе отправки" чтобы избежать дубликатов
+                // Используем whereNull для защиты от race condition
+                $updated = UserSubscription::where('id', $subscription->id)
+                    ->whereNull($notifiedField)
+                    ->update([$notifiedField => Carbon::now()]);
+                
+                // Если не удалось обновить — значит другой процесс уже обработал эту подписку
+                if ($updated === 0) {
+                    $this->logger->info("Подписка уже обрабатывается другим процессом", 
+                        ['subscription_id' => $subscription->id], 'subscription-expiring');
+                    continue;
+                }
+                
                 $user = User::find($subscription->user_id);
                 
                 if (!$user || empty($user->telegram_id)) {
@@ -150,11 +168,16 @@ class NotifySubscriptionExpiringCommand extends Command
         $targetStartTime = $now->copy()->addMinutes($minutes)->subMinutes(2); // -2 минуты погрешность
         $targetEndTime = $now->copy()->addMinutes($minutes)->addMinutes(2);   // +2 минуты погрешность
         
+        // Определяем поле для проверки отправки уведомления
+        $notifiedField = $minutes === 60 ? 'notified_expiring_1h_at' : 'notified_expiring_15m_at';
+        
         // Находим активные демо-подписки, которые истекают в этом интервале
         // Демо тариф имеет код 'demo'
         // Исключаем пользователей, у которых заблокирован бот
+        // Исключаем подписки, для которых уже отправлено уведомление
         $expiringSubscriptions = UserSubscription::where('status', 'active')
             ->whereBetween('end_date', [$targetStartTime, $targetEndTime])
+            ->whereNull($notifiedField)
             ->whereHas('tariff', function($query) {
                 $query->where('code', 'demo');
             })
@@ -169,6 +192,18 @@ class NotifySubscriptionExpiringCommand extends Command
         
         foreach ($expiringSubscriptions as $subscription) {
             try {
+                // Атомарно помечаем подписку как "в процессе отправки" чтобы избежать дубликатов
+                $updated = UserSubscription::where('id', $subscription->id)
+                    ->whereNull($notifiedField)
+                    ->update([$notifiedField => Carbon::now()]);
+                
+                // Если не удалось обновить — значит другой процесс уже обработал эту подписку
+                if ($updated === 0) {
+                    $this->logger->info("Подписка уже обрабатывается другим процессом", 
+                        ['subscription_id' => $subscription->id], 'subscription-expiring');
+                    continue;
+                }
+                
                 $user = User::find($subscription->user_id);
                 
                 if (!$user || empty($user->telegram_id)) {

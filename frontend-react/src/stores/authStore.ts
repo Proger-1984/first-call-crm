@@ -164,6 +164,10 @@ export const useAuthStore = create<AuthState>()(
           // Очищаем access_token из localStorage
           localStorage.removeItem('access_token');
           
+          // Очищаем данные имперсонации
+          localStorage.removeItem('admin_token_backup');
+          localStorage.removeItem('impersonated_by');
+          
           // Очищаем persisted Zustand state
           localStorage.removeItem('auth-storage');
           
@@ -196,6 +200,10 @@ export const useAuthStore = create<AuthState>()(
           // Очищаем всё локальное состояние
           localStorage.removeItem('access_token');
           localStorage.removeItem('auth-storage');
+          
+          // Очищаем данные имперсонации
+          localStorage.removeItem('admin_token_backup');
+          localStorage.removeItem('impersonated_by');
           
           set({
             user: null,
@@ -301,6 +309,10 @@ export const useAuthStore = create<AuthState>()(
           // Очищаем токен
           localStorage.removeItem('access_token');
           localStorage.removeItem('auth-storage');
+          
+          // Очищаем данные имперсонации
+          localStorage.removeItem('admin_token_backup');
+          localStorage.removeItem('impersonated_by');
           
           set({
             user: null,

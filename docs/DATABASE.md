@@ -260,6 +260,11 @@
 | `admin_notes` | VARCHAR NULL | Заметки админа |
 | `approved_by` | INT NULL | ID админа |
 | `approved_at` | TIMESTAMP NULL | Дата одобрения |
+| `notified_expiring_3d_at` | TIMESTAMP NULL | Уведомление за 3 дня (премиум) |
+| `notified_expiring_1d_at` | TIMESTAMP NULL | Уведомление за 1 день (премиум) |
+| `notified_expiring_1h_at` | TIMESTAMP NULL | Уведомление за 1 час (демо) |
+| `notified_expiring_15m_at` | TIMESTAMP NULL | Уведомление за 15 минут (демо) |
+| `notified_expired_at` | TIMESTAMP NULL | Уведомление об истечении |
 | `created_at` | TIMESTAMP | Дата создания |
 | `updated_at` | TIMESTAMP | Дата обновления |
 
@@ -269,6 +274,9 @@
 - `extend_pending` — ожидает продления (подписка работает, заявка отправлена)
 - `expired` — истекла
 - `cancelled` — отменена
+
+**Поля уведомлений:**
+Используются для предотвращения дубликатов уведомлений. При отправке уведомления записывается timestamp. При продлении подписки все поля сбрасываются в NULL.
 
 **FK:**
 - `user_id` → `users(id)` ON DELETE CASCADE
@@ -690,6 +698,7 @@ docker exec -it slim_php-cli php db/migrations/run.php
 38. `20260202000002` — add metro_fields to listings (phone_unavailable)
 39. `20260202000003` — move metro_info to listing_metro (distance)
 40. `20260206000001` — photo_tasks
+41. `20260208000001` — add notification tracking to user_subscriptions (notified_expiring_*, notified_expired_at)
 
 ---
 

@@ -294,6 +294,7 @@
 .billing-table {
   border-collapse: collapse;
   width: 100%;
+  table-layout: fixed;
 }
 
 .billing-table th,
@@ -302,7 +303,29 @@
   padding: 12px 14px;
   vertical-align: middle;
   text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+/* Фиксированная ширина колонок для предотвращения скачков при сортировке */
+.billing-table th:nth-child(1),
+.billing-table td:nth-child(1) { width: 60px; }  /* ID */
+.billing-table th:nth-child(2),
+.billing-table td:nth-child(2) { width: 100px; } /* Дата */
+.billing-table th:nth-child(3),
+.billing-table td:nth-child(3) { width: 100px; } /* Тариф */
+.billing-table th:nth-child(4),
+.billing-table td:nth-child(4) { width: 180px; } /* Категория */
+.billing-table th:nth-child(5),
+.billing-table td:nth-child(5) { width: 200px; } /* Локация */
+.billing-table th:nth-child(6),
+.billing-table td:nth-child(6) { width: 140px; } /* Статус */
+.billing-table th:nth-child(7),
+.billing-table td:nth-child(7) { width: 80px; }  /* Осталось */
+.billing-table th:nth-child(8),
+.billing-table td:nth-child(8) { width: 100px; } /* Период */
+.billing-table th:nth-child(9),
+.billing-table td:nth-child(9) { width: 80px; }  /* Действия */
 
 .billing-table th {
   background: var(--bg-main);
@@ -449,76 +472,6 @@
   border-top: 1px solid var(--border);
   gap: 16px;
   flex-wrap: wrap;
-}
-
-.billing-pagination-info {
-  font-size: 13px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.billing-pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.billing-pagination-btn {
-  min-width: 32px;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--border-radius-sm);
-  background: var(--bg-card);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  color: var(--text-primary);
-  transition: all var(--transition-fast);
-}
-
-.billing-pagination-btn:hover:not(:disabled) {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.billing-pagination-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.billing-pagination-btn.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: white;
-}
-
-.billing-pagination-btn .material-icons {
-  font-size: 20px;
-}
-
-.billing-pagination-per-page {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.billing-pagination-per-page select {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--border-radius-sm);
-  background: var(--bg-card);
-  font-size: 13px;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.billing-pagination-per-page select:hover {
-  border-color: var(--primary);
 }
 
 /* Кнопки */
@@ -802,10 +755,6 @@ textarea.billing-modal-input {
   .billing-table-footer {
     flex-direction: column;
     gap: 12px;
-  }
-  
-  .billing-pagination-controls {
-    order: -1;
   }
   
   .billing-filters-row {

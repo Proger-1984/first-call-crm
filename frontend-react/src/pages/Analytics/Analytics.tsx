@@ -96,7 +96,7 @@ export function Analytics() {
   }, [period, periodDates]);
 
   // Запрос данных для графиков
-  const chartsQuery = useQuery({
+  const { data: chartsData, isLoading: isLoadingCharts, refetch: refetchCharts } = useQuery({
     queryKey: ['analytics-charts', period, appliedDates],
     queryFn: () => {
       if (period === 'custom' && appliedDates.from && appliedDates.to) {
@@ -110,22 +110,24 @@ export function Analytics() {
         period: period === 'custom' ? 'week' : period,
       });
     },
-    staleTime: 60000, // 1 минута
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Запрос сводной статистики
-  const summaryQuery = useQuery({
+  const { data: summaryData, refetch: refetchSummary } = useQuery({
     queryKey: ['analytics-summary'],
     queryFn: () => analyticsApi.getSummary(),
-    staleTime: 60000,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Парсинг данных из API ответа
-  const chartsResponse = chartsQuery.data?.data as any;
+  const chartsResponse = chartsData?.data as any;
   const chartData = chartsResponse?.data?.chart_data || chartsResponse?.chart_data || [];
   const totals = chartsResponse?.data?.totals || chartsResponse?.totals || { revenue: 0, users: 0, subscriptions: 0 };
   
-  const summaryResponse = summaryQuery.data?.data as any;
+  const summaryResponse = summaryData?.data as any;
   const summary = summaryResponse?.data || summaryResponse;
 
   const handleApplyCustomDates = () => {
@@ -133,6 +135,9 @@ export function Analytics() {
       setAppliedDates({ from: dateFrom, to: dateTo });
       setPeriod('custom');
     }
+    // Принудительно обновляем данные
+    refetchCharts();
+    refetchSummary();
   };
 
   const handlePeriodChange = (newPeriod: PeriodType) => {
@@ -159,7 +164,7 @@ export function Analytics() {
 
   // Рендер графика
   const renderChart = () => {
-    if (chartsQuery.isLoading) {
+    if (isLoadingCharts) {
       return (
         <div className="analytics-chart-loading">
           <span className="material-icons spinning">sync</span>

@@ -1000,4 +1000,71 @@ export const analyticsApi = {
     api.get<ApiResponse<AnalyticsSummaryResponse>>('/admin/analytics/summary'),
 };
 
+// === ADMIN USERS API ===
+
+export interface AdminUser {
+  id: number;
+  name: string;
+  telegram_username: string | null;
+  telegram_id: string | null;
+  role: 'user' | 'admin';
+  created_at: string;
+  has_active_subscription: boolean;
+  active_subscriptions_count: number;
+  subscriptions: Array<{
+    id: number;
+    category: string;
+    location: string;
+    status: string;
+    end_date: string;
+  }>;
+}
+
+export interface AdminUsersResponse {
+  users: AdminUser[];
+  pagination: {
+    page: number;
+    per_page: number;
+    total: number;
+    total_pages: number;
+  };
+}
+
+export interface AdminUsersParams {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  role?: 'user' | 'admin';
+  has_subscription?: boolean;
+  sort?: string;
+  order?: 'asc' | 'desc';
+}
+
+export interface ImpersonateResponse {
+  access_token: string;
+  user: {
+    id: number;
+    name: string;
+    telegram_username: string | null;
+    role: string;
+  };
+  impersonated_by: number;
+}
+
+export const adminUsersApi = {
+  /**
+   * Получить список пользователей
+   * POST /api/v1/admin/users
+   */
+  getUsers: (params: AdminUsersParams = {}) =>
+    api.post<ApiResponse<AdminUsersResponse>>('/admin/users', params),
+
+  /**
+   * Войти под пользователем (имперсонация)
+   * POST /api/v1/admin/users/impersonate
+   */
+  impersonate: (userId: number) =>
+    api.post<ApiResponse<ImpersonateResponse>>('/admin/users/impersonate', { user_id: userId }),
+};
+
 export default api;

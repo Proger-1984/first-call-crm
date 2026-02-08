@@ -45,6 +45,9 @@
     padding: 14px 0;
     flex-grow: 1;
     overflow-y: auto;
+    overflow-x: hidden;
+    /* Резервируем минимальную высоту для предотвращения скачков при появлении админ-секции */
+    min-height: 300px;
 }
 
 .menu-item {
@@ -142,13 +145,92 @@
     visibility: visible;
 }
 
-/* Админский пункт меню */
-.menu-item.admin-item {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+/* Секции меню */
+.menu-section {
+    margin-bottom: 8px;
 }
 
+.menu-section:not(:first-child) {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.menu-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px 10px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    user-select: none;
+}
+
+.menu-section-header.clickable {
+    cursor: pointer;
+    padding: 10px 18px;
+    margin: 0 8px;
+    border-radius: var(--border-radius-sm);
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.menu-section-header.clickable:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.menu-section-header.clickable.has-active {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+.menu-section-header .section-icon {
+    font-size: 18px;
+    color: #f59e0b;
+}
+
+.menu-section-header .expand-icon {
+    margin-left: auto;
+    font-size: 18px;
+    transition: transform 0.2s ease;
+}
+
+.menu-section-header .expand-icon.expanded {
+    transform: rotate(180deg);
+}
+
+/* Анимация раскрытия/скрытия подменю */
+.menu-section-items {
+    overflow: hidden;
+    max-height: 500px;
+    transition: max-height 0.25s ease-out, opacity 0.2s ease;
+    opacity: 1;
+}
+
+.menu-section-items.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+
+.sidebar.collapsed .menu-section-header {
+    justify-content: center;
+    padding: 8px;
+    margin: 0;
+}
+
+.sidebar.collapsed .menu-section-header.clickable {
+    margin: 0 4px;
+}
+
+.sidebar.collapsed .menu-section-title,
+.sidebar.collapsed .expand-icon {
+    display: none;
+}
+
+/* Админский пункт меню */
 .menu-item.admin-item .material-icons {
     color: #f59e0b;
 }

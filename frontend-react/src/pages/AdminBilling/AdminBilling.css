@@ -438,76 +438,6 @@
   flex-wrap: wrap;
 }
 
-.admin-billing-pagination-info {
-  font-size: 13px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.admin-billing-pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.admin-billing-pagination-btn {
-  min-width: 32px;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--border-radius-sm);
-  background: var(--bg-card);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  color: var(--text-primary);
-  transition: all var(--transition-fast);
-}
-
-.admin-billing-pagination-btn:hover:not(:disabled) {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.admin-billing-pagination-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.admin-billing-pagination-btn.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: white;
-}
-
-.admin-billing-pagination-btn .material-icons {
-  font-size: 20px;
-}
-
-.admin-billing-pagination-per-page {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.admin-billing-pagination-per-page select {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--border-radius-sm);
-  background: var(--bg-card);
-  font-size: 13px;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.admin-billing-pagination-per-page select:hover {
-  border-color: var(--primary);
-}
-
 /* Кнопки */
 .btn {
   padding: 8px 16px;
@@ -963,15 +893,85 @@
   margin-top: 4px;
 }
 
+/* Toast уведомления */
+.admin-billing-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  animation: slideInRight 0.3s ease;
+  max-width: 400px;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.admin-billing-toast.success {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  color: #166534;
+}
+
+.admin-billing-toast.error {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+}
+
+.admin-billing-toast .material-icons {
+  font-size: 24px;
+}
+
+.admin-billing-toast.success .material-icons {
+  color: #16a34a;
+}
+
+.admin-billing-toast.error .material-icons {
+  color: #dc2626;
+}
+
+.admin-billing-toast-message {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.admin-billing-toast-close {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.admin-billing-toast-close:hover {
+  opacity: 1;
+}
+
+.admin-billing-toast-close .material-icons {
+  font-size: 20px;
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
   .admin-billing-table-footer {
     flex-direction: column;
     gap: 12px;
-  }
-  
-  .admin-billing-pagination-controls {
-    order: -1;
   }
   
   .admin-billing-filters-row {

@@ -1,0 +1,149 @@
+/* ============================================
+   Pagination Component - Унифицированная пагинация
+   ============================================ */
+
+.pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-light);
+  background: var(--bg-main);
+  border-radius: 0 0 var(--border-radius-lg) var(--border-radius-lg);
+}
+
+.pagination-left {
+  min-width: 100px;
+}
+
+.pagination-center {
+  display: flex;
+  justify-content: center;
+}
+
+.pagination-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 100px;
+}
+
+.results-info {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.per-page-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.per-page-selector select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.per-page-selector select:hover {
+  border-color: var(--text-muted);
+}
+
+.per-page-selector select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.pagination {
+  display: flex;
+  gap: 4px;
+}
+
+.page-item {
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.page-item:hover:not(.disabled):not(.ellipsis) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.page-item.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.page-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-item.ellipsis {
+  border: none;
+  background: transparent;
+  cursor: default;
+  min-width: 24px;
+}
+
+.page-item .material-icons {
+  font-size: 20px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .pagination-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .pagination-left,
+  .pagination-right {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .pagination-left {
+    order: 2;
+  }
+  
+  .pagination-center {
+    order: 1;
+  }
+  
+  .pagination-right {
+    order: 3;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-item {
+    min-width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+  
+  .page-item .material-icons {
+    font-size: 18px;
+  }
+}

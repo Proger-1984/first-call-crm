@@ -5,6 +5,7 @@ import { SourceBadge, DuplicateBadge, Badge } from '../../components/UI/Badge';
 import { MultiSelect } from '../../components/UI/MultiSelect';
 import { DatePicker } from '../../components/UI/DatePicker';
 import { Tooltip } from '../../components/UI/Tooltip';
+import { Pagination } from '../../components/UI/Pagination';
 import { listingsApi, filtersApi, favoritesApi, photoTasksApi, type FilterOption } from '../../services/api';
 import { useUIStore } from '../../stores/uiStore';
 import './Dashboard.css';
@@ -260,8 +261,9 @@ export function Dashboard() {
   const { data: filtersResponse } = useQuery({
     queryKey: ['filters', selectedCategoryId, selectedLocationIds],
     queryFn: () => filtersApi.getFilters(selectedCategoryId, selectedLocationIds),
-    staleTime: 60000, // Кешируем на 1 минуту
-    placeholderData: (previousData) => previousData, // Сохраняем предыдущие данные во время загрузки
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
   });
 
   const filtersData = filtersResponse?.data?.data;
@@ -360,7 +362,7 @@ export function Dashboard() {
   }, [columns]);
 
   // Загрузка данных с API
-  const { data: apiResponse, isLoading, isError, error } = useQuery({
+  const { data: apiResponse, isLoading, isError, error, refetch: refetchListings } = useQuery({
     queryKey: ['listings', { page: currentPage, perPage, sortField, sortOrder, ...appliedFilters }],
     queryFn: () => listingsApi.getAll({ 
       page: currentPage, 
@@ -527,7 +529,9 @@ export function Dashboard() {
     
     setAppliedFilters(filters);
     setCurrentPage(1); // Сбрасываем на первую страницу
-  }, [dateFrom, dateTo, priceFrom, priceTo, areaFrom, areaTo, categoryFilter, locationFilter, sourceFilter, roomsFilter, metroFilter, callStatusFilter, phoneFilter, externalIdFilter]);
+    // Принудительно обновляем данные
+    refetchListings();
+  }, [dateFrom, dateTo, priceFrom, priceTo, areaFrom, areaTo, categoryFilter, locationFilter, sourceFilter, roomsFilter, metroFilter, callStatusFilter, phoneFilter, externalIdFilter, refetchListings]);
 
   // Сбросить все фильтры
   const handleResetFilters = useCallback(() => {
@@ -676,46 +680,6 @@ export function Dashboard() {
     setPerPage(newPerPage);
     setCurrentPage(1); // Сбрасываем на первую страницу
   };
-
-  // Генерация номеров страниц для отображения
-  const getPageNumbers = (): (number | 'ellipsis')[] => {
-    const pages: (number | 'ellipsis')[] = [];
-    const maxVisiblePages = 5;
-    
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Всегда показываем первую страницу
-      pages.push(1);
-      
-      if (currentPage > 3) {
-        pages.push('ellipsis');
-      }
-      
-      // Страницы вокруг текущей
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-      
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-      
-      if (currentPage < totalPages - 2) {
-        pages.push('ellipsis');
-      }
-      
-      // Всегда показываем последнюю страницу
-      pages.push(totalPages);
-    }
-    
-    return pages;
-  };
-
-  // Вычисление диапазона отображаемых записей
-  const startRecord = (currentPage - 1) * perPage + 1;
-  const endRecord = Math.min(currentPage * perPage, totalItems);
 
   // Переключение видимости столбца
   const toggleColumnVisibility = (columnId: ColumnId) => {
@@ -1455,52 +1419,14 @@ export function Dashboard() {
             </tbody>
           </table>
         </div>
-        <div className="pagination-container">
-          <div className="pagination">
-            <div 
-              className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}
-              onClick={() => handlePageChange(currentPage - 1)}
-            >
-              <span className="material-icons">chevron_left</span>
-            </div>
-            {getPageNumbers().map((page, index) => (
-              page === 'ellipsis' ? (
-                <div key={`ellipsis-${index}`} className="page-item ellipsis">...</div>
-              ) : (
-                <div 
-                  key={page}
-                  className={`page-item ${currentPage === page ? 'active' : ''}`}
-                  onClick={() => handlePageChange(page)}
-                >
-                  {page}
-                </div>
-              )
-            ))}
-            <div 
-              className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}
-              onClick={() => handlePageChange(currentPage + 1)}
-            >
-              <span className="material-icons">chevron_right</span>
-            </div>
-          </div>
-          <div className="pagination-right">
-            <div className="per-page-selector">
-              <span>Строк:</span>
-              <select 
-                value={perPage}
-                onChange={(e) => handlePerPageChange(Number(e.target.value))}
-              >
-                <option value="10">10</option>
-                <option value="20">20</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-            </div>
-            <div className="results-info">
-              <strong>{startRecord}–{endRecord}</strong> из <strong>{totalItems}</strong>
-            </div>
-          </div>
-        </div>
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          perPage={perPage}
+          total={totalItems}
+          onPageChange={handlePageChange}
+          onPerPageChange={handlePerPageChange}
+        />
       </div>
     </div>
   );

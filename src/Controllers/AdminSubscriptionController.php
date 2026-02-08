@@ -322,17 +322,24 @@ class AdminSubscriptionController
                 return $this->respondWithError($response, 'Локация не найдена', 'not_found', 404);
             }
             
-            // Проверяем, нет ли уже активной подписки для этой категории и локации
+            // Проверяем, нет ли уже активной/ожидающей подписки для этой категории и локации
             $existingSubscription = UserSubscription::where('user_id', $userId)
                 ->where('category_id', $categoryId)
                 ->where('location_id', $locationId)
-                ->where('status', 'active')
+                ->whereIn('status', ['active', 'extend_pending', 'pending'])
                 ->first();
                 
             if ($existingSubscription) {
+                $statusMessages = [
+                    'active' => 'активная подписка',
+                    'extend_pending' => 'подписка, ожидающая продления',
+                    'pending' => 'подписка, ожидающая активации',
+                ];
+                $statusText = $statusMessages[$existingSubscription->status] ?? 'подписка';
+                
                 return $this->respondWithError(
                     $response, 
-                    'У пользователя уже есть активная подписка для этой категории и локации', 
+                    "У пользователя уже есть {$statusText} для этой категории и локации", 
                     'subscription_exists', 
                     409
                 );

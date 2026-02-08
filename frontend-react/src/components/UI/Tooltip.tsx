@@ -27,6 +27,7 @@ export function Tooltip({
     
     const rect = wrapperRef.current.getBoundingClientRect();
     const gap = 8;
+    const padding = 16; // Отступ от края экрана
     
     let top = 0;
     let left = 0;
@@ -48,6 +49,23 @@ export function Tooltip({
         top = rect.top + rect.height / 2;
         left = rect.right + gap;
         break;
+    }
+
+    // Корректируем позицию, чтобы не выходить за границы экрана
+    const tooltipWidth = maxWidth;
+    const tooltipHeight = 150; // Примерная высота
+    
+    // Проверяем правую границу
+    if (left + tooltipWidth / 2 > window.innerWidth - padding) {
+      left = window.innerWidth - tooltipWidth / 2 - padding;
+    }
+    // Проверяем левую границу
+    if (left - tooltipWidth / 2 < padding) {
+      left = tooltipWidth / 2 + padding;
+    }
+    // Проверяем нижнюю границу
+    if (top + tooltipHeight > window.innerHeight - padding && position === 'bottom') {
+      top = rect.top - gap - tooltipHeight;
     }
 
     return { top, left };

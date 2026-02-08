@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { favoritesApi, type FavoriteListing, type FavoriteStatus } from '../../services/api';
 import { SourceBadge } from '../../components/UI/Badge';
 import { DatePicker } from '../../components/UI/DatePicker';
-import { Tooltip } from '../../components/UI';
+import { Tooltip, Pagination } from '../../components/UI';
 import './Favorites.css';
 
 // Маппинг source_id -> код источника
@@ -68,14 +68,16 @@ export function Favorites() {
   const queryClient = useQueryClient();
 
   // Загрузка статусов
-  const { data: statusesResponse } = useQuery({
+  const { data: statusesResponse, refetch: refetchStatuses } = useQuery({
     queryKey: ['favoriteStatuses'],
     queryFn: () => favoritesApi.getStatuses(),
+    staleTime: 0,
+    gcTime: 0,
   });
   const statuses = statusesResponse?.data?.data?.statuses || [];
 
   // Загрузка избранных
-  const { data: favoritesResponse, isLoading, error } = useQuery({
+  const { data: favoritesResponse, isLoading, error, refetch: refetchFavorites } = useQuery({
     queryKey: ['favorites', page, perPage, sortField, sortOrder, appliedFilters],
     queryFn: () => favoritesApi.getList({
       page,
@@ -87,6 +89,8 @@ export function Favorites() {
       comment: appliedFilters.comment || undefined,
       statusId: appliedFilters.statusId,
     }),
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const favorites = favoritesResponse?.data?.data;
@@ -200,7 +204,10 @@ export function Favorites() {
       statusId: statusFilter || undefined,
     });
     setPage(1);
-  }, [dateFrom, dateTo, commentSearch, statusFilter]);
+    // Принудительно обновляем данные
+    refetchFavorites();
+    refetchStatuses();
+  }, [dateFrom, dateTo, commentSearch, statusFilter, refetchFavorites, refetchStatuses]);
 
   // Сбросить фильтры
   const handleResetFilters = useCallback(() => {
@@ -292,28 +299,6 @@ export function Favorites() {
   const handlePerPageChange = (newPerPage: number) => {
     setPerPage(newPerPage);
     setPage(1);
-  };
-
-  // Генерация номеров страниц для пагинации
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (page > 3) pages.push('...');
-      
-      const start = Math.max(2, page - 1);
-      const end = Math.min(totalPages - 1, page + 1);
-      
-      for (let i = start; i <= end; i++) pages.push(i);
-      
-      if (page < totalPages - 2) pages.push('...');
-      pages.push(totalPages);
-    }
-    
-    return pages;
   };
 
   // Проверка, есть ли активные фильтры
@@ -617,56 +602,14 @@ export function Favorites() {
           </div>
 
           {/* Пагинация */}
-          <div className="table-footer">
-            <div className="pagination-info">
-              {((page - 1) * perPage) + 1}–{Math.min(page * perPage, total)} из {total}
-            </div>
-            
-            <div className="pagination-controls">
-              <button 
-                className="pagination-btn"
-                onClick={() => handlePageChange(page - 1)}
-                disabled={page === 1}
-              >
-                <span className="material-icons">chevron_left</span>
-              </button>
-              
-              {getPageNumbers().map((p, idx) => (
-                typeof p === 'number' ? (
-                  <button
-                    key={idx}
-                    className={`pagination-btn ${p === page ? 'active' : ''}`}
-                    onClick={() => handlePageChange(p)}
-                  >
-                    {p}
-                  </button>
-                ) : (
-                  <span key={idx} className="pagination-ellipsis">...</span>
-                )
-              ))}
-              
-              <button 
-                className="pagination-btn"
-                onClick={() => handlePageChange(page + 1)}
-                disabled={page === totalPages}
-              >
-                <span className="material-icons">chevron_right</span>
-              </button>
-            </div>
-
-            <div className="per-page-selector">
-              <span>Строк:</span>
-              <select 
-                value={perPage} 
-                onChange={(e) => handlePerPageChange(Number(e.target.value))}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
-          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            perPage={perPage}
+            total={total}
+            onPageChange={handlePageChange}
+            onPerPageChange={handlePerPageChange}
+          />
         </div>
       )}
     </div>

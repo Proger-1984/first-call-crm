@@ -393,5 +393,5 @@
 }
 
 .btn-primary:hover {
-  background: var(--primary-dark);
+  background: var(--primary-hover);
 }

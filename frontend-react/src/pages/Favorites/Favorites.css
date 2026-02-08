@@ -36,12 +36,14 @@
     align-items: flex-end;
     gap: 16px;
     flex-wrap: wrap;
+    min-height: 70px;
 }
 
 .filter-group {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-width: 120px;
 }
 
 .filter-group-wide {
@@ -106,7 +108,7 @@
 }
 
 .btn-primary:hover {
-    background: var(--primary-dark);
+    background: var(--primary-hover);
 }
 
 .btn-secondary {
@@ -139,6 +141,7 @@
 .favorites-page .favorites-table {
     border-collapse: collapse;
     width: 100%;
+    table-layout: fixed;
 }
 
 .favorites-page .favorites-table th,
@@ -146,6 +149,8 @@
     box-sizing: border-box;
     padding: 12px 10px;
     vertical-align: top;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .favorites-page .favorites-table th {
@@ -523,81 +528,6 @@
     flex-wrap: wrap;
 }
 
-.pagination-info {
-    font-size: 13px;
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-
-.pagination-controls {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.pagination-btn {
-    min-width: 32px;
-    height: 32px;
-    padding: 0 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius-sm);
-    background: var(--bg-card);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    color: var(--text-primary);
-    transition: all var(--transition-fast);
-}
-
-.pagination-btn:hover:not(:disabled) {
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-.pagination-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.pagination-btn.active {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: white;
-}
-
-.pagination-btn .material-icons {
-    font-size: 20px;
-}
-
-.pagination-ellipsis {
-    padding: 0 4px;
-    color: var(--text-muted);
-}
-
-.per-page-selector {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--text-muted);
-}
-
-.per-page-selector select {
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius-sm);
-    background: var(--bg-card);
-    font-size: 13px;
-    color: var(--text-primary);
-    cursor: pointer;
-}
-
-.per-page-selector select:hover {
-    border-color: var(--primary);
-}
-
 /* Состояния */
 .loading-state,
 .error-state,
@@ -799,10 +729,6 @@
     .table-footer {
         flex-direction: column;
         gap: 12px;
-    }
-    
-    .pagination-controls {
-        order: -1;
     }
     
     .status-form {

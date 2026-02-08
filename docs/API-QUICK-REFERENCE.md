@@ -487,6 +487,54 @@ Response: {
 ```
 Примечание: Учитываются только активные подписки. Админы исключены из статистики.
 
+## 👥 Управление пользователями (только админ)
+
+### Получить список пользователей
+```http
+POST /api/v1/admin/users
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "page": 1,                    // номер страницы
+  "per_page": 20,               // записей на страницу (макс. 100)
+  "search": "имя",              // поиск по ID, имени или @username
+  "role": "user|admin",         // фильтр по роли
+  "has_subscription": true,     // фильтр по наличию активной подписки
+  "sort": "created_at",         // поле сортировки (id, name, role, created_at)
+  "order": "desc"               // направление (asc, desc)
+}
+
+Response: {
+  users: [
+    {
+      id, name, telegram_username, telegram_id, role, created_at,
+      has_active_subscription, active_subscriptions_count,
+      subscriptions: [ { id, category, location, status, end_date } ]
+    }
+  ],
+  pagination: { page, per_page, total, total_pages }
+}
+```
+
+### Имперсонация (вход под пользователем)
+```http
+POST /api/v1/admin/users/impersonate
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "user_id": 123
+}
+
+Response: {
+  access_token: "...",
+  user: { id, name, telegram_username, role },
+  impersonated_by: 1  // ID админа
+}
+```
+Примечание: Генерирует access_token для указанного пользователя. Используется для тестирования системы от имени пользователя.
+
 ## 📋 Объявления
 
 ### Получить список объявлений

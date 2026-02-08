@@ -1,6 +1,7 @@
 <?php
 
 use App\Controllers\AdminSubscriptionController;
+use App\Controllers\AdminUserController;
 use App\Controllers\AnalyticsController;
 use App\Controllers\AuthController;
 use App\Controllers\FavoriteController;
@@ -153,6 +154,15 @@ return function (App $app) {
         $group->group('/admin/analytics', function (RouteCollectorProxy $group) {
             $group->post('/charts', [AnalyticsController::class, 'getChartsData']);
             $group->get('/summary', [AnalyticsController::class, 'getSummary']);
+        })->add(new AuthMiddleware($container));
+
+        /** Маршруты для управления пользователями (только для администраторов)
+         * Получение списка пользователей - getUsers
+         * Имперсонация (вход под пользователем) - impersonate
+         */
+        $group->group('/admin/users', function (RouteCollectorProxy $group) {
+            $group->post('', [AdminUserController::class, 'getUsers']);
+            $group->post('/impersonate', [AdminUserController::class, 'impersonate']);
         })->add(new AuthMiddleware($container));
 
         /** Маршруты для получения данных фильтров

@@ -66,6 +66,8 @@ tags:
     description: Методы для получения данных фильтров
   - name: Обработка фото
     description: Методы для обработки фото (удаление водяных знаков)
+  - name: Admin Users
+    description: Методы для управления пользователями (только для администраторов)
 
 servers:
   - url: http://localhost:8080
@@ -113,6 +115,88 @@ components:
             - validation_error
             - internal_error
           example: validation_error
+
+    Pagination:
+      type: object
+      description: Информация о пагинации
+      properties:
+        page:
+          type: integer
+          description: Текущая страница
+          example: 1
+        per_page:
+          type: integer
+          description: Записей на страницу
+          example: 20
+        total:
+          type: integer
+          description: Общее количество записей
+          example: 150
+        total_pages:
+          type: integer
+          description: Общее количество страниц
+          example: 8
+
+    AdminUser:
+      type: object
+      description: Пользователь (для админ-панели)
+      properties:
+        id:
+          type: integer
+          description: ID пользователя
+          example: 1
+        name:
+          type: string
+          description: Имя пользователя
+          example: "Иван Петров"
+        telegram_username:
+          type: string
+          nullable: true
+          description: Telegram username
+          example: "ivan_petrov"
+        telegram_id:
+          type: string
+          nullable: true
+          description: Telegram ID
+          example: "123456789"
+        role:
+          type: string
+          enum: [user, admin]
+          description: Роль пользователя
+          example: "user"
+        created_at:
+          type: string
+          description: Дата регистрации
+          example: "15.01.2026 10:30"
+        has_active_subscription:
+          type: boolean
+          description: Есть ли активная подписка
+          example: true
+        active_subscriptions_count:
+          type: integer
+          description: Количество активных подписок
+          example: 2
+        subscriptions:
+          type: array
+          description: Список активных подписок
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 1
+              category:
+                type: string
+                example: "Аренда"
+              location:
+                type: string
+                example: "Москва"
+              status:
+                type: string
+                example: "active"
+              end_date:
+                type: string
+                example: "15.02.2026"
 
     Source:
       type: object
@@ -6939,4 +7023,366 @@ paths:
                 code: 500
                 status: "error"
                 message: "Ошибка скачивания"
+                error: "internal_error"
+
+  # ==================== ADMIN USERS ====================
+  /api/v1/admin/users:
+    post:
+      tags:
+        - Admin Users
+      summary: Список пользователей
+      description: |
+        Получение списка пользователей с фильтрацией и пагинацией.
+        
+        ## Права доступа
+        - Только для администраторов
+        
+        ## Фильтрация
+        - **search** — поиск по ID (точное совпадение), имени или @username (частичное совпадение)
+        - **role** — фильтр по роли (user, admin)
+        - **has_subscription** — фильтр по наличию активной подписки
+        
+        ## Сортировка
+        Доступные поля: id, name, role, created_at
+        
+        ## Возможные ошибки
+        - 401: Токен отсутствует или истёк
+        - 403: Нет прав администратора
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                page:
+                  type: integer
+                  default: 1
+                  minimum: 1
+                  description: Номер страницы
+                per_page:
+                  type: integer
+                  default: 20
+                  minimum: 1
+                  maximum: 100
+                  description: Количество записей на страницу
+                search:
+                  type: string
+                  description: Поиск по ID, имени или @username
+                role:
+                  type: string
+                  enum: [user, admin]
+                  description: Фильтр по роли
+                has_subscription:
+                  type: boolean
+                  description: Фильтр по наличию активной подписки
+                sort:
+                  type: string
+                  enum: [id, name, role, created_at]
+                  default: created_at
+                  description: Поле сортировки
+                order:
+                  type: string
+                  enum: [asc, desc]
+                  default: desc
+                  description: Направление сортировки
+            examples:
+              default:
+                summary: Запрос без фильтров
+                value: {}
+              with_filters:
+                summary: Запрос с фильтрами
+                value:
+                  page: 1
+                  per_page: 20
+                  search: "Иван"
+                  role: "user"
+                  has_subscription: true
+                  sort: "created_at"
+                  order: "desc"
+      responses:
+        '200':
+          description: Список пользователей
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AdminUser'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+              examples:
+                success:
+                  summary: Успешный ответ
+                  value:
+                    code: 200
+                    status: "success"
+                    data:
+                      users:
+                        - id: 1
+                          name: "Иван Петров"
+                          telegram_username: "ivan_petrov"
+                          telegram_id: "123456789"
+                          role: "user"
+                          created_at: "15.01.2026 10:30"
+                          has_active_subscription: true
+                          active_subscriptions_count: 2
+                          subscriptions:
+                            - id: 1
+                              category: "Аренда"
+                              location: "Москва"
+                              status: "active"
+                              end_date: "15.02.2026"
+                            - id: 2
+                              category: "Продажа"
+                              location: "Санкт-Петербург"
+                              status: "active"
+                              end_date: "20.03.2026"
+                        - id: 2
+                          name: "Мария Сидорова"
+                          telegram_username: null
+                          telegram_id: "987654321"
+                          role: "user"
+                          created_at: "10.01.2026 14:20"
+                          has_active_subscription: false
+                          active_subscriptions_count: 0
+                          subscriptions: []
+                      pagination:
+                        page: 1
+                        per_page: 20
+                        total: 150
+                        total_pages: 8
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '403':
+          description: Нет прав администратора
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: "error"
+                message: "У вас нет доступа к этому ресурсу"
+                error: "access_denied"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Ошибка получения списка пользователей"
+                error: "internal_error"
+
+  /api/v1/admin/users/impersonate:
+    post:
+      tags:
+        - Admin Users
+      summary: Имперсонация (вход под пользователем)
+      description: |
+        Генерирует access_token для указанного пользователя, позволяя администратору
+        просматривать систему от его имени.
+        
+        ## Права доступа
+        - Только для администраторов
+        
+        ## Использование
+        1. Вызвать этот метод с user_id целевого пользователя
+        2. Сохранить текущий admin токен для возврата
+        3. Использовать полученный access_token для запросов от имени пользователя
+        4. Для возврата — восстановить admin токен
+        
+        ## Ограничения
+        - Нельзя имперсонировать самого себя
+        - Refresh токен не генерируется (только access_token)
+        
+        ## Возможные ошибки
+        - 400: Не указан user_id или попытка имперсонации себя
+        - 401: Токен отсутствует или истёк
+        - 403: Нет прав администратора
+        - 404: Пользователь не найден
+        - 500: Внутренняя ошибка сервера
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+              properties:
+                user_id:
+                  type: integer
+                  description: ID пользователя для имперсонации
+            examples:
+              impersonate_user:
+                summary: Вход под пользователем
+                value:
+                  user_id: 123
+      responses:
+        '200':
+          description: Токен для имперсонации
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  message:
+                    type: string
+                    example: "Вход выполнен под пользователем: Иван Петров"
+                  data:
+                    type: object
+                    properties:
+                      access_token:
+                        type: string
+                        description: JWT токен для запросов от имени пользователя
+                      user:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+                          telegram_username:
+                            type: string
+                            nullable: true
+                          role:
+                            type: string
+                      impersonated_by:
+                        type: integer
+                        description: ID администратора, выполнившего имперсонацию
+              examples:
+                success:
+                  summary: Успешный вход
+                  value:
+                    code: 200
+                    status: "success"
+                    message: "Вход выполнен под пользователем: Иван Петров"
+                    data:
+                      access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      user:
+                        id: 123
+                        name: "Иван Петров"
+                        telegram_username: "ivan_petrov"
+                        role: "user"
+                      impersonated_by: 1
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_user_id:
+                  summary: Не указан user_id
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Не указан user_id"
+                    error: "validation_error"
+                self_impersonate:
+                  summary: Попытка имперсонации себя
+                  value:
+                    code: 400
+                    status: "error"
+                    message: "Нельзя войти под своим аккаунтом"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                token_not_found:
+                  summary: Токен отсутствует
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token not found"
+                    error: "token_not_found"
+                token_expired:
+                  summary: Токен истёк
+                  value:
+                    code: 401
+                    status: "error"
+                    message: "Access token expired"
+                    error: "token_expired"
+        '403':
+          description: Нет прав администратора
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 403
+                status: "error"
+                message: "У вас нет доступа к этому ресурсу"
+                error: "access_denied"
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 404
+                status: "error"
+                message: "Пользователь не найден"
+                error: "not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 500
+                status: "error"
+                message: "Ошибка имперсонации"
                 error: "internal_error"

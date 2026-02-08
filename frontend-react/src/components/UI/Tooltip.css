@@ -179,3 +179,41 @@
 .header-tooltip-status .status-dot.offline {
     background: var(--danger);
 }
+
+/* Тултип для подписок в админке пользователей */
+.admin-users-sub-tooltip-content {
+    min-width: 240px;
+}
+
+.admin-users-sub-tooltip-content .admin-users-sub-tooltip-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.admin-users-sub-tooltip-content .admin-users-sub-item {
+    padding: 6px 0;
+    font-size: 13px;
+    color: var(--text-primary);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.admin-users-sub-tooltip-content .admin-users-sub-item:not(:last-child) {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.admin-users-sub-tooltip-content .admin-users-sub-item-name {
+    font-weight: 500;
+}
+
+.admin-users-sub-tooltip-content .admin-users-sub-item-date {
+    color: var(--text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+}

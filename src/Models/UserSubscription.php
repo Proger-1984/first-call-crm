@@ -61,7 +61,12 @@ class UserSubscription extends Model
         'admin_notes',
         'approved_by',
         'approved_at',
-        'is_enabled'
+        'is_enabled',
+        'notified_expiring_3d_at',
+        'notified_expiring_1d_at',
+        'notified_expiring_1h_at',
+        'notified_expiring_15m_at',
+        'notified_expired_at'
     ];
 
     protected $casts = [
@@ -69,7 +74,12 @@ class UserSubscription extends Model
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'approved_at' => 'datetime',
-        'is_enabled' => 'boolean'
+        'is_enabled' => 'boolean',
+        'notified_expiring_3d_at' => 'datetime',
+        'notified_expiring_1d_at' => 'datetime',
+        'notified_expiring_1h_at' => 'datetime',
+        'notified_expiring_15m_at' => 'datetime',
+        'notified_expired_at' => 'datetime'
     ];
 
     /**
@@ -257,6 +267,13 @@ class UserSubscription extends Model
         $this->admin_notes = $notes ? ($this->admin_notes ? $this->admin_notes . "; " . $notes : $notes) : $this->admin_notes;
         $this->approved_by = $adminId;
         $this->approved_at = Carbon::now();
+        
+        // Сбрасываем флаги уведомлений для нового цикла подписки
+        $this->notified_expiring_3d_at = null;
+        $this->notified_expiring_1d_at = null;
+        $this->notified_expiring_1h_at = null;
+        $this->notified_expiring_15m_at = null;
+        $this->notified_expired_at = null;
         
         $result = $this->save();
         

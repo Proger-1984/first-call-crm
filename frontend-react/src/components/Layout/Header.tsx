@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -7,12 +7,36 @@ import { Tooltip } from '../UI/Tooltip';
 import './Header.css';
 
 export function Header() {
-  const { user, logout, updateUser } = useAuthStore();
+  const { user, logout, updateUser, checkAuth } = useAuthStore();
   const { soundEnabled, toggleSound, playNotificationSound } = useUIStore();
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isPhoneDropdownOpen, setIsPhoneDropdownOpen] = useState(false);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
+  
+  // Проверка режима имперсонации
+  const [isImpersonating, setIsImpersonating] = useState(false);
+  const [impersonatedBy, setImpersonatedBy] = useState<number | null>(null);
+  
+  useEffect(() => {
+    const adminBackup = localStorage.getItem('admin_token_backup');
+    const impersonatedByStr = localStorage.getItem('impersonated_by');
+    if (adminBackup && impersonatedByStr) {
+      setIsImpersonating(true);
+      setImpersonatedBy(parseInt(impersonatedByStr, 10));
+    }
+  }, []);
+  
+  // Возврат к админу
+  const handleExitImpersonation = () => {
+    const adminToken = localStorage.getItem('admin_token_backup');
+    if (adminToken) {
+      localStorage.setItem('access_token', adminToken);
+      localStorage.removeItem('admin_token_backup');
+      localStorage.removeItem('impersonated_by');
+      window.location.href = '/admin/users';
+    }
+  };
 
   // Статус автозвонка берём из user (из /me/info)
   const autoCallStatus = user?.auto_call ?? null;
@@ -60,7 +84,7 @@ export function Header() {
   };
 
   return (
-    <header className="header">
+    <header className={`header ${isImpersonating ? 'impersonating' : ''}`}>
       <div className="header-left">
         <img
           src="/logo.svg"
@@ -70,6 +94,20 @@ export function Header() {
             e.currentTarget.style.display = 'none';
           }}
         />
+        
+        {/* Индикатор режима имперсонации */}
+        {isImpersonating && (
+          <div className="impersonation-banner">
+            <span className="material-icons">visibility</span>
+            <span className="impersonation-text">
+              Просмотр от имени: <strong>{user?.name}</strong>
+            </span>
+            <button className="impersonation-exit-btn" onClick={handleExitImpersonation}>
+              <span className="material-icons">logout</span>
+              Вернуться к админу
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="header-right">

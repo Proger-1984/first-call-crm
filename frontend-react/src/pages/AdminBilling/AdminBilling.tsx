@@ -10,6 +10,7 @@ import {
 } from '../../services/api';
 import { DatePicker } from '../../components/UI/DatePicker';
 import { Tooltip } from '../../components/UI/Tooltip';
+import { Pagination } from '../../components/UI/Pagination';
 import './AdminBilling.css';
 
 type TabType = 'current' | 'history';
@@ -144,8 +145,16 @@ export function AdminBilling() {
   const [createLocationId, setCreateLocationId] = useState('');
   const [createAutoActivate, setCreateAutoActivate] = useState(true);
 
+  // Toast уведомление
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 5000);
+  };
+
   // Запрос текущих подписок
-  const currentQuery = useQuery({
+  const { data: currentQueryData, isLoading: isLoadingCurrent, refetch: refetchCurrent } = useQuery({
     queryKey: ['admin-current-subscriptions', page, perPage, appliedCurrentFilters, currentSortField, currentSortDirection],
     queryFn: () => adminBillingApi.getCurrentSubscriptions({
       page,
@@ -156,12 +165,10 @@ export function AdminBilling() {
     enabled: activeTab === 'current',
     staleTime: 0,
     gcTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: false,
   });
 
   // Запрос истории
-  const historyQuery = useQuery({
+  const { data: historyQueryData, isLoading: isLoadingHistory, refetch: refetchHistory } = useQuery({
     queryKey: ['admin-subscription-history', page, perPage, appliedHistoryFilters, historySortField, historySortDirection],
     queryFn: () => adminBillingApi.getSubscriptionHistory({
       page,
@@ -172,27 +179,24 @@ export function AdminBilling() {
     enabled: activeTab === 'history',
     staleTime: 0,
     gcTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: false,
   });
 
-  const currentData = (currentQuery.data?.data as any)?.data || [];
-  const currentMeta = (currentQuery.data?.data as any)?.meta;
+  const currentData = (currentQueryData?.data as any)?.data || [];
+  const currentMeta = (currentQueryData?.data as any)?.meta;
   
-  const historyData = (historyQuery.data?.data as any)?.data || [];
-  const historyMeta = (historyQuery.data?.data as any)?.meta;
+  const historyData = (historyQueryData?.data as any)?.data || [];
+  const historyMeta = (historyQueryData?.data as any)?.meta;
 
   const meta = activeTab === 'current' ? currentMeta : historyMeta;
-  const isLoading = activeTab === 'current' ? currentQuery.isLoading : historyQuery.isLoading;
+  const isLoading = activeTab === 'current' ? isLoadingCurrent : isLoadingHistory;
   const totalPages = meta?.total_pages || 1;
 
   // Загрузка тарифов, категорий и локаций для создания подписки
   const { data: tariffInfoResponse } = useQuery({
     queryKey: ['tariff-info-for-create'],
     queryFn: () => tariffsApi.getTariffInfo(),
-    enabled: modalType === 'create',
   });
-  const tariffInfo = (tariffInfoResponse?.data as any) || {};
+  const tariffInfo = (tariffInfoResponse?.data?.data as any) || {};
   const tariffs = tariffInfo.tariffs || [];
   const categories = tariffInfo.categories || [];
   const locations = tariffInfo.locations || [];
@@ -257,10 +261,10 @@ export function AdminBilling() {
       queryClient.invalidateQueries({ queryKey: ['admin-current-subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ['admin-subscription-history'] });
       closeModal();
-      alert('Подписка успешно создана!');
+      showToast('success', 'Подписка успешно создана!');
     },
     onError: (error: any) => {
-      alert(error?.response?.data?.message || 'Ошибка при создании подписки');
+      showToast('error', error?.response?.data?.message || 'Ошибка при создании подписки');
     },
   });
 
@@ -288,6 +292,26 @@ export function AdminBilling() {
   }, []);
 
   const handleModalSubmit = useCallback(() => {
+    // Для create не нужна selectedSubscription
+    if (modalType === 'create') {
+      if (!createUserId || !createTariffId || !createCategoryId || !createLocationId) {
+        showToast('error', 'Заполните все обязательные поля');
+        return;
+      }
+      createMutation.mutate({
+        userId: parseInt(createUserId, 10),
+        tariffId: parseInt(createTariffId, 10),
+        categoryId: parseInt(createCategoryId, 10),
+        locationId: parseInt(createLocationId, 10),
+        paymentMethod: modalPaymentMethod,
+        notes: modalNotes || undefined,
+        durationHours: modalDurationHours ? parseInt(modalDurationHours, 10) : undefined,
+        price: modalPrice ? parseFloat(modalPrice) : undefined,
+        autoActivate: createAutoActivate,
+      });
+      return;
+    }
+
     if (!selectedSubscription) return;
 
     if (modalType === 'activate') {
@@ -310,22 +334,6 @@ export function AdminBilling() {
         subscriptionId: selectedSubscription.id,
         reason: modalReason || undefined,
       });
-    } else if (modalType === 'create') {
-      if (!createUserId || !createTariffId || !createCategoryId || !createLocationId) {
-        alert('Заполните все обязательные поля');
-        return;
-      }
-      createMutation.mutate({
-        userId: parseInt(createUserId, 10),
-        tariffId: parseInt(createTariffId, 10),
-        categoryId: parseInt(createCategoryId, 10),
-        locationId: parseInt(createLocationId, 10),
-        paymentMethod: modalPaymentMethod,
-        notes: modalNotes || undefined,
-        durationHours: modalDurationHours ? parseInt(modalDurationHours, 10) : undefined,
-        price: modalPrice ? parseFloat(modalPrice) : undefined,
-        autoActivate: createAutoActivate,
-      });
     }
   }, [selectedSubscription, modalType, modalPaymentMethod, modalNotes, modalDurationHours, modalPrice, modalReason, createUserId, createTariffId, createCategoryId, createLocationId, createAutoActivate, activateMutation, extendMutation, cancelMutation, createMutation]);
 
@@ -335,7 +343,7 @@ export function AdminBilling() {
   // Применение фильтров для текущих подписок
   const handleApplyCurrentFilters = () => {
     setPage(1);
-    const filters: AdminBillingFilters['filters'] & { _ts?: number } = {};
+    const filters: AdminBillingFilters['filters'] = {};
     
     if (subscriptionIdFilter) filters.subscription_id = parseInt(subscriptionIdFilter, 10);
     if (userIdFilter) filters.user_id = parseInt(userIdFilter, 10);
@@ -347,15 +355,15 @@ export function AdminBilling() {
       if (dateTo) filters.created_at.to = formatDateForFilter(dateTo);
     }
     
-    // Добавляем timestamp для принудительного обновления
-    filters._ts = Date.now();
     setAppliedCurrentFilters(filters);
+    // Принудительно обновляем данные
+    refetchCurrent();
   };
 
   // Применение фильтров для истории
   const handleApplyHistoryFilters = () => {
     setPage(1);
-    const filters: AdminBillingFilters['filters'] & { _ts?: number } = {};
+    const filters: AdminBillingFilters['filters'] = {};
     
     if (historySubscriptionId) filters.subscription_id = parseInt(historySubscriptionId, 10);
     if (historyUserId) filters.user_id = parseInt(historyUserId, 10);
@@ -367,9 +375,9 @@ export function AdminBilling() {
       if (actionDateTo) filters.action_date.to = formatDateForFilter(actionDateTo);
     }
     
-    // Добавляем timestamp для принудительного обновления
-    filters._ts = Date.now();
     setAppliedHistoryFilters(filters);
+    // Принудительно обновляем данные
+    refetchHistory();
   };
 
   // Сброс всех фильтров
@@ -381,14 +389,16 @@ export function AdminBilling() {
       setStatusFilter([]);
       setDateFrom('');
       setDateTo('');
-      setAppliedCurrentFilters({ _ts: Date.now() });
+      setAppliedCurrentFilters({});
+      refetchCurrent();
     } else {
       setHistorySubscriptionId('');
       setHistoryUserId('');
       setActionFilter([]);
       setActionDateFrom('');
       setActionDateTo('');
-      setAppliedHistoryFilters({ _ts: Date.now() });
+      setAppliedHistoryFilters({});
+      refetchHistory();
     }
   };
 
@@ -790,35 +800,42 @@ export function AdminBilling() {
                         <td className="admin-billing-cell-date">{formatDate(sub.end_date)}</td>
                         <td className="admin-billing-cell-notes">{sub.admin_notes || ''}</td>
                         <td className="admin-billing-cell-actions">
-                          {(sub.status === 'pending' || sub.status === 'expired') && (
-                            <Tooltip content="Активировать" position="top">
-                              <button
-                                className="admin-billing-action-icon activate"
-                                onClick={() => openModal('activate', sub)}
-                              >
-                                <span className="material-icons">check_circle</span>
-                              </button>
-                            </Tooltip>
-                          )}
-                          {(sub.status === 'active' || sub.status === 'extend_pending') && (
-                            <Tooltip content="Продлить" position="top">
-                              <button
-                                className="admin-billing-action-icon extend"
-                                onClick={() => openModal('extend', sub)}
-                              >
-                                <span className="material-icons">update</span>
-                              </button>
-                            </Tooltip>
-                          )}
-                          {(sub.status === 'pending' || sub.status === 'active' || sub.status === 'extend_pending') && (
-                            <Tooltip content="Отменить" position="top">
-                              <button
-                                className="admin-billing-action-icon cancel"
-                                onClick={() => openModal('cancel', sub)}
-                              >
-                                <span className="material-icons">cancel</span>
-                              </button>
-                            </Tooltip>
+                          {/* Для демо-подписок не показываем действия */}
+                          {sub.tariff_info?.toLowerCase().includes('демо') || sub.tariff_info?.toLowerCase().includes('demo') ? (
+                            <span className="admin-billing-no-actions">—</span>
+                          ) : (
+                            <>
+                              {(sub.status === 'pending' || sub.status === 'expired') && (
+                                <Tooltip content="Активировать" position="top">
+                                  <button
+                                    className="admin-billing-action-icon activate"
+                                    onClick={() => openModal('activate', sub)}
+                                  >
+                                    <span className="material-icons">check_circle</span>
+                                  </button>
+                                </Tooltip>
+                              )}
+                              {(sub.status === 'active' || sub.status === 'extend_pending') && (
+                                <Tooltip content="Продлить" position="top">
+                                  <button
+                                    className="admin-billing-action-icon extend"
+                                    onClick={() => openModal('extend', sub)}
+                                  >
+                                    <span className="material-icons">update</span>
+                                  </button>
+                                </Tooltip>
+                              )}
+                              {(sub.status === 'pending' || sub.status === 'active' || sub.status === 'extend_pending') && (
+                                <Tooltip content="Отменить" position="top">
+                                  <button
+                                    className="admin-billing-action-icon cancel"
+                                    onClick={() => openModal('cancel', sub)}
+                                  >
+                                    <span className="material-icons">cancel</span>
+                                  </button>
+                                </Tooltip>
+                              )}
+                            </>
                           )}
                         </td>
                       </tr>
@@ -826,20 +843,14 @@ export function AdminBilling() {
                   </tbody>
                 </table>
               </div>
-              <div className="admin-billing-table-footer">
-                <div className="admin-billing-pagination-info">
-                  {currentMeta?.from || 1}–{currentMeta?.to || currentData.length} из {currentMeta?.total || currentData.length}
-                </div>
-                <div className="admin-billing-pagination-per-page">
-                  <span>Строк:</span>
-                  <select value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                </div>
-              </div>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                perPage={perPage}
+                total={currentMeta?.total || currentData.length}
+                onPageChange={setPage}
+                onPerPageChange={(newPerPage) => { setPerPage(newPerPage); setPage(1); }}
+              />
             </>
           )
         ) : (
@@ -889,47 +900,16 @@ export function AdminBilling() {
                   </tbody>
                 </table>
               </div>
-              <div className="admin-billing-table-footer">
-                <div className="admin-billing-pagination-info">
-                  {historyMeta?.from || 1}–{historyMeta?.to || historyData.length} из {historyMeta?.total || historyData.length}
-                </div>
-                <div className="admin-billing-pagination-per-page">
-                  <span>Строк:</span>
-                  <select value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                </div>
-              </div>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                perPage={perPage}
+                total={historyMeta?.total || historyData.length}
+                onPageChange={setPage}
+                onPerPageChange={(newPerPage) => { setPerPage(newPerPage); setPage(1); }}
+              />
             </>
           )
-        )}
-        
-        {/* Пагинация внутри карточки */}
-        {totalPages > 1 && (
-          <div className="admin-billing-table-footer">
-            <div className="admin-billing-pagination-info">
-              Страница {page} из {totalPages}
-            </div>
-            
-            <div className="admin-billing-pagination-controls">
-              <button className="admin-billing-pagination-btn" disabled={page === 1} onClick={() => setPage(1)}>
-                <span className="material-icons">first_page</span>
-              </button>
-              <button className="admin-billing-pagination-btn" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-                <span className="material-icons">chevron_left</span>
-              </button>
-              <button className="admin-billing-pagination-btn active">{page}</button>
-              <button className="admin-billing-pagination-btn" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
-                <span className="material-icons">chevron_right</span>
-              </button>
-              <button className="admin-billing-pagination-btn" disabled={page === totalPages} onClick={() => setPage(totalPages)}>
-                <span className="material-icons">last_page</span>
-              </button>
-            </div>
-          </div>
         )}
       </div>
 
@@ -1080,7 +1060,7 @@ export function AdminBilling() {
                     className="admin-billing-filter-input"
                   >
                     <option value="">Выберите тариф</option>
-                    {tariffs.filter((t: any) => t.is_active && t.code !== 'demo').map((t: any) => (
+                    {tariffs.filter((t: any) => t.code !== 'demo').map((t: any) => (
                       <option key={t.id} value={t.id}>
                         {t.name} — {t.duration_hours} ч. ({Math.round(t.duration_hours / 24)} дн.)
                       </option>
@@ -1196,6 +1176,19 @@ export function AdminBilling() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast уведомление */}
+      {toast && (
+        <div className={`admin-billing-toast ${toast.type}`}>
+          <span className="material-icons">
+            {toast.type === 'success' ? 'check_circle' : 'error'}
+          </span>
+          <span className="admin-billing-toast-message">{toast.message}</span>
+          <button className="admin-billing-toast-close" onClick={() => setToast(null)}>
+            <span className="material-icons">close</span>
+          </button>
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import { Tariffs } from './pages/Tariffs';
 import { Favorites } from './pages/Favorites';
 import { Billing } from './pages/Billing';
 import { AdminBilling } from './pages/AdminBilling';
+import { AdminUsers } from './pages/AdminUsers';
 import { Analytics } from './pages/Analytics';
 import { ProtectedRoute, SubscriptionRoute } from './components/Auth';
 import { useAuthStore } from './stores/authStore';
@@ -60,6 +61,7 @@ function AppContent() {
         {/* Админские маршруты */}
         <Route path="admin/billing" element={<AdminBilling />} />
         <Route path="admin/analytics" element={<Analytics />} />
+        <Route path="admin/users" element={<AdminUsers />} />
       </Route>
       
       {/* Редирект на тарифы для несуществующих маршрутов */}

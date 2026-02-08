@@ -4,10 +4,12 @@
 # Обновление истёкших подписок - каждые 5 минут
 */5 * * * * /usr/bin/supervisorctl start update-expired-subscriptions >> /var/log/supervisor/cron.log 2>&1
 
-# Уведомление об истекающих подписках - каждый день в 10:00
-0 10 * * * /usr/bin/supervisorctl start notify-subscription-expiring >> /var/log/supervisor/cron.log 2>&1
+# Уведомление об истекающих подписках - каждые 10 минут
+# (защита от дубликатов реализована через поля notified_expiring_*_at)
+*/10 * * * * /usr/bin/supervisorctl start notify-subscription-expiring >> /var/log/supervisor/cron.log 2>&1
 
-# Уведомление об истёкших подписках - каждый день в 10:30
-30 10 * * * /usr/bin/supervisorctl start notify-subscription-expired >> /var/log/supervisor/cron.log 2>&1
+# Уведомление об истёкших подписках - каждые 30 минут
+# (защита от дубликатов реализована через поле notified_expired_at)
+*/30 * * * * /usr/bin/supervisorctl start notify-subscription-expired >> /var/log/supervisor/cron.log 2>&1
 
 # Пустая строка в конце обязательна для cron
