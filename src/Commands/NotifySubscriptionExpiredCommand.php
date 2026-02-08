@@ -54,10 +54,10 @@ class NotifySubscriptionExpiredCommand extends Command
             $now = Carbon::now();
             $startDate = $now->copy()->subDay();
             
-            // Находим активные подписки, которые истекли в указанном интервале
+            // Находим подписки со статусом expired, которые истекли в указанном интервале
             // Исключаем пользователей, у которых заблокирован бот
             // Исключаем подписки, для которых уже отправлено уведомление
-            $expiredSubscriptions = UserSubscription::where('status', 'active')
+            $expiredSubscriptions = UserSubscription::where('status', 'expired')
                 ->whereBetween('end_date', [$startDate, $now])
                 ->whereNull('notified_expired_at')
                 ->whereHas('user', function($query) {
