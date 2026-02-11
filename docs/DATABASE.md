@@ -1,6 +1,6 @@
 # Схема базы данных First Call
 
-**Дата обновления:** 8 февраля 2026
+**Дата обновления:** 11 февраля 2026
 
 ## Обзор
 
@@ -12,6 +12,8 @@
 - Database: `slim_api`
 - Username: `postgres`
 - Password: `postgres`
+
+**Всего таблиц:** 30 (не считая `spatial_ref_sys`)
 
 ---
 
@@ -28,7 +30,7 @@
          │
          │     ┌─────────────────┐     ┌─────────────────┐
          ├────<│user_subscriptions│>───<│    tariffs      │
-         │     └────────┬────────┘     └─────────────────┘
+         │     └────────┬────────┘     └────────┬────────┘
          │              │                       │
          │              │              ┌────────┴────────┐
          │              │              │  tariff_prices  │>──┐
@@ -41,25 +43,40 @@
          │                                      │
          │     ┌─────────────────┐     ┌────────┴────────┐
          ├────<│user_location_   │>───<│   categories    │
-         │     │   polygons      │     └─────────────────┘
-         │     └─────────────────┘
-         │
-         │     ┌─────────────────┐
-         ├────<│ refresh_tokens  │
-         │     └─────────────────┘
+         │     │   polygons      │     └────────┬────────┘
+         │     └─────────────────┘              │
+         │                              ┌───────┴────────┐
+         │                              │ category_rooms │>──┐
+         │                              └────────────────┘   │
+         │                                                   │
+         │     ┌─────────────────┐     ┌─────────────────┐   │
+         ├────<│ refresh_tokens  │     │     rooms       │<──┘
+         │     └─────────────────┘     └─────────────────┘
          │
          │     ┌─────────────────┐     ┌─────────────────┐
-         ├────<│ agent_listings  │>───<│    listings     │
-         │     └─────────────────┘     └────────┬────────┘
-         │                                      │
-         │     ┌─────────────────┐     ┌────────┴────────┐
-         ├────<│ user_favorites  │>────│  listing_metro  │>──┐
+         ├────<│ agent_listings  │>───<│    listings     │>──┐
+         │     └─────────────────┘     └────────┬────────┘   │
+         │                                      │            │
+         │     ┌─────────────────┐     ┌────────┴────────┐   │
+         ├────<│ user_favorites  │>────│  listing_metro  │>──┤
          │     └────────┬────────┘     └─────────────────┘   │
          │              │                                    │
          │     ┌────────┴────────┐     ┌─────────────────┐   │
-         └────<│user_favorite_   │     │ metro_stations  │<──┘
-               │   statuses      │     └─────────────────┘
-               └─────────────────┘
+         ├────<│user_favorite_   │     │ metro_stations  │<──┘
+         │     │   statuses      │     └─────────────────┘
+         │     └─────────────────┘
+         │
+         │     ┌─────────────────┐
+         ├────<│user_source_     │
+         │     │   cookies       │
+         │     └─────────────────┘
+         │
+         │     ┌─────────────────┐     ┌─────────────────┐
+         ├────<│   agencies      │>───<│ agency_members  │
+         │     └─────────────────┘     └─────────────────┘
+         │              │
+         │              └──────> user_subscriptions
+         │
 ```
 
 ---
@@ -71,24 +88,24 @@
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `name` | VARCHAR | Имя пользователя |
-| `password_hash` | VARCHAR | Хеш пароля (bcrypt) |
-| `telegram_id` | VARCHAR UNIQUE | ID в Telegram |
-| `telegram_username` | VARCHAR NULL | Username в Telegram |
-| `telegram_photo_url` | VARCHAR NULL | URL аватара |
+| `name` | VARCHAR(255) NOT NULL | Имя пользователя |
+| `password_hash` | VARCHAR(255) NOT NULL | Хеш пароля (bcrypt) |
+| `telegram_id` | VARCHAR(255) NOT NULL UNIQUE | ID в Telegram |
+| `telegram_username` | VARCHAR(255) NULL | Username в Telegram |
+| `telegram_photo_url` | VARCHAR(255) NULL | URL аватара |
 | `telegram_auth_date` | INT NULL | Дата авторизации через Telegram |
-| `telegram_hash` | VARCHAR NULL | Хеш авторизации Telegram |
-| `phone` | VARCHAR NULL | Телефон |
-| `phone_status` | BOOLEAN | Статус верификации телефона |
-| `app_connected` | BOOLEAN | Подключено ли приложение (WebSocket) |
+| `telegram_hash` | VARCHAR(255) NULL | Хеш авторизации Telegram |
+| `phone` | VARCHAR(255) NULL | Телефон |
+| `phone_status` | BOOLEAN NOT NULL DEFAULT false | Статус верификации телефона |
+| `role` | VARCHAR(255) NOT NULL DEFAULT 'user' | Роль: `user`, `admin` |
+| `is_trial_used` | BOOLEAN NOT NULL DEFAULT false | Использован ли демо-период |
+| `telegram_bot_blocked` | BOOLEAN NOT NULL DEFAULT false | Заблокировал ли бота |
+| `app_connected` | BOOLEAN NOT NULL DEFAULT false | Подключено ли приложение (WebSocket) |
 | `app_last_ping_at` | TIMESTAMP NULL | Время последнего пинга от приложения |
-| `role` | VARCHAR | Роль: `user`, `admin` |
-| `is_trial_used` | BOOLEAN | Использован ли демо-период |
-| `telegram_bot_blocked` | BOOLEAN | Заблокировал ли бота |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
-**Индексы:** `telegram_id` (UNIQUE)
+**Индексы:** `users_telegram_id_unique` (UNIQUE on `telegram_id`)
 
 ---
 
@@ -97,15 +114,17 @@
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `user_id` | INT FK UNIQUE | Ссылка на users |
-| `log_events` | BOOLEAN | Логировать события |
-| `auto_call` | BOOLEAN | Автозвонок включён |
-| `auto_call_raised` | BOOLEAN | Автозвонок на поднятые |
-| `telegram_notifications` | BOOLEAN | Уведомления в Telegram |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `user_id` | INT NOT NULL FK | Ссылка на users |
+| `log_events` | BOOLEAN NOT NULL DEFAULT false | Логировать события |
+| `auto_call` | BOOLEAN NOT NULL DEFAULT false | Автозвонок включён |
+| `auto_call_raised` | BOOLEAN NOT NULL DEFAULT false | Автозвонок на поднятые |
+| `telegram_notifications` | BOOLEAN NOT NULL DEFAULT false | Уведомления в Telegram |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
-**FK:** `user_id` → `users(id)` ON DELETE CASCADE
+**FK:** `user_id` -> `users(id)`
+
+**Индексы:** `user_settings_user_id_unique` (UNIQUE on `user_id`)
 
 ---
 
@@ -114,34 +133,34 @@
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `name` | VARCHAR | Название источника |
-| `is_active` | BOOLEAN | Активен ли источник |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `name` | VARCHAR(255) NOT NULL | Название источника |
+| `is_active` | BOOLEAN NOT NULL DEFAULT true | Активен ли источник |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **Начальные данные:**
-- Авито
-- Яндекс.Н
-- Циан
-- ЮЛА
+1. Авито
+2. Яндекс.Н
+3. Циан
+4. ЮЛА
 
 ---
 
-### 4. user_sources — Источники пользователя (pivot)
+### 4. user_sources — Источники пользователя (pivot, composite PK)
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
-| `user_id` | INT FK | Ссылка на users |
-| `source_id` | INT FK | Ссылка на sources |
-| `enabled` | BOOLEAN | Включён ли источник |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `user_id` | INT NOT NULL FK | Ссылка на users |
+| `source_id` | INT NOT NULL FK | Ссылка на sources |
+| `enabled` | BOOLEAN NOT NULL DEFAULT true | Включён ли источник |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **PK:** (`user_id`, `source_id`)
 
 **FK:**
-- `user_id` → `users(id)` ON DELETE CASCADE
-- `source_id` → `sources(id)` ON DELETE CASCADE
+- `user_id` -> `users(id)`
+- `source_id` -> `sources(id)`
 
 ---
 
@@ -150,9 +169,9 @@
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `name` | VARCHAR | Название категории |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `name` | VARCHAR(255) NOT NULL | Название категории |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **Начальные данные:**
 1. Аренда жилая (Квартиры)
@@ -162,102 +181,160 @@
 
 ---
 
-### 6. locations — Локации (регионы/города)
+### 6. rooms — Типы комнат
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `city` | VARCHAR | Город |
-| `region` | VARCHAR | Регион/область |
-| `center_lat` | DECIMAL(10,6) | Широта центра |
-| `center_lng` | DECIMAL(10,6) | Долгота центра |
-| `bounds` | JSON | Границы {north, east, south, west} |
-| `center_point` | GEOMETRY(Point) | PostGIS точка центра |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `name` | VARCHAR(50) NOT NULL | Название (напр. "Студия", "1-комн") |
+| `code` | VARCHAR(20) NOT NULL UNIQUE | Код (напр. "studio", "1", "2", "5+", "free") |
+| `sort_order` | SMALLINT NOT NULL DEFAULT 0 | Порядок сортировки |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
-**Начальные данные:** 19 городов (Москва, СПб, Новосибирск и др.)
-
----
-
-### 7. cities — Детальные города/районы
-
-| Колонка | Тип | Описание |
-|---------|-----|----------|
-| `id` | SERIAL PK | Первичный ключ |
-| `name` | VARCHAR(100) | Название |
-| `city_parent_id` | INT | ID родительского города |
-| `location_parent_id` | INT FK | Ссылка на locations |
-| `lat` | DECIMAL(10,8) | Широта |
-| `lng` | DECIMAL(11,8) | Долгота |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
-
-**FK:** `location_parent_id` → `locations(id)` ON DELETE CASCADE
-
-**UNIQUE:** (`name`, `city_parent_id`)
-
----
-
-### 8. tariffs — Тарифы
-
-| Колонка | Тип | Описание |
-|---------|-----|----------|
-| `id` | SERIAL PK | Первичный ключ |
-| `name` | VARCHAR | Название тарифа |
-| `code` | VARCHAR | Код: `demo`, `premium` |
-| `duration_hours` | INT | Длительность в часах |
-| `price` | DECIMAL(10,2) | Базовая цена |
-| `description` | TEXT NULL | Описание |
-| `is_active` | BOOLEAN | Активен ли тариф |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+**Индексы:** `rooms_code_unique` (UNIQUE on `code`)
 
 **Начальные данные:**
-- Demo: 3 часа, 0₽
-- Premium: 744 часа (31 день), 5000₽
+1. Студия (studio)
+2. 1-комн (1)
+3. 2-комн (2)
+4. 3-комн (3)
+5. 4-комн (4)
+6. 5+ комн (5+)
+7. Свободная планировка (free)
 
 ---
 
-### 9. tariff_prices — Цены тарифов по локациям и категориям
+### 7. category_rooms — Связь категорий и комнат (pivot)
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `tariff_id` | INT FK | Ссылка на tariffs |
-| `location_id` | INT FK | Ссылка на locations |
-| `category_id` | INT FK NULL | Ссылка на categories |
-| `price` | DECIMAL(10,2) | Цена для комбинации |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `category_id` | INT NOT NULL FK | Ссылка на categories |
+| `room_id` | INT NOT NULL FK | Ссылка на rooms |
 
 **FK:**
-- `tariff_id` → `tariffs(id)` ON DELETE CASCADE
-- `location_id` → `locations(id)` ON DELETE CASCADE
-- `category_id` → `categories(id)` ON DELETE CASCADE
+- `category_id` -> `categories(id)`
+- `room_id` -> `rooms(id)`
 
-**UNIQUE:** (`tariff_id`, `location_id`, `category_id`)
-
-**Примечание:** Цена зависит от комбинации тариф + локация + категория. Например, Москва + Аренда жилая = 10000₽, остальные = 5000₽.
+**Индексы:** `category_rooms_category_id_room_id_unique` (UNIQUE on `category_id`, `room_id`)
 
 ---
 
-### 10. user_subscriptions — Подписки пользователей
+### 8. locations — Локации (регионы/города)
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `user_id` | INT FK | Ссылка на users |
-| `tariff_id` | INT FK | Ссылка на tariffs |
-| `category_id` | INT FK | Ссылка на categories |
-| `location_id` | INT FK | Ссылка на locations |
-| `price_paid` | DECIMAL(10,2) | Уплаченная цена |
+| `city` | VARCHAR(255) NOT NULL | Город |
+| `region` | VARCHAR(255) NOT NULL | Регион/область |
+| `center_lat` | NUMERIC NULL | Широта центра |
+| `center_lng` | NUMERIC NULL | Долгота центра |
+| `bounds` | JSON NULL | Границы {north, east, south, west} |
+| `center_point` | GEOMETRY NULL | PostGIS точка центра |
+| `bounds_polygon` | GEOMETRY NULL | PostGIS полигон границ |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**Индексы:**
+- GIST on `center_point`
+- GIST on `bounds_polygon`
+
+**Начальные данные:** 19 городов (Москва, Санкт-Петербург, Новосибирск, Екатеринбург, Казань, Красноярск, Нижний Новгород, Челябинск, Уфа, Самара, Ростов-на-Дону, Краснодар, Омск, Воронеж, Пермь, Волгоград, Саратов, Тюмень, Тверь)
+
+---
+
+### 9. cities — Детальные города/районы
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `name` | VARCHAR(100) NOT NULL | Название |
+| `city_parent_id` | INT NOT NULL | ID родительского города |
+| `location_parent_id` | INT NOT NULL FK | Ссылка на locations |
+| `lat` | NUMERIC NULL | Широта |
+| `lng` | NUMERIC NULL | Долгота |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:** `location_parent_id` -> `locations(id)`
+
+**Индексы:**
+- `cities_name_city_parent_id_unique` (UNIQUE on `name`, `city_parent_id`)
+- `cities_location_parent_id_index`
+- `cities_city_parent_id_index`
+- `cities_location_parent_id_city_parent_id_index`
+
+---
+
+### 10. tariffs — Тарифы
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `name` | VARCHAR(255) NOT NULL | Название тарифа |
+| `code` | VARCHAR(255) NOT NULL | Код тарифа |
+| `duration_hours` | INT NOT NULL | Длительность в часах |
+| `price` | NUMERIC NOT NULL | Базовая цена |
+| `description` | TEXT NULL | Описание |
+| `is_active` | BOOLEAN NOT NULL DEFAULT true | Активен ли тариф |
+| `is_office` | BOOLEAN NULL DEFAULT false | Офисный тариф |
+| `max_agents` | INT NULL DEFAULT 1 | Максимум агентов |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**Начальные данные:**
+
+| id | name | code | duration_hours | price | is_office | max_agents |
+|----|------|------|----------------|-------|-----------|------------|
+| 1 | Демо | demo | 3 | 0 | false | 1 |
+| 2 | Премиум 31 день | premium_31 | 744 | 5000 | false | 1 |
+| 3 | Офис S | office_5 | 744 | 12500 | true | 5 |
+| 4 | Офис M | office_10 | 744 | 22500 | true | 10 |
+| 5 | Офис L | office_20 | 744 | 40000 | true | 20 |
+| 6 | Офис XL | office_30 | 744 | 52500 | true | 30 |
+
+---
+
+### 11. tariff_prices — Цены тарифов по локациям и категориям
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `tariff_id` | INT NOT NULL FK | Ссылка на tariffs |
+| `location_id` | INT NOT NULL FK | Ссылка на locations |
+| `price` | NUMERIC NOT NULL | Цена для комбинации |
+| `category_id` | INT NULL FK | Ссылка на categories |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:**
+- `tariff_id` -> `tariffs(id)`
+- `location_id` -> `locations(id)`
+- `category_id` -> `categories(id)`
+
+**Индексы:** `tariff_prices_unique` (UNIQUE on `tariff_id`, `location_id`, `category_id`)
+
+**Примечание:** Цена зависит от комбинации тариф + локация + категория. Например, Москва + Аренда жилая = 10000, остальные = 5000.
+
+---
+
+### 12. user_subscriptions — Подписки пользователей
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `user_id` | INT NOT NULL FK | Ссылка на users |
+| `tariff_id` | INT NOT NULL FK | Ссылка на tariffs |
+| `category_id` | INT NOT NULL FK | Ссылка на categories |
+| `location_id` | INT NOT NULL FK | Ссылка на locations |
+| `price_paid` | NUMERIC NOT NULL | Уплаченная цена |
 | `start_date` | TIMESTAMP NULL | Дата начала |
 | `end_date` | TIMESTAMP NULL | Дата окончания |
-| `status` | VARCHAR | Статус: `pending`, `active`, `extend_pending`, `expired`, `cancelled` |
-| `is_enabled` | BOOLEAN | Временно отключена |
-| `payment_method` | VARCHAR NULL | Способ оплаты |
-| `admin_notes` | VARCHAR NULL | Заметки админа |
+| `status` | VARCHAR(255) NOT NULL DEFAULT 'pending' | Статус подписки |
+| `is_enabled` | BOOLEAN NOT NULL DEFAULT true | Временно отключена |
+| `payment_method` | VARCHAR(255) NULL | Способ оплаты |
+| `admin_notes` | VARCHAR(255) NULL | Заметки админа |
 | `approved_by` | INT NULL | ID админа |
 | `approved_at` | TIMESTAMP NULL | Дата одобрения |
 | `notified_expiring_3d_at` | TIMESTAMP NULL | Уведомление за 3 дня (премиум) |
@@ -265,8 +342,8 @@
 | `notified_expiring_1h_at` | TIMESTAMP NULL | Уведомление за 1 час (демо) |
 | `notified_expiring_15m_at` | TIMESTAMP NULL | Уведомление за 15 минут (демо) |
 | `notified_expired_at` | TIMESTAMP NULL | Уведомление об истечении |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **Статусы:**
 - `pending` — ожидает подтверждения админом
@@ -279,171 +356,170 @@
 Используются для предотвращения дубликатов уведомлений. При отправке уведомления записывается timestamp. При продлении подписки все поля сбрасываются в NULL.
 
 **FK:**
-- `user_id` → `users(id)` ON DELETE CASCADE
-- `tariff_id` → `tariffs(id)` ON DELETE CASCADE
-- `category_id` → `categories(id)` ON DELETE CASCADE
-- `location_id` → `locations(id)` ON DELETE CASCADE
+- `user_id` -> `users(id)`
+- `tariff_id` -> `tariffs(id)`
+- `category_id` -> `categories(id)`
+- `location_id` -> `locations(id)`
 
-**UNIQUE:** (`user_id`, `category_id`, `location_id`, `status`)
+**Индексы:** `unique_subscription` (UNIQUE on `user_id`, `category_id`, `location_id` WHERE `status` IN ('active', 'pending'))
 
 ---
 
-### 11. subscription_history — История подписок
+### 13. subscription_history — История подписок
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `user_id` | INT FK | Ссылка на users |
-| `subscription_id` | INT FK NULL | Ссылка на user_subscriptions |
-| `action` | VARCHAR | Действие: `created`, `expired`, `cancelled`, `renewed` |
-| `tariff_name` | VARCHAR | Название тарифа |
-| `category_name` | VARCHAR | Название категории |
-| `location_name` | VARCHAR | Название локации |
-| `price_paid` | DECIMAL(10,2) | Уплаченная цена |
-| `action_date` | TIMESTAMP | Дата действия |
+| `user_id` | INT NOT NULL FK | Ссылка на users |
+| `subscription_id` | INT NULL FK | Ссылка на user_subscriptions |
+| `action` | VARCHAR(255) NOT NULL | Действие: `created`, `expired`, `cancelled`, `renewed` |
+| `tariff_name` | VARCHAR(255) NOT NULL | Название тарифа |
+| `category_name` | VARCHAR(255) NOT NULL | Название категории |
+| `location_name` | VARCHAR(255) NOT NULL | Название локации |
+| `price_paid` | NUMERIC NOT NULL | Уплаченная цена |
+| `action_date` | TIMESTAMP NOT NULL | Дата действия |
 | `notes` | TEXT NULL | Примечания |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **FK:**
-- `user_id` → `users(id)` ON DELETE CASCADE
-- `subscription_id` → `user_subscriptions(id)` ON DELETE SET NULL
+- `user_id` -> `users(id)`
+- `subscription_id` -> `user_subscriptions(id)`
 
 ---
 
-### 12. refresh_tokens — JWT Refresh токены
+### 14. refresh_tokens — JWT Refresh токены
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `user_id` | INT FK | Ссылка на users |
-| `token` | VARCHAR(255) | Токен |
-| `device_type` | VARCHAR(20) | Тип устройства: `web`, `mobile` |
-| `expires_at` | TIMESTAMP | Дата истечения |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `user_id` | INT NOT NULL FK | Ссылка на users |
+| `token` | VARCHAR(255) NOT NULL | Токен |
+| `device_type` | VARCHAR(20) NOT NULL | Тип устройства: `web`, `mobile` |
+| `expires_at` | TIMESTAMP NOT NULL | Дата истечения |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
-**FK:** `user_id` → `users(id)` ON DELETE CASCADE
+**FK:** `user_id` -> `users(id)`
 
-**UNIQUE:** (`user_id`, `device_type`)
+**Индексы:** `refresh_tokens_user_id_device_type_unique` (UNIQUE on `user_id`, `device_type`)
 
 ---
 
-### 13. user_location_polygons — Пользовательские полигоны
+### 15. user_location_polygons — Пользовательские полигоны
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `user_id` | INT FK | Ссылка на users |
-| `subscription_id` | INT FK | Ссылка на user_subscriptions |
-| `name` | VARCHAR | Название локации |
-| `polygon_coordinates` | JSON | Координаты в GeoJSON |
-| `center_lat` | DECIMAL(10,6) | Широта центра |
-| `center_lng` | DECIMAL(10,6) | Долгота центра |
+| `user_id` | INT NOT NULL FK | Ссылка на users |
+| `subscription_id` | INT NOT NULL FK | Ссылка на user_subscriptions |
+| `name` | VARCHAR(255) NOT NULL | Название локации |
+| `polygon_coordinates` | JSON NOT NULL | Координаты в GeoJSON |
+| `center_lat` | NUMERIC NULL | Широта центра |
+| `center_lng` | NUMERIC NULL | Долгота центра |
 | `bounds` | JSON NULL | Границы |
-| `polygon` | GEOMETRY(Polygon) | PostGIS полигон |
-| `center_point` | GEOMETRY(Point) | PostGIS точка центра |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `polygon` | GEOMETRY NULL | PostGIS полигон |
+| `center_point` | GEOMETRY NULL | PostGIS точка центра |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **FK:**
-- `user_id` → `users(id)` ON DELETE CASCADE
-- `subscription_id` → `user_subscriptions(id)` ON DELETE CASCADE
+- `user_id` -> `users(id)`
+- `subscription_id` -> `user_subscriptions(id)`
 
-**Индексы:** GIST на `polygon`, `center_point`
+**Индексы:**
+- GIST on `polygon`
+- GIST on `center_point`
 
 ---
 
-### 14. listing_statuses — Статусы объявлений
+### 16. listing_statuses — Статусы объявлений
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `name` | VARCHAR(50) UNIQUE | Название статуса |
-| `color` | VARCHAR(20) | Цвет для UI |
-| `sort_order` | SMALLINT | Порядок сортировки |
+| `name` | VARCHAR(50) NOT NULL UNIQUE | Название статуса |
+| `color` | VARCHAR(20) NULL | Цвет для UI |
+| `sort_order` | SMALLINT NOT NULL DEFAULT 0 | Порядок сортировки |
 
 **Начальные данные:**
-- Новое (#4CAF50)
-- Поднятое (#2196F3)
+1. Новое (#4CAF50)
+2. Поднятое (#2196F3)
 
 ---
 
-### 15. call_statuses — Статусы звонков
+### 17. call_statuses — Статусы звонков
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `name` | VARCHAR(100) | Название статуса |
-| `color` | VARCHAR(20) | Цвет для UI |
-| `sort_order` | SMALLINT | Порядок сортировки |
+| `name` | VARCHAR(100) NOT NULL | Название статуса |
+| `color` | VARCHAR(20) NULL | Цвет для UI |
+| `sort_order` | SMALLINT NOT NULL DEFAULT 0 | Порядок сортировки |
 
 **Начальные данные:**
-- Наша квартира (#4CAF50)
-- Не дозвонился (#FFC107)
-- Не снял (#FF9800)
-- Агент (#F44336)
-- Не первые (#9C27B0)
-- Звонок (#2196F3)
+1. Наша квартира (#4CAF50)
+2. Не дозвонился (#FFC107)
+3. Не снял (#FF9800)
+4. Агент (#F44336)
+5. Не первые (#9C27B0)
+6. Звонок (#2196F3)
 
 ---
 
-### 16. metro_stations — Станции метро
+### 18. metro_stations — Станции метро
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `location_id` | INT FK | Ссылка на locations (город) |
-| `name` | VARCHAR(100) | Название станции |
+| `location_id` | INT NOT NULL FK | Ссылка на locations (город) |
+| `name` | VARCHAR(100) NOT NULL | Название станции |
 | `line` | VARCHAR(100) NULL | Линия метро |
+| `color` | VARCHAR(20) NULL | Цвет линии |
+| `lat` | NUMERIC NULL | Широта |
+| `lng` | NUMERIC NULL | Долгота |
 | `line_id` | VARCHAR(20) NULL | ID линии из API hh.ru |
 | `station_id` | VARCHAR(20) NULL | ID станции из API hh.ru |
-| `color` | VARCHAR(20) NULL | Цвет линии |
-| `lat` | DECIMAL(10,8) | Широта |
-| `lng` | DECIMAL(11,8) | Долгота |
 
-**FK:** `location_id` → `locations(id)` ON DELETE CASCADE
+**FK:** `location_id` -> `locations(id)`
 
-**UNIQUE:** (`location_id`, `name`, `line`)
-
-**Индексы:** `station_id`
+**Индексы:**
+- `metro_stations_location_id_name_line_unique` (UNIQUE on `location_id`, `name`, `line`)
+- `metro_stations_station_id_index`
 
 ---
 
-### 17. listings — Объявления
+### 19. listings — Объявления
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `source_id` | INT FK | Ссылка на sources |
-| `category_id` | INT FK | Ссылка на categories |
-| `listing_status_id` | INT FK | Ссылка на listing_statuses |
-| `city_id` | INT FK NULL | Ссылка на cities |
-| `external_id` | VARCHAR(100) | ID во внешней системе |
-| `title` | VARCHAR NULL | Заголовок |
+| `source_id` | INT NOT NULL FK | Ссылка на sources |
+| `category_id` | INT NOT NULL FK | Ссылка на categories |
+| `listing_status_id` | INT NOT NULL DEFAULT 1 FK | Ссылка на listing_statuses |
+| `external_id` | VARCHAR(100) NOT NULL | ID во внешней системе |
+| `title` | VARCHAR(255) NULL | Заголовок |
 | `description` | TEXT NULL | Описание |
-| `rooms` | SMALLINT NULL | Количество комнат |
-| `price` | DECIMAL(12,2) NULL | Цена |
-| `price_history` | JSONB NULL | История изменения цен |
-| `square_meters` | DECIMAL(8,2) NULL | Площадь |
+| `room_id` | INT NULL FK | Ссылка на rooms |
+| `price` | NUMERIC NULL | Цена |
+| `square_meters` | NUMERIC NULL | Площадь |
 | `floor` | SMALLINT NULL | Этаж |
 | `floors_total` | SMALLINT NULL | Всего этажей |
 | `phone` | VARCHAR(20) NULL | Телефон |
-| `phone_unavailable` | BOOLEAN | Телефон недоступен (только звонки через приложение) |
+| `phone_unavailable` | BOOLEAN NOT NULL DEFAULT false | Телефон недоступен (только звонки через приложение) |
 | `city` | VARCHAR(100) NULL | Город (текст) |
 | `street` | VARCHAR(150) NULL | Улица |
-| `building` | VARCHAR(20) NULL | Номер дома |
+| `house` | VARCHAR(20) NULL | Номер дома |
 | `address` | VARCHAR(255) NULL | Полный адрес |
 | `url` | VARCHAR(255) NULL | URL объявления |
-| `lat` | DECIMAL(10,8) NULL | Широта |
-| `lng` | DECIMAL(11,8) NULL | Долгота |
-| `is_promoted` | BOOLEAN | Поднятое |
-| `is_paid` | BOOLEAN | Платное |
-| `promoted_at` | TIMESTAMP NULL | Дата поднятия |
-| `auto_call_processed_at` | TIMESTAMP NULL | Дата автозвонка |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
-| `deleted_at` | TIMESTAMP NULL | Soft delete |
+| `lat` | NUMERIC NULL | Широта |
+| `lng` | NUMERIC NULL | Долгота |
+| `is_paid` | BOOLEAN NOT NULL DEFAULT false | Платное |
+| `location_id` | INT NULL FK | Ссылка на locations |
+| `point` | GEOMETRY NULL | PostGIS точка (координаты) |
+| `price_history` | JSONB NULL | История изменения цен |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **Формат price_history:**
 ```json
@@ -454,85 +530,41 @@
 ```
 
 **FK:**
-- `source_id` → `sources(id)`
-- `category_id` → `categories(id)`
-- `listing_status_id` → `listing_statuses(id)`
-- `city_id` → `cities(id)` ON DELETE SET NULL
-
-**UNIQUE:** (`source_id`, `external_id`)
+- `source_id` -> `sources(id)`
+- `category_id` -> `categories(id)`
+- `listing_status_id` -> `listing_statuses(id)`
+- `room_id` -> `rooms(id)`
+- `location_id` -> `locations(id)`
 
 **Индексы:**
-- (`listing_status_id`, `created_at`)
-- (`is_promoted`, `promoted_at`)
-- (`is_paid`)
-- (`auto_call_processed_at`)
-- (`category_id`, `created_at`)
+- `listings_source_id_external_id_unique` (UNIQUE on `source_id`, `external_id`)
+- `idx_listings_point` (GIST on `point`)
+- `listings_category_id_created_at_index`
+- `listings_is_paid_index`
+- `listings_listing_status_id_created_at_index`
+- `listings_location_id_index`
+- `listings_room_id_index`
 
 ---
 
-### 18. listing_metro — Связь объявлений с метро
+### 20. listing_metro — Связь объявлений с метро
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `listing_id` | INT FK | Ссылка на listings |
-| `metro_station_id` | INT FK | Ссылка на metro_stations |
+| `listing_id` | INT NOT NULL FK | Ссылка на listings |
+| `metro_station_id` | INT NOT NULL FK | Ссылка на metro_stations |
 | `travel_time_min` | SMALLINT NULL | Время до метро (мин) |
+| `travel_type` | VARCHAR(20) NOT NULL DEFAULT 'walk' | Тип: `walk`, `car`, `public_transport` |
 | `distance` | VARCHAR(50) NULL | Расстояние до метро ("900 м", "2,7 км") |
-| `travel_type` | VARCHAR(20) | Тип: `walk`, `car`, `public_transport` |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **FK:**
-- `listing_id` → `listings(id)` ON DELETE CASCADE
-- `metro_station_id` → `metro_stations(id)` ON DELETE CASCADE
+- `listing_id` -> `listings(id)`
+- `metro_station_id` -> `metro_stations(id)`
 
-**UNIQUE:** (`listing_id`, `metro_station_id`)
-
----
-
-### 19. user_favorites — Избранные объявления пользователей
-
-| Колонка | Тип | Описание |
-|---------|-----|----------|
-| `id` | SERIAL PK | Первичный ключ |
-| `user_id` | INT FK | Ссылка на users |
-| `listing_id` | INT FK | Ссылка на listings |
-| `comment` | VARCHAR(250) NULL | Комментарий пользователя |
-| `status_id` | INT FK NULL | Ссылка на user_favorite_statuses |
-| `created_at` | TIMESTAMP | Дата добавления в избранное |
-
-**FK:**
-- `user_id` → `users(id)` ON DELETE CASCADE
-- `listing_id` → `listings(id)` ON DELETE CASCADE
-- `status_id` → `user_favorite_statuses(id)` ON DELETE SET NULL
-
-**UNIQUE:** (`user_id`, `listing_id`)
-
-**Индексы:**
-- `user_id`
-- `listing_id`
-- `status_id`
-
----
-
-### 20. user_favorite_statuses — Пользовательские статусы избранного
-
-| Колонка | Тип | Описание |
-|---------|-----|----------|
-| `id` | SERIAL PK | Первичный ключ |
-| `user_id` | INT FK | Ссылка на users |
-| `name` | VARCHAR(50) | Название статуса |
-| `color` | VARCHAR(7) | Цвет в HEX формате (#RRGGBB) |
-| `sort_order` | SMALLINT | Порядок сортировки |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
-
-**FK:** `user_id` → `users(id)` ON DELETE CASCADE
-
-**UNIQUE:** (`user_id`, `name`)
-
-**Индексы:** `user_id`
+**Индексы:** `listing_metro_listing_id_metro_station_id_unique` (UNIQUE on `listing_id`, `metro_station_id`)
 
 ---
 
@@ -541,126 +573,180 @@
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `user_id` | INT FK | Ссылка на users (агент) |
-| `listing_id` | INT FK | Ссылка на listings |
-| `call_status_id` | INT FK NULL | Ссылка на call_statuses |
+| `user_id` | INT NOT NULL FK | Ссылка на users (агент) |
+| `listing_id` | INT NOT NULL FK | Ссылка на listings |
+| `call_status_id` | INT NULL FK | Ссылка на call_statuses |
 | `notes` | TEXT NULL | Заметки агента |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **FK:**
-- `user_id` → `users(id)` ON DELETE CASCADE
-- `listing_id` → `listings(id)` ON DELETE CASCADE
-- `call_status_id` → `call_statuses(id)`
-
-**UNIQUE:** (`user_id`, `listing_id`)
+- `user_id` -> `users(id)`
+- `listing_id` -> `listings(id)`
+- `call_status_id` -> `call_statuses(id)`
 
 **Индексы:**
-- (`user_id`, `call_status_id`)
-- (`listing_id`, `call_status_id`)
+- `agent_listings_user_id_listing_id_unique` (UNIQUE on `user_id`, `listing_id`)
+- `agent_listings_user_id_call_status_id_index`
+- `agent_listings_listing_id_call_status_id_index`
 
 ---
 
-### 22. listing_photo_tasks — Задачи парсинга фото (устаревшая)
+### 22. user_favorites — Избранные объявления пользователей
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | BIGSERIAL PK | Первичный ключ |
+| `user_id` | BIGINT NOT NULL FK | Ссылка на users |
+| `listing_id` | BIGINT NOT NULL FK | Ссылка на listings |
+| `comment` | VARCHAR(250) NULL | Комментарий пользователя |
+| `status_id` | BIGINT NULL FK | Ссылка на user_favorite_statuses |
+| `created_at` | TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP | Дата добавления в избранное |
+
+**FK:**
+- `user_id` -> `users(id)`
+- `listing_id` -> `listings(id)`
+- `status_id` -> `user_favorite_statuses(id)`
+
+**Индексы:**
+- `user_favorites_user_listing_unique` (UNIQUE on `user_id`, `listing_id`)
+- `user_favorites_user_id_index`
+- `user_favorites_listing_id_index`
+- `user_favorites_status_id_index`
+
+---
+
+### 23. user_favorite_statuses — Пользовательские статусы избранного
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | BIGSERIAL PK | Первичный ключ |
+| `user_id` | BIGINT NOT NULL FK | Ссылка на users |
+| `name` | VARCHAR(50) NOT NULL | Название статуса |
+| `color` | VARCHAR(7) NOT NULL DEFAULT '#808080' | Цвет в HEX формате (#RRGGBB) |
+| `sort_order` | SMALLINT NOT NULL DEFAULT 0 | Порядок сортировки |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:** `user_id` -> `users(id)`
+
+**Индексы:**
+- `user_favorite_statuses_user_name_unique` (UNIQUE on `user_id`, `name`)
+- `user_favorite_statuses_user_id_index`
+
+---
+
+### 24. listing_photo_tasks — Задачи парсинга фото (устаревшая)
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | INT PK FK | ID = listings.id |
-| `source_id` | INT FK | Ссылка на sources |
-| `url` | VARCHAR(1000) | URL объявления |
-| `status` | VARCHAR(20) | Статус: `pending`, `processing`, `completed`, `failed` |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `source_id` | INT NOT NULL FK | Ссылка на sources |
+| `url` | VARCHAR(1000) NOT NULL | URL объявления |
+| `status` | VARCHAR(20) NOT NULL DEFAULT 'pending' | Статус: `pending`, `processing`, `completed`, `failed` |
+| `created_at` | TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **FK:**
-- `id` → `listings(id)` ON DELETE CASCADE
-- `source_id` → `sources(id)`
+- `id` -> `listings(id)`
+- `source_id` -> `sources(id)`
 
-**Индексы:** `status`, `created_at`, `source_id`
+**Индексы:**
+- `listing_photo_tasks_status_index`
+- `listing_photo_tasks_created_at_index`
+- `listing_photo_tasks_source_id_index`
 
 ---
 
-### 23. photo_tasks — Задачи обработки фото (удаление водяных знаков)
+### 25. photo_tasks — Задачи обработки фото (удаление водяных знаков)
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | BIGSERIAL PK | Первичный ключ |
-| `listing_id` | BIGINT FK UNIQUE | Ссылка на listings (одна задача на объявление) |
-| `source_id` | TINYINT | ID источника |
-| `external_id` | VARCHAR(50) | ID объявления на источнике |
-| `url` | VARCHAR(500) | URL объявления |
-| `status` | ENUM | Статус: `pending`, `processing`, `completed`, `failed` |
+| `listing_id` | BIGINT NOT NULL UNIQUE FK | Ссылка на listings (одна задача на объявление) |
+| `source_id` | SMALLINT NOT NULL | ID источника |
+| `external_id` | VARCHAR(50) NOT NULL | ID объявления на источнике |
+| `url` | VARCHAR(500) NOT NULL | URL объявления |
+| `status` | VARCHAR(255) NOT NULL DEFAULT 'pending' | Статус: `pending`, `processing`, `completed`, `failed` |
 | `error_message` | VARCHAR(500) NULL | Сообщение об ошибке |
-| `photos_count` | SMALLINT | Количество обработанных фото |
+| `photos_count` | SMALLINT NOT NULL DEFAULT 0 | Количество обработанных фото |
 | `archive_path` | VARCHAR(255) NULL | Путь к архиву с фото |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
-**FK:** `listing_id` → `listings(id)` ON DELETE CASCADE
+**FK:** `listing_id` -> `listings(id)`
 
-**Индексы:** (`status`, `created_at`)
+**Индексы:**
+- `photo_tasks_listing_id_unique` (UNIQUE on `listing_id`)
+- `photo_tasks_status_created_at_index`
 
 ---
 
-### 24. location_proxies — Прокси для парсинга
+### 26. location_proxies — Прокси для парсинга
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `proxy` | VARCHAR(255) | Прокси ip:port |
-| `source_id` | INT FK | Ссылка на sources |
-| `location_id` | INT FK | Ссылка на locations |
-| `category_id` | INT FK | Ссылка на categories |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `proxy` | VARCHAR(255) NOT NULL | Прокси ip:port |
+| `source_id` | INT NOT NULL FK | Ссылка на sources |
+| `location_id` | INT NOT NULL FK | Ссылка на locations |
+| `category_id` | INT NOT NULL FK | Ссылка на categories |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **FK:**
-- `source_id` → `sources(id)`
-- `location_id` → `locations(id)`
-- `category_id` → `categories(id)`
+- `source_id` -> `sources(id)`
+- `location_id` -> `locations(id)`
+- `category_id` -> `categories(id)`
 
-**UNIQUE:** (`proxy`, `source_id`, `location_id`, `category_id`)
+**Индексы:**
+- `location_proxies_proxy_source_id_location_id_category_id_unique` (UNIQUE on `proxy`, `source_id`, `location_id`, `category_id`)
+- `location_proxies_location_id_index`
+- `location_proxies_source_id_index`
+- `location_proxies_category_id_index`
 
 ---
 
-### 25. cian_auth — Авторизация ЦИАН
+### 27. cian_auth — Авторизация ЦИАН
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | SERIAL PK | Первичный ключ |
-| `login` | VARCHAR(255) | Логин |
+| `login` | VARCHAR(255) NOT NULL | Логин |
 | `password` | VARCHAR(255) NULL | Пароль |
-| `auth_token` | TEXT | Токен авторизации |
-| `is_active` | BOOLEAN | Активна ли запись |
+| `auth_token` | TEXT NOT NULL | Токен авторизации |
+| `is_active` | BOOLEAN NOT NULL DEFAULT true | Активна ли запись |
 | `last_used_at` | TIMESTAMP NULL | Последнее использование |
 | `comment` | VARCHAR(500) NULL | Комментарий |
-| `location_id` | INT FK | Ссылка на locations |
-| `category_id` | INT FK | Ссылка на categories |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `location_id` | INT NOT NULL FK | Ссылка на locations |
+| `category_id` | INT NOT NULL FK | Ссылка на categories |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **FK:**
-- `location_id` → `locations(id)`
-- `category_id` → `categories(id)`
+- `location_id` -> `locations(id)`
+- `category_id` -> `categories(id)`
 
-**UNIQUE:** (`location_id`, `category_id`)
+**Индексы:**
+- `cian_auth_location_id_category_id_unique` (UNIQUE on `location_id`, `category_id`)
+- `cian_auth_is_active_index`
 
 ---
 
-### 26. user_source_cookies — Куки авторизации на источниках
+### 28. user_source_cookies — Куки авторизации на источниках
 
 | Колонка | Тип | Описание |
 |---------|-----|----------|
 | `id` | BIGSERIAL PK | Первичный ключ |
-| `user_id` | BIGINT FK | Ссылка на users |
-| `source_type` | ENUM | Тип источника: `cian`, `avito` |
+| `user_id` | BIGINT NOT NULL FK | Ссылка на users |
+| `source_type` | VARCHAR(255) NOT NULL DEFAULT 'cian' | Тип источника: `cian`, `avito` |
 | `cookies` | TEXT NULL | Строка с куками |
-| `is_valid` | BOOLEAN | Валидны ли куки |
+| `is_valid` | BOOLEAN NOT NULL DEFAULT false | Валидны ли куки |
 | `subscription_info` | JSONB NULL | Информация о подписке на источнике |
 | `last_validated_at` | TIMESTAMP NULL | Когда последний раз проверяли |
 | `expires_at` | TIMESTAMP NULL | Когда истекает подписка на источнике |
-| `created_at` | TIMESTAMP | Дата создания |
-| `updated_at` | TIMESTAMP | Дата обновления |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **Формат subscription_info:**
 ```json
@@ -673,9 +759,104 @@
 }
 ```
 
-**FK:** `user_id` → `users(id)` ON DELETE CASCADE
+**FK:** `user_id` -> `users(id)`
 
-**UNIQUE:** (`user_id`, `source_type`)
+**Индексы:** `user_source_cookies_user_id_source_type_unique` (UNIQUE on `user_id`, `source_type`)
+
+---
+
+### 29. agencies — Агентства
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `name` | VARCHAR(255) NOT NULL | Название агентства |
+| `owner_id` | INT NOT NULL FK | Ссылка на users (владелец) |
+| `subscription_id` | INT NULL FK | Ссылка на user_subscriptions (офисная подписка) |
+| `max_agents` | INT NOT NULL DEFAULT 5 | Максимум агентов |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:**
+- `owner_id` -> `users(id)`
+- `subscription_id` -> `user_subscriptions(id)`
+
+**Индексы:** `agencies_owner_id_unique` (UNIQUE on `owner_id`)
+
+---
+
+### 30. agency_members — Участники агентства
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `agency_id` | INT NOT NULL FK | Ссылка на agencies |
+| `user_id` | INT NOT NULL FK | Ссылка на users |
+| `role` | VARCHAR(20) NOT NULL DEFAULT 'agent' | Роль в агентстве |
+| `joined_at` | TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP | Дата вступления |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:**
+- `agency_id` -> `agencies(id)`
+- `user_id` -> `users(id)`
+
+**Индексы:**
+- `agency_members_agency_id_user_id_unique` (UNIQUE on `agency_id`, `user_id`)
+- `agency_members_user_id_unique` (UNIQUE on `user_id`)
+
+---
+
+## Внешние ключи (46 всего)
+
+| Таблица | Колонка | Ссылается на |
+|---------|---------|--------------|
+| agencies | owner_id | users(id) |
+| agencies | subscription_id | user_subscriptions(id) |
+| agency_members | agency_id | agencies(id) |
+| agency_members | user_id | users(id) |
+| agent_listings | user_id | users(id) |
+| agent_listings | listing_id | listings(id) |
+| agent_listings | call_status_id | call_statuses(id) |
+| category_rooms | category_id | categories(id) |
+| category_rooms | room_id | rooms(id) |
+| cian_auth | location_id | locations(id) |
+| cian_auth | category_id | categories(id) |
+| cities | location_parent_id | locations(id) |
+| listing_metro | listing_id | listings(id) |
+| listing_metro | metro_station_id | metro_stations(id) |
+| listing_photo_tasks | id | listings(id) |
+| listing_photo_tasks | source_id | sources(id) |
+| listings | source_id | sources(id) |
+| listings | category_id | categories(id) |
+| listings | listing_status_id | listing_statuses(id) |
+| listings | room_id | rooms(id) |
+| listings | location_id | locations(id) |
+| location_proxies | source_id | sources(id) |
+| location_proxies | location_id | locations(id) |
+| location_proxies | category_id | categories(id) |
+| metro_stations | location_id | locations(id) |
+| photo_tasks | listing_id | listings(id) |
+| refresh_tokens | user_id | users(id) |
+| subscription_history | user_id | users(id) |
+| subscription_history | subscription_id | user_subscriptions(id) |
+| tariff_prices | tariff_id | tariffs(id) |
+| tariff_prices | location_id | locations(id) |
+| tariff_prices | category_id | categories(id) |
+| user_favorite_statuses | user_id | users(id) |
+| user_favorites | user_id | users(id) |
+| user_favorites | listing_id | listings(id) |
+| user_favorites | status_id | user_favorite_statuses(id) |
+| user_location_polygons | user_id | users(id) |
+| user_location_polygons | subscription_id | user_subscriptions(id) |
+| user_settings | user_id | users(id) |
+| user_source_cookies | user_id | users(id) |
+| user_sources | user_id | users(id) |
+| user_sources | source_id | sources(id) |
+| user_subscriptions | user_id | users(id) |
+| user_subscriptions | tariff_id | tariffs(id) |
+| user_subscriptions | category_id | categories(id) |
+| user_subscriptions | location_id | locations(id) |
 
 ---
 
@@ -689,50 +870,61 @@ make migrate
 docker exec -it slim_php-cli php db/migrations/run.php
 ```
 
-**Порядок миграций:**
-1. `20230101000001` — users
-2. `20230101000002` — sources
-3. `20230101000003` — categories
-4. `20230101000004` — user_settings
-5. `20230101000005` — user_sources
-6. `20230101000007` — refresh_tokens
-7. `20240320000001` — tariffs
-8. `20240522000001` — telegram_bot_blocked (alter users)
-9. `20240526000001` — locations
-10. `20240526000002` — tariff_prices
-11. `20240526000003` — user_subscriptions
-12. `20240526000004` — subscription_history
-13. `20240701000001` — user_location_polygons
-14. `20240701000002` — coordinates to locations
-15. `20240701000003` — PostGIS fields
+**Порядок миграций (51 всего):**
+1. `20230101000001` — create users table
+2. `20230101000002` — create sources table
+3. `20230101000003` — create categories table
+4. `20230101000004` — create user_settings table
+5. `20230101000005` — create user_sources table
+6. `20230101000007` — create refresh_tokens table
+7. `20240320000001` — create tariffs table
+8. `20240522000001` — add telegram_bot_blocked to users
+9. `20240526000001` — create locations table
+10. `20240526000002` — create tariff_prices table
+11. `20240526000003` — create user_subscriptions table
+12. `20240526000004` — create subscription_history table
+13. `20240701000001` — create user_location_polygons table
+14. `20240701000002` — add coordinates to locations table
+15. `20240701000003` — add PostGIS fields to existing tables
 16. `20240801000001` — fill location coordinates
 17. `20240915000001` — update tariffs structure
-18. `20240920000001` — fix subscription constraint
-19. `20241001000001` — listing_statuses
-20. `20241001000002` — call_statuses
-21. `20241001000003` — metro_stations
-22. `20241001000004` — listings
-23. `20241001000005` — listing_metro
-24. `20241001000006` — agent_listings
-25. `20241001000009` — listing_photo_tasks
-26. `20241201000001` — cities
-27. `20241201000002` — city_id to listings
-28. `20241201000003` — fill cities
-29. `20241201000004` — location_proxies
-30. `20241201000005` — cian_auth
-31. `20260128000001` — user_favorites
-32. `20260128000002` — add comment to user_favorites
-33. `20260128000003` — user_favorite_statuses
-34. `20260128000004` — add status_id to user_favorites
-35. `20260128000005` — add category_id to tariff_prices
-36. `20260201000001` — add price_history to listings
-37. `20260202000001` — add hh_ids to metro_stations
-38. `20260202000002` — add metro_fields to listings (phone_unavailable)
-39. `20260202000003` — move metro_info to listing_metro (distance)
-40. `20260206000001` — photo_tasks
-41. `20260208000001` — add notification tracking to user_subscriptions (notified_expiring_*, notified_expired_at)
-42. `20260208000002` — user_source_cookies (куки авторизации на источниках)
-43. `20260208100001` — drop bookmarklet_tokens (удалена неиспользуемая таблица)
+18. `20240920000001` — fix subscription unique constraint
+19. `20241001000001` — create listing_statuses table
+20. `20241001000002` — create call_statuses table
+21. `20241001000003` — create metro_stations table
+22. `20241001000004` — create listings table
+23. `20241001000005` — create listing_metro table
+24. `20241001000006` — create agent_listings table
+25. `20241001000009` — create listing_photo_tasks (parsing_tasks) table
+26. `20241201000001` — create cities table
+27. `20241201000002` — add city_id to listings table
+28. `20241201000003` — fill cities table
+29. `20241201000004` — create location_proxies table
+30. `20241201000005` — create cian_auth table
+31. `20260125000001` — add app_connected to users
+32. `20260125000001` — add point (PostGIS) to listings
+33. `20260125000002` — remove promoted fields from listings
+34. `20260126000001` — update listings structure
+35. `20260126000002` — create rooms table
+36. `20260126000003` — rename rooms to room_id in listings
+37. `20260128000001` — create user_favorites table
+38. `20260128000002` — add comment to user_favorites
+39. `20260128000003` — create user_favorite_statuses table
+40. `20260128000004` — add status_id to user_favorites
+41. `20260128000005` — add category_id to tariff_prices
+42. `20260201000001` — add price_history to listings
+43. `20260202000001` — add hh_ids to metro_stations
+44. `20260202000002` — add metro fields to listings (phone_unavailable)
+45. `20260202000003` — move metro_info to listing_metro (distance)
+46. `20260206000001` — create photo_tasks table
+47. `20260208000001` — add notification tracking to user_subscriptions
+48. `20260208000002` — create user_source_cookies table
+49. `20260208000003` — create bookmarklet_tokens table
+50. `20260208100001` — drop bookmarklet_tokens table
+51. `20260209000001` — add office fields to tariffs (is_office, max_agents)
+52. `20260209000002` — create agencies table
+53. `20260209000003` — create agency_members table
+54. `20260209000004` — add office tariffs (Офис S/M/L/XL)
 
 ---
 
@@ -744,15 +936,20 @@ docker exec -it slim_php-cli php db/migrations/run.php
 - `GEOMETRY(Point, 4326)` — точка (SRID 4326 = WGS84)
 - `GEOMETRY(Polygon, 4326)` — полигон
 
+**Таблицы с PostGIS полями:**
+- `locations` — `center_point`, `bounds_polygon`
+- `listings` — `point`
+- `user_location_polygons` — `polygon`, `center_point`
+
 **Индексы:**
-- GIST индексы для быстрого поиска
+- GIST индексы для быстрого геопространственного поиска
 
 **Примеры запросов:**
 
 ```sql
 -- Найти объявления в полигоне пользователя
 SELECT l.* FROM listings l
-JOIN user_location_polygons ulp ON ST_Contains(ulp.polygon, ST_SetSRID(ST_Point(l.lng, l.lat), 4326))
+JOIN user_location_polygons ulp ON ST_Contains(ulp.polygon, l.point)
 WHERE ulp.user_id = 1;
 
 -- Расстояние между точками
@@ -760,4 +957,9 @@ SELECT ST_Distance(
   ST_SetSRID(ST_Point(lng1, lat1), 4326)::geography,
   ST_SetSRID(ST_Point(lng2, lat2), 4326)::geography
 ) AS distance_meters;
+
+-- Найти объявления в пределах границ города
+SELECT l.* FROM listings l
+JOIN locations loc ON ST_Contains(loc.bounds_polygon, l.point)
+WHERE loc.id = 1;
 ```

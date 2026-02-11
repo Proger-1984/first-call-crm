@@ -1,0 +1,50 @@
+# Зависимости и сборки
+vendor/
+node_modules/
+composer.lock
+package-lock.json
+
+# Логи и временные файлы
+logs/
+*.log
+*.cache
+
+# Docker и окружение
+.env
+.env.local
+.env.backup
+.env.docker
+docker-compose.override.yml
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Compiled и кэш файлы
+*.compiled
+.phpunit.result.cache
+
+# Большие файлы данных
+*.sql
+*.dump
+*.backup
+
+# Frontend build
+frontend-react/node_modules/
+frontend-react/dist/
+frontend-react/build/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Документация сторонних библиотек
+docs/api/assets/
+
+# Git
+.git/
+
+# Секреты
+.github-token

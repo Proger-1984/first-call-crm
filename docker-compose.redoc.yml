@@ -1,9 +1,8 @@
-version: '3'
 services:
   redoc:
-    image: redocly/redoc
+    image: nginx:alpine
     ports:
-      - "8080:80"
+      - "8090:80"
     volumes:
-      - ./docs/api:/usr/share/nginx/html
-    command: nginx -g 'daemon off;' 
+      - ./docs/api:/usr/share/nginx/html:ro
+    restart: unless-stopped
