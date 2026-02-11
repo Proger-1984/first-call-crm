@@ -160,10 +160,12 @@ return function (App $app) {
         /** Маршруты для управления пользователями (только для администраторов)
          * Получение списка пользователей - getUsers
          * Имперсонация (вход под пользователем) - impersonate
+         * Выход из имперсонации - exitImpersonate
          */
         $group->group('/admin/users', function (RouteCollectorProxy $group) {
             $group->post('', [AdminUserController::class, 'getUsers']);
             $group->post('/impersonate', [AdminUserController::class, 'impersonate']);
+            $group->post('/exit-impersonate', [AdminUserController::class, 'exitImpersonate']);
         })->add(new AuthMiddleware($container));
 
         /** Маршруты для получения данных фильтров

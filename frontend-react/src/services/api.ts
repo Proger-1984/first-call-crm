@@ -1051,6 +1051,16 @@ export interface ImpersonateResponse {
   impersonated_by: number;
 }
 
+export interface ExitImpersonateResponse {
+  access_token: string;
+  user: {
+    id: number;
+    name: string;
+    telegram_username: string | null;
+    role: string;
+  };
+}
+
 export const adminUsersApi = {
   /**
    * Получить список пользователей
@@ -1065,6 +1075,13 @@ export const adminUsersApi = {
    */
   impersonate: (userId: number) =>
     api.post<ApiResponse<ImpersonateResponse>>('/admin/users/impersonate', { user_id: userId }),
+
+  /**
+   * Выйти из имперсонации (вернуться к админу)
+   * POST /api/v1/admin/users/exit-impersonate
+   */
+  exitImpersonate: (adminId: number) =>
+    api.post<ApiResponse<ExitImpersonateResponse>>('/admin/users/exit-impersonate', { admin_id: adminId }),
 };
 
 // === SOURCE AUTH API (авторизация на источниках: CIAN, Avito) ===

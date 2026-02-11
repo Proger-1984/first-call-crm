@@ -211,8 +211,8 @@ class AuthController
                 );
             }
 
-            // Если это веб-клиент, устанавливаем куки
-            if ($tokenData['device_type'] === 'web') {
+            // Если это веб-клиент (включая impersonate), устанавливаем куки
+            if ($tokenData['device_type'] === 'web' || $tokenData['device_type'] === 'web_impersonate') {
                 $sameSite = '; SameSite=None';
                 $expiresGMT = gmdate('D, d M Y H:i:s T', $result['expires_in']);
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useUIStore } from '../../stores/uiStore';
-import { userApi } from '../../services/api';
+import { userApi, adminUsersApi } from '../../services/api';
 import { Tooltip } from '../UI/Tooltip';
 import './Header.css';
 
@@ -28,13 +28,31 @@ export function Header() {
   }, []);
   
   // Возврат к админу
-  const handleExitImpersonation = () => {
-    const adminToken = localStorage.getItem('admin_token_backup');
-    if (adminToken) {
-      localStorage.setItem('access_token', adminToken);
+  const handleExitImpersonation = async () => {
+    if (!impersonatedBy) return;
+    
+    try {
+      // Запрашиваем новые токены для админа
+      const response = await adminUsersApi.exitImpersonate(impersonatedBy);
+      const { access_token } = response.data.data;
+      
+      // Устанавливаем токен админа
+      localStorage.setItem('access_token', access_token);
       localStorage.removeItem('admin_token_backup');
       localStorage.removeItem('impersonated_by');
+      
+      // Перезагружаем страницу
       window.location.href = '/admin/users';
+    } catch (error) {
+      console.error('Ошибка выхода из имперсонации:', error);
+      // Fallback: используем сохранённый токен
+      const adminToken = localStorage.getItem('admin_token_backup');
+      if (adminToken) {
+        localStorage.setItem('access_token', adminToken);
+        localStorage.removeItem('admin_token_backup');
+        localStorage.removeItem('impersonated_by');
+        window.location.href = '/admin/users';
+      }
     }
   };
 

@@ -172,8 +172,97 @@ class AdminUserController
     }
 
     /**
+     * Выход из имперсонации — возврат к админу
+     * Восстанавливает токены админа
+     * 
+     * Безопасность: проверяем что текущий токен был создан через impersonate
+     * и что admin_id совпадает с тем, кто делал impersonate
+     */
+    public function exitImpersonate(Request $request, Response $response): Response
+    {
+        try {
+            // Получаем текущего пользователя из токена
+            $currentUserId = $request->getAttribute('userId');
+            
+            // Проверяем, что токен был создан через impersonate (device_type = 'web_impersonate')
+            // Это проверяется через наличие refresh токена с таким device_type
+            $currentUser = User::find($currentUserId);
+            if (!$currentUser) {
+                return $this->respondWithError($response, 'Пользователь не найден', 'not_found', 404);
+            }
+            
+            // Проверяем, есть ли у пользователя активный refresh токен с типом web_impersonate
+            $impersonateToken = $currentUser->refreshTokens()
+                ->where('device_type', 'web_impersonate')
+                ->where('expires_at', '>', Carbon::now())
+                ->first();
+            
+            if (!$impersonateToken) {
+                return $this->respondWithError(
+                    $response, 
+                    'Вы не находитесь в режиме просмотра от имени другого пользователя', 
+                    'access_denied', 
+                    403
+                );
+            }
+            
+            $data = $request->getParsedBody();
+            
+            if (!isset($data['admin_id']) || !is_numeric($data['admin_id'])) {
+                return $this->respondWithError($response, 'Не указан admin_id', 'validation_error', 400);
+            }
+            
+            $adminId = (int)$data['admin_id'];
+            
+            // Проверяем существование админа
+            $admin = User::find($adminId);
+            if (!$admin || $admin->role !== 'admin') {
+                return $this->respondWithError($response, 'Администратор не найден', 'not_found', 404);
+            }
+            
+            // Удаляем impersonate токен
+            $impersonateToken->delete();
+            
+            // Генерируем новые токены для админа
+            $tokens = $this->jwtService->createTokens($adminId, 'web');
+            
+            // Устанавливаем refresh token в HttpOnly cookie (формат как в AuthController)
+            $expiresIn = 30 * 24 * 60 * 60; // 30 дней
+            $expiresGMT = gmdate('D, d M Y H:i:s', time() + $expiresIn) . ' GMT';
+            $sameSite = '; SameSite=None';
+            
+            $refreshCookie = sprintf(
+                'refreshToken=%s; path=/api/v1/auth; domain=.%s; max-age=%d; expires=%s; HttpOnly; Secure%s',
+                urlencode($tokens['refresh_token']),
+                $_ENV['HOST'],
+                $expiresIn,
+                $expiresGMT,
+                $sameSite
+            );
+            
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'message' => 'Возврат к администратору выполнен',
+                'data' => [
+                    'access_token' => $tokens['access_token'],
+                    'user' => [
+                        'id' => $admin->id,
+                        'name' => $admin->name,
+                        'telegram_username' => $admin->telegram_username,
+                        'role' => $admin->role,
+                    ],
+                ],
+            ], 200, $refreshCookie);
+            
+        } catch (Exception $e) {
+            return $this->respondWithError($response, 'Ошибка выхода из имперсонации: ' . $e->getMessage(), 'internal_error', 500);
+        }
+    }
+
+    /**
      * Имперсонация — вход под другим пользователем
-     * Генерирует access_token для указанного пользователя
+     * Генерирует полную пару токенов (access + refresh) для указанного пользователя
      */
     public function impersonate(Request $request, Response $response): Response
     {
@@ -202,18 +291,29 @@ class AdminUserController
                 return $this->respondWithError($response, 'Пользователь не найден', 'not_found', 404);
             }
             
-            // Генерируем access_token для целевого пользователя
-            $accessToken = $this->jwtService->createAccessToken(
-                $targetUserId,
-                'web_impersonate'
+            // Генерируем полную пару токенов для целевого пользователя
+            $tokens = $this->jwtService->createTokens($targetUserId, 'web_impersonate');
+            
+            // Устанавливаем refresh token в HttpOnly cookie (формат как в AuthController)
+            $expiresIn = 30 * 24 * 60 * 60; // 30 дней
+            $expiresGMT = gmdate('D, d M Y H:i:s', time() + $expiresIn) . ' GMT';
+            $sameSite = '; SameSite=None';
+            
+            $refreshCookie = sprintf(
+                'refreshToken=%s; path=/api/v1/auth; domain=.%s; max-age=%d; expires=%s; HttpOnly; Secure%s',
+                urlencode($tokens['refresh_token']),
+                $_ENV['HOST'],
+                $expiresIn,
+                $expiresGMT,
+                $sameSite
             );
             
-            return $this->respondWithData($response, [
+            $responseData = $this->respondWithData($response, [
                 'code' => 200,
                 'status' => 'success',
-                'message' => "Вход выполнен под пользователем: {$targetUser->name}",
+                'message' => "Вход выполнен под пользователем: $targetUser->name",
                 'data' => [
-                    'access_token' => $accessToken,
+                    'access_token' => $tokens['access_token'],
                     'user' => [
                         'id' => $targetUser->id,
                         'name' => $targetUser->name,
@@ -222,7 +322,9 @@ class AdminUserController
                     ],
                     'impersonated_by' => $adminId,
                 ],
-            ], 200);
+            ], 200, $refreshCookie);
+            
+            return $responseData;
             
         } catch (Exception $e) {
             return $this->respondWithError($response, 'Ошибка имперсонации: ' . $e->getMessage(), 'internal_error', 500);

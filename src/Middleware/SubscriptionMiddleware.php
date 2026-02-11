@@ -7,6 +7,7 @@ namespace App\Middleware;
 use App\Models\User;
 use App\Models\UserSubscription;
 use App\Traits\ResponseTrait;
+use Carbon\Carbon;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\MiddlewareInterface;
@@ -68,7 +69,7 @@ class SubscriptionMiddleware implements MiddlewareInterface
         // Проверяем наличие активной подписки
         $hasActiveSubscription = UserSubscription::where('user_id', $userId)
             ->whereIn('status', ['active', 'extend_pending'])
-            ->where('end_date', '>=', now())
+            ->where('end_date', '>=', Carbon::now())
             ->exists();
 
         if (!$hasActiveSubscription) {
