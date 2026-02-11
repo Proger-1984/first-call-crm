@@ -13,7 +13,7 @@
 - Username: `postgres`
 - Password: `postgres`
 
-**Всего таблиц:** 30 (не считая `spatial_ref_sys`)
+**Всего таблиц:** 28 (не считая `spatial_ref_sys`)
 
 ---
 
@@ -70,12 +70,6 @@
          ├────<│user_source_     │
          │     │   cookies       │
          │     └─────────────────┘
-         │
-         │     ┌─────────────────┐     ┌─────────────────┐
-         ├────<│   agencies      │>───<│ agency_members  │
-         │     └─────────────────┘     └─────────────────┘
-         │              │
-         │              └──────> user_subscriptions
          │
 ```
 
@@ -278,21 +272,15 @@
 | `price` | NUMERIC NOT NULL | Базовая цена |
 | `description` | TEXT NULL | Описание |
 | `is_active` | BOOLEAN NOT NULL DEFAULT true | Активен ли тариф |
-| `is_office` | BOOLEAN NULL DEFAULT false | Офисный тариф |
-| `max_agents` | INT NULL DEFAULT 1 | Максимум агентов |
 | `created_at` | TIMESTAMP NULL | Дата создания |
 | `updated_at` | TIMESTAMP NULL | Дата обновления |
 
 **Начальные данные:**
 
-| id | name | code | duration_hours | price | is_office | max_agents |
-|----|------|------|----------------|-------|-----------|------------|
-| 1 | Демо | demo | 3 | 0 | false | 1 |
-| 2 | Премиум 31 день | premium_31 | 744 | 5000 | false | 1 |
-| 3 | Офис S | office_5 | 744 | 12500 | true | 5 |
-| 4 | Офис M | office_10 | 744 | 22500 | true | 10 |
-| 5 | Офис L | office_20 | 744 | 40000 | true | 20 |
-| 6 | Офис XL | office_30 | 744 | 52500 | true | 30 |
+| id | name | code | duration_hours | price |
+|----|------|------|----------------|-------|
+| 1 | Демо | demo | 3 | 0 |
+| 2 | Премиум 31 день | premium_31 | 744 | 5000 |
 
 ---
 
@@ -765,56 +753,10 @@
 
 ---
 
-### 29. agencies — Агентства
-
-| Колонка | Тип | Описание |
-|---------|-----|----------|
-| `id` | SERIAL PK | Первичный ключ |
-| `name` | VARCHAR(255) NOT NULL | Название агентства |
-| `owner_id` | INT NOT NULL FK | Ссылка на users (владелец) |
-| `subscription_id` | INT NULL FK | Ссылка на user_subscriptions (офисная подписка) |
-| `max_agents` | INT NOT NULL DEFAULT 5 | Максимум агентов |
-| `created_at` | TIMESTAMP NULL | Дата создания |
-| `updated_at` | TIMESTAMP NULL | Дата обновления |
-
-**FK:**
-- `owner_id` -> `users(id)`
-- `subscription_id` -> `user_subscriptions(id)`
-
-**Индексы:** `agencies_owner_id_unique` (UNIQUE on `owner_id`)
-
----
-
-### 30. agency_members — Участники агентства
-
-| Колонка | Тип | Описание |
-|---------|-----|----------|
-| `id` | SERIAL PK | Первичный ключ |
-| `agency_id` | INT NOT NULL FK | Ссылка на agencies |
-| `user_id` | INT NOT NULL FK | Ссылка на users |
-| `role` | VARCHAR(20) NOT NULL DEFAULT 'agent' | Роль в агентстве |
-| `joined_at` | TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP | Дата вступления |
-| `created_at` | TIMESTAMP NULL | Дата создания |
-| `updated_at` | TIMESTAMP NULL | Дата обновления |
-
-**FK:**
-- `agency_id` -> `agencies(id)`
-- `user_id` -> `users(id)`
-
-**Индексы:**
-- `agency_members_agency_id_user_id_unique` (UNIQUE on `agency_id`, `user_id`)
-- `agency_members_user_id_unique` (UNIQUE on `user_id`)
-
----
-
-## Внешние ключи (46 всего)
+## Внешние ключи
 
 | Таблица | Колонка | Ссылается на |
 |---------|---------|--------------|
-| agencies | owner_id | users(id) |
-| agencies | subscription_id | user_subscriptions(id) |
-| agency_members | agency_id | agencies(id) |
-| agency_members | user_id | users(id) |
 | agent_listings | user_id | users(id) |
 | agent_listings | listing_id | listings(id) |
 | agent_listings | call_status_id | call_statuses(id) |
@@ -921,10 +863,6 @@ docker exec -it slim_php-cli php db/migrations/run.php
 48. `20260208000002` — create user_source_cookies table
 49. `20260208000003` — create bookmarklet_tokens table
 50. `20260208100001` — drop bookmarklet_tokens table
-51. `20260209000001` — add office fields to tariffs (is_office, max_agents)
-52. `20260209000002` — create agencies table
-53. `20260209000003` — create agency_members table
-54. `20260209000004` — add office tariffs (Офис S/M/L/XL)
 
 ---
 
