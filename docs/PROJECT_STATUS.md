@@ -29,8 +29,16 @@
 - ILIKE-спецсимволы (`%`, `_`, `\`) экранируются в поиске клиентов
 - `createDefaultStages()` обёрнут в транзакцию
 
+#### Дополнительное укрепление безопасности
+- Убрана утечка `exception->getMessage()` из всех catch-блоков (generic сообщения)
+- Null-safe `getParsedBody()` во всех методах контроллера
+- `InvalidArgumentException` для бизнес-ошибок в create/update/moveStage
+- Валидация FK (category_id, location_id) перед INSERT в criteria
+- `safeParseDate()` вместо голого `Carbon::parse()`
+
 #### Также
 - Обновлён PROJECT_STATUS.md: удалена устаревшая секция про агентства, обновлены блокеры
+- Пересобран frontend (`npm run build`)
 
 ### ✅ Выполнено (12.02.2026): CRM модуль (Фаза 1)
 
@@ -275,8 +283,13 @@
 ---
 
 ### Текущий фокус
-- CRM Фаза 1 завершена и запушена
-- Следующий этап: CRM Фаза 2 (таймлайн, напоминания, авто-мэтчинг)
+- CRM Фаза 1 завершена, багфикс выполнен, всё запушено
+- **Следующая задача:** CRM Фаза 2 по плану (`~/.claude/plans/jaunty-whistling-robin.md`):
+  - Таймлайн/хронология взаимодействий (`client_interactions`)
+  - Напоминания с Telegram-уведомлениями (`client_reminders`)
+  - Авто-мэтчинг объявлений с критериями клиентов
+  - Drag-n-drop на kanban
+  - Кнопка "Предложить клиенту" в Dashboard
 
 ### Важно помнить
 - **Парсинг ответа API:** `response.data` = `{ meta, data }` (без обёртки success)
@@ -454,6 +467,8 @@ npx tsc --noEmit
 ### Все коммиты отправлены (origin/main = HEAD)
 | Коммит | Описание |
 |--------|----------|
+| `dfbfd00` | fix: Дополнительное укрепление безопасности CRM контроллеров |
+| `00c807c` | docs: Обновлён PROJECT_STATUS.md — багфикс CRM, актуализация статуса |
 | `ba2c601` | fix: Исправлены 11 багов и проблем производительности CRM модуля |
 | `de2648d` | feat: CRM модуль — клиенты, воронка продаж, подборки объявлений |
 | `eb66fd2` | docs: Удалена ложная документация agencies/agency_members из DATABASE.md |
@@ -530,6 +545,7 @@ npx tsc --noEmit
 - ✅ Исправлен баг `now()` → `Carbon::now()` в AdminUserController
 - ✅ Удалена ложная документация agencies/agency_members
 - ✅ Багфикс CRM: 4 бага, 4 N+1, 3 проблемы валидации
+- ✅ Укрепление безопасности: утечка сообщений, null-safe getParsedBody, safeParseDate, FK-валидация
 
 ### 11 февраля 2026
 - ✅ Миграция с Cursor IDE на Claude Code CLI
