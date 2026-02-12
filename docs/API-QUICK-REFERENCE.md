@@ -860,3 +860,164 @@ docker-compose exec postgres psql -U postgres -d slim_api
 # Email: admin@example.com
 # Password: admin
 ```
+
+---
+
+## CRM — Клиенты
+
+> Требует `Authorization: Bearer <token>` + активная подписка (`SubscriptionMiddleware`)
+
+### Список клиентов
+```http
+GET /api/v1/clients?page=1&per_page=20&search=Иванов&client_type=buyer&stage_id=1&is_archived=false&sort=created_at&order=desc
+```
+
+### Карточка клиента
+```http
+GET /api/v1/clients/{id}
+```
+
+### Создать клиента
+```http
+POST /api/v1/clients
+Content-Type: application/json
+
+{
+  "name": "Иванов Иван",
+  "phone": "+79001234567",
+  "client_type": "buyer",
+  "budget_min": 5000000,
+  "budget_max": 8000000,
+  "source_type": "cian",
+  "comment": "Ищет 2к в центре"
+}
+```
+
+### Обновить клиента
+```http
+PUT /api/v1/clients/{id}
+```
+
+### Удалить клиента
+```http
+DELETE /api/v1/clients/{id}
+```
+
+### Архивировать/разархивировать
+```http
+PATCH /api/v1/clients/{id}/archive
+Content-Type: application/json
+
+{ "is_archived": true }
+```
+
+### Переместить по воронке
+```http
+PATCH /api/v1/clients/{id}/stage
+Content-Type: application/json
+
+{ "stage_id": 3 }
+```
+
+### Kanban-доска (стадии + клиенты)
+```http
+GET /api/v1/clients/pipeline
+```
+
+### Статистика
+```http
+GET /api/v1/clients/stats
+```
+
+---
+
+## CRM — Подборки (привязка объявлений к клиенту)
+
+### Добавить объявление в подборку
+```http
+POST /api/v1/clients/{id}/listings
+Content-Type: application/json
+
+{ "listing_id": 123, "comment": "Хороший вариант" }
+```
+
+### Удалить из подборки
+```http
+DELETE /api/v1/clients/{id}/listings/{listing_id}
+```
+
+### Обновить статус объявления
+```http
+PATCH /api/v1/clients/{id}/listings/{listing_id}
+Content-Type: application/json
+
+{ "status": "showed" }
+```
+Допустимые статусы: `proposed`, `showed`, `liked`, `rejected`
+
+---
+
+## CRM — Критерии поиска
+
+### Добавить критерий
+```http
+POST /api/v1/clients/{id}/criteria
+Content-Type: application/json
+
+{
+  "category_id": 1,
+  "location_id": 5,
+  "price_min": 3000000,
+  "price_max": 7000000,
+  "room_ids": [2, 3],
+  "notes": "Не первый и не последний этаж"
+}
+```
+
+### Обновить критерий
+```http
+PUT /api/v1/clients/criteria/{id}
+```
+
+### Удалить критерий
+```http
+DELETE /api/v1/clients/criteria/{id}
+```
+
+---
+
+## CRM — Стадии воронки
+
+### Получить все стадии
+```http
+GET /api/v1/clients/stages
+```
+
+### Создать стадию
+```http
+POST /api/v1/clients/stages
+Content-Type: application/json
+
+{ "name": "Ожидание документов", "color": "#FF9800" }
+```
+
+### Обновить стадию
+```http
+PUT /api/v1/clients/stages/{id}
+Content-Type: application/json
+
+{ "name": "Новое название", "color": "#4CAF50" }
+```
+
+### Удалить стадию
+```http
+DELETE /api/v1/clients/stages/{id}
+```
+
+### Изменить порядок
+```http
+PUT /api/v1/clients/stages/reorder
+Content-Type: application/json
+
+{ "order": [1, 3, 2, 5, 4] }
+```

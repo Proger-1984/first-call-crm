@@ -8,6 +8,7 @@ import { Profile } from './pages/Profile';
 import { Settings } from './pages/Settings';
 import { Tariffs } from './pages/Tariffs';
 import { Favorites } from './pages/Favorites';
+import { Clients, ClientCard } from './pages/Clients';
 import { Billing } from './pages/Billing';
 import { AdminBilling } from './pages/AdminBilling';
 import { AdminUsers } from './pages/AdminUsers';
@@ -53,7 +54,9 @@ function AppContent() {
         <Route path="profile" element={<SubscriptionRoute><Profile /></SubscriptionRoute>} />
         <Route path="settings" element={<SubscriptionRoute><Settings /></SubscriptionRoute>} />
         <Route path="favorites" element={<SubscriptionRoute><Favorites /></SubscriptionRoute>} />
-        
+        <Route path="clients" element={<SubscriptionRoute><Clients /></SubscriptionRoute>} />
+        <Route path="clients/:id" element={<SubscriptionRoute><ClientCard /></SubscriptionRoute>} />
+
         {/* Маршруты доступные всегда (без подписки) */}
         <Route path="tariffs" element={<Tariffs />} />
         <Route path="billing" element={<Billing />} />

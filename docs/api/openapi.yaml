@@ -36,6 +36,7 @@ info:
     - `/api/v1/listings/*`
     - `/api/v1/photo-tasks/*`
     - `/api/v1/favorites/*`
+    - `/api/v1/clients/*`
     
     **Эндпоинты, доступные без подписки:**
     - `/api/v1/me/info`, `/api/v1/me/status`, `/api/v1/me/download-info`, `/api/v1/me/download/android`
@@ -70,6 +71,10 @@ tags:
     description: Методы для управления пользователями (только для администраторов)
   - name: Source Auth
     description: Методы для авторизации на внешних источниках (CIAN, Avito)
+  - name: Клиенты
+    description: Методы для управления клиентами CRM (карточки, воронка, подборки)
+  - name: Воронка продаж
+    description: Методы для управления стадиями воронки продаж
 
 servers:
   - url: http://localhost:8080
@@ -678,6 +683,143 @@ components:
               type: string
               description: Название категории
               example: "Аренда. Жилая"
+
+    Client:
+      type: object
+      description: Клиент CRM
+      properties:
+        id:
+          type: integer
+          description: ID клиента
+          example: 1
+        name:
+          type: string
+          description: Имя клиента
+          example: "Иванов Иван Иванович"
+        phone:
+          type: string
+          nullable: true
+          description: Телефон
+          example: "+7 999 123-45-67"
+        phone_secondary:
+          type: string
+          nullable: true
+          description: Дополнительный телефон
+        email:
+          type: string
+          nullable: true
+          description: Email
+          example: "ivanov@mail.ru"
+        telegram_username:
+          type: string
+          nullable: true
+          description: Telegram username
+          example: "ivanov_ivan"
+        client_type:
+          type: string
+          description: |
+            Тип клиента:
+            - buyer: Покупатель
+            - seller: Продавец
+            - renter: Арендатор
+            - landlord: Арендодатель
+          enum: [buyer, seller, renter, landlord]
+          example: "buyer"
+        source_type:
+          type: string
+          nullable: true
+          description: Источник клиента
+          example: "cian"
+        source_details:
+          type: string
+          nullable: true
+          description: Детали источника
+        budget_min:
+          type: number
+          nullable: true
+          description: Минимальный бюджет
+          example: 3000000
+        budget_max:
+          type: number
+          nullable: true
+          description: Максимальный бюджет
+          example: 5000000
+        comment:
+          type: string
+          nullable: true
+          description: Комментарий
+        is_archived:
+          type: boolean
+          description: В архиве
+          example: false
+        last_contact_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Дата последнего контакта
+        next_contact_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Дата следующего контакта
+        created_at:
+          type: string
+          format: date-time
+          description: Дата создания
+        updated_at:
+          type: string
+          format: date-time
+          description: Дата обновления
+        pipeline_stage:
+          type: object
+          nullable: true
+          description: Стадия воронки
+          properties:
+            id:
+              type: integer
+              example: 1
+            name:
+              type: string
+              example: "Новый лид"
+            color:
+              type: string
+              example: "#2196F3"
+            is_final:
+              type: boolean
+              example: false
+
+    PipelineStage:
+      type: object
+      description: Стадия воронки продаж
+      properties:
+        id:
+          type: integer
+          description: ID стадии
+          example: 1
+        name:
+          type: string
+          description: Название стадии
+          example: "Новый лид"
+        color:
+          type: string
+          description: Цвет в HEX формате
+          example: "#2196F3"
+        sort_order:
+          type: integer
+          description: Порядок сортировки
+          example: 1
+        is_system:
+          type: boolean
+          description: Системная стадия (нельзя удалить)
+          example: true
+        is_final:
+          type: boolean
+          description: Финальная стадия (сделка завершена)
+          example: false
+        clients_count:
+          type: integer
+          description: Количество клиентов на стадии
+          example: 5
 
 paths:
   /api/v1/auth/telegram:
@@ -7891,6 +8033,1644 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ==========================================
+  # CRM: КЛИЕНТЫ
+  # ==========================================
+
+  /api/v1/clients:
+    get:
+      summary: Получить список клиентов
+      description: |
+        Возвращает список клиентов с фильтрами и пагинацией.
+
+        ## Права доступа
+        Требуется активная подписка.
+
+        ## Фильтры
+        - `search` — поиск по имени, телефону, email, Telegram (ILIKE)
+        - `client_type` — тип клиента (buyer/seller/renter/landlord)
+        - `stage_id` — ID стадии воронки
+        - `is_archived` — показать архивные (по умолчанию false)
+        - `source_type` — источник клиента
+
+        ## Сортировка
+        - `sort` — поле (created_at, name, last_contact_at, next_contact_at, budget_max)
+        - `order` — направление (asc, desc)
+      tags:
+        - Клиенты
+      operationId: indexClients
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Номер страницы
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Записей на страницу
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Поиск по имени, телефону, email, Telegram
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [buyer, seller, renter, landlord]
+          description: Тип клиента
+        - name: stage_id
+          in: query
+          schema:
+            type: integer
+          description: ID стадии воронки
+        - name: is_archived
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Показать архивных клиентов
+        - name: source_type
+          in: query
+          schema:
+            type: string
+          description: Источник клиента (avito, cian, звонок, рекомендация)
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at, name, last_contact_at, next_contact_at, budget_max]
+            default: created_at
+          description: Поле сортировки
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Направление сортировки
+      responses:
+        '200':
+          description: Список клиентов получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      clients:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Client'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+              examples:
+                success:
+                  summary: Список клиентов
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      clients:
+                        - id: 1
+                          name: "Иванов Иван Иванович"
+                          phone: "+7 999 123-45-67"
+                          client_type: "buyer"
+                          pipeline_stage:
+                            id: 3
+                            name: "Квалификация"
+                            color: "#9C27B0"
+                            is_final: false
+                      pagination:
+                        page: 1
+                        per_page: 20
+                        total: 1
+                        total_pages: 1
+                empty:
+                  summary: Пустой список
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      clients: []
+                      pagination:
+                        page: 1
+                        per_page: 20
+                        total: 0
+                        total_pages: 0
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: "unauthorized"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка получения списка клиентов"
+                    error: "internal_error"
+
+    post:
+      summary: Создать нового клиента
+      description: |
+        Создаёт нового клиента. Если не указана стадия воронки, автоматически назначается первая стадия (Новый лид).
+      tags:
+        - Клиенты
+      operationId: createClient
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Имя клиента
+                  example: "Иванов Иван Иванович"
+                phone:
+                  type: string
+                  nullable: true
+                  description: Телефон
+                  example: "+7 999 123-45-67"
+                client_type:
+                  type: string
+                  enum: [buyer, seller, renter, landlord]
+                  description: Тип клиента
+                  example: "buyer"
+                budget_min:
+                  type: number
+                  nullable: true
+                  example: 3000000
+                budget_max:
+                  type: number
+                  nullable: true
+                  example: 5000000
+                comment:
+                  type: string
+                  nullable: true
+                pipeline_stage_id:
+                  type: integer
+                  nullable: true
+                  description: ID стадии воронки (если не указана — первая)
+            examples:
+              minimal:
+                summary: Минимальный набор полей
+                value:
+                  name: "Иванов Иван"
+              full:
+                summary: Полный набор полей
+                value:
+                  name: "Иванов Иван Иванович"
+                  phone: "+7 999 123-45-67"
+                  client_type: "buyer"
+                  budget_min: 3000000
+                  budget_max: 5000000
+                  comment: "Ищет 2-к квартиру в центре"
+      responses:
+        '201':
+          description: Клиент создан
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Клиент создан
+                  value:
+                    code: 201
+                    status: success
+                    data:
+                      client:
+                        id: 1
+                        name: "Иванов Иван Иванович"
+                        client_type: "buyer"
+                        pipeline_stage:
+                          id: 1
+                          name: "Новый лид"
+                          color: "#2196F3"
+                      message: "Клиент создан"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                empty_name:
+                  summary: Имя не указано
+                  value:
+                    code: 400
+                    status: error
+                    message: "Имя клиента обязательно"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/clients/pipeline:
+    get:
+      summary: Получить данные воронки для kanban-доски
+      description: |
+        Возвращает все стадии воронки с привязанными активными клиентами.
+      tags:
+        - Клиенты
+      operationId: getPipeline
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Данные воронки получены
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Воронка с клиентами
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      pipeline:
+                        - id: 1
+                          name: "Новый лид"
+                          color: "#2196F3"
+                          sort_order: 1
+                          is_system: true
+                          is_final: false
+                          clients:
+                            - id: 1
+                              name: "Иванов Иван"
+                              phone: "+7 999 123-45-67"
+                              client_type: "buyer"
+                              budget_min: 3000000
+                              budget_max: 5000000
+                        - id: 8
+                          name: "Сделка закрыта"
+                          color: "#4CAF50"
+                          sort_order: 8
+                          is_system: true
+                          is_final: true
+                          clients: []
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/clients/stats:
+    get:
+      summary: Получить статистику по клиентам
+      description: |
+        Возвращает сводную статистику: активные, архивные, по типам, новые за неделю, просроченные контакты.
+      tags:
+        - Клиенты
+      operationId: getClientStats
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Статистика получена
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Статистика клиентов
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      total_active: 15
+                      total_archived: 3
+                      by_type:
+                        buyer: 8
+                        seller: 3
+                        renter: 4
+                        landlord: 0
+                      new_this_week: 2
+                      overdue_contacts: 1
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/clients/{id}:
+    get:
+      summary: Получить карточку клиента
+      description: |
+        Возвращает полные данные клиента со связями: стадия воронки, критерии поиска, привязанные объявления.
+      tags:
+        - Клиенты
+      operationId: showClient
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID клиента
+      responses:
+        '200':
+          description: Карточка клиента
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Полная карточка
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      client:
+                        id: 1
+                        name: "Иванов Иван Иванович"
+                        phone: "+7 999 123-45-67"
+                        client_type: "buyer"
+                        pipeline_stage:
+                          id: 3
+                          name: "Квалификация"
+                          color: "#9C27B0"
+                          is_final: false
+                        search_criteria:
+                          - id: 1
+                            category: { id: 1, name: "Аренда. Жилая" }
+                            location: { id: 1, name: "Москва" }
+                            room_ids: [2, 3]
+                            price_min: 30000
+                            price_max: 50000
+                        listings:
+                          - id: 1
+                            listing_id: 1234
+                            status: "proposed"
+                            listing:
+                              id: 1234
+                              title: "2-к. квартира, 55 м²"
+                              price: 45000
+                        listings_count: 1
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_id:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указан ID клиента"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    code: 404
+                    status: error
+                    message: "Клиент не найден"
+                    error: "not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Обновить клиента
+      description: |
+        Обновляет данные клиента. Все поля опциональны.
+      tags:
+        - Клиенты
+      operationId: updateClient
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                  nullable: true
+                email:
+                  type: string
+                  nullable: true
+                client_type:
+                  type: string
+                  enum: [buyer, seller, renter, landlord]
+                budget_min:
+                  type: number
+                  nullable: true
+                budget_max:
+                  type: number
+                  nullable: true
+                comment:
+                  type: string
+                  nullable: true
+                next_contact_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+            examples:
+              update_budget:
+                summary: Обновить бюджет
+                value:
+                  budget_min: 4000000
+                  budget_max: 6000000
+      responses:
+        '200':
+          description: Клиент обновлён
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      client: { id: 1, name: "Иванов Иван" }
+                      message: "Клиент обновлён"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                empty_name:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Имя клиента обязательно"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Удалить клиента
+      tags:
+        - Клиенты
+      operationId: deleteClient
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Клиент удалён
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      message: "Клиент удалён"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/clients/{id}/archive:
+    patch:
+      summary: Архивировать/разархивировать клиента
+      tags:
+        - Клиенты
+      operationId: archiveClient
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_archived:
+                  type: boolean
+                  description: true — архивировать, false — восстановить
+            examples:
+              archive:
+                value:
+                  is_archived: true
+              restore:
+                value:
+                  is_archived: false
+      responses:
+        '200':
+          description: Статус изменён
+          content:
+            application/json:
+              examples:
+                archived:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      client: { id: 1, is_archived: true }
+                      message: "Клиент перемещён в архив"
+                restored:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      client: { id: 1, is_archived: false }
+                      message: "Клиент восстановлен из архива"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/clients/{id}/stage:
+    patch:
+      summary: Переместить клиента на другую стадию
+      tags:
+        - Клиенты
+      operationId: moveStage
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - stage_id
+              properties:
+                stage_id:
+                  type: integer
+                  description: ID новой стадии
+            examples:
+              move:
+                value:
+                  stage_id: 5
+      responses:
+        '200':
+          description: Стадия изменена
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      client:
+                        id: 1
+                        pipeline_stage:
+                          id: 5
+                          name: "Показ"
+                          color: "#FFC107"
+                      message: "Стадия изменена"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                no_stage:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указана стадия"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ==========================================
+  # CRM: ПОДБОРКИ (ПРИВЯЗКА ОБЪЯВЛЕНИЙ)
+  # ==========================================
+
+  /api/v1/clients/{id}/listings:
+    post:
+      summary: Добавить объявление в подборку клиента
+      tags:
+        - Клиенты
+      operationId: addListing
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID клиента
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - listing_id
+              properties:
+                listing_id:
+                  type: integer
+                  description: ID объявления
+                comment:
+                  type: string
+                  nullable: true
+            examples:
+              with_comment:
+                value:
+                  listing_id: 1234
+                  comment: "Хороший вариант"
+      responses:
+        '201':
+          description: Объявление добавлено
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 201
+                    status: success
+                    data:
+                      client_listing:
+                        id: 1
+                        listing_id: 1234
+                        status: "proposed"
+                        listing:
+                          id: 1234
+                          title: "2-к. квартира, 55 м²"
+                          price: 45000
+                      message: "Объявление добавлено в подборку"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                no_listing:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указан ID объявления"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/clients/{id}/listings/{listing_id}:
+    patch:
+      summary: Обновить статус привязки объявления
+      description: |
+        Статусы: proposed, showed (авто showed_at), liked, rejected.
+      tags:
+        - Клиенты
+      operationId: updateListingStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: listing_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [proposed, showed, liked, rejected]
+                comment:
+                  type: string
+                  nullable: true
+            examples:
+              showed:
+                value:
+                  status: "showed"
+      responses:
+        '200':
+          description: Статус обновлён
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      client_listing:
+                        id: 1
+                        listing_id: 1234
+                        status: "showed"
+                        showed_at: "2026-02-12T14:30:00+00:00"
+                      message: "Статус обновлён"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Удалить объявление из подборки
+      tags:
+        - Клиенты
+      operationId: removeListing
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: listing_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Объявление удалено
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      message: "Объявление удалено из подборки"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ==========================================
+  # CRM: КРИТЕРИИ ПОИСКА
+  # ==========================================
+
+  /api/v1/clients/{id}/criteria:
+    post:
+      summary: Добавить критерий поиска клиенту
+      tags:
+        - Клиенты
+      operationId: addCriteria
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category_id:
+                  type: integer
+                  nullable: true
+                location_id:
+                  type: integer
+                  nullable: true
+                room_ids:
+                  type: array
+                  nullable: true
+                  items:
+                    type: integer
+                price_min:
+                  type: number
+                  nullable: true
+                price_max:
+                  type: number
+                  nullable: true
+                area_min:
+                  type: number
+                  nullable: true
+                area_max:
+                  type: number
+                  nullable: true
+                floor_min:
+                  type: integer
+                  nullable: true
+                floor_max:
+                  type: integer
+                  nullable: true
+                metro_ids:
+                  type: array
+                  nullable: true
+                  items:
+                    type: integer
+                districts:
+                  type: array
+                  nullable: true
+                  items:
+                    type: string
+                notes:
+                  type: string
+                  nullable: true
+                is_active:
+                  type: boolean
+                  default: true
+            examples:
+              full:
+                summary: Полный набор критериев
+                value:
+                  category_id: 1
+                  location_id: 1
+                  room_ids: [2, 3]
+                  price_min: 30000
+                  price_max: 50000
+      responses:
+        '201':
+          description: Критерий добавлен
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 201
+                    status: success
+                    data:
+                      criteria:
+                        id: 1
+                        category: { id: 1, name: "Аренда. Жилая" }
+                        location: { id: 1, name: "Москва" }
+                        room_ids: [2, 3]
+                        price_min: 30000
+                        price_max: 50000
+                        is_active: true
+                      message: "Критерий поиска добавлен"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/clients/criteria/{id}:
+    put:
+      summary: Обновить критерий поиска
+      tags:
+        - Клиенты
+      operationId: updateCriteria
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID критерия
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category_id:
+                  type: integer
+                  nullable: true
+                location_id:
+                  type: integer
+                  nullable: true
+                room_ids:
+                  type: array
+                  nullable: true
+                  items:
+                    type: integer
+                price_min:
+                  type: number
+                  nullable: true
+                price_max:
+                  type: number
+                  nullable: true
+                is_active:
+                  type: boolean
+            examples:
+              update_price:
+                value:
+                  price_min: 35000
+                  price_max: 60000
+      responses:
+        '200':
+          description: Критерий обновлён
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      message: "Критерий обновлён"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Критерий не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    code: 404
+                    status: error
+                    message: "Критерий не найден"
+                    error: "not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Удалить критерий поиска
+      tags:
+        - Клиенты
+      operationId: deleteCriteria
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Критерий удалён
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      message: "Критерий удалён"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Критерий не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ==========================================
+  # CRM: СТАДИИ ВОРОНКИ ПРОДАЖ
+  # ==========================================
+
+  /api/v1/clients/stages:
+    get:
+      summary: Получить стадии воронки
+      description: |
+        Возвращает все стадии воронки текущего пользователя. При первом вызове автоматически создаёт 9 стадий по умолчанию.
+      tags:
+        - Воронка продаж
+      operationId: getStages
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Список стадий
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Стадии воронки
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      stages:
+                        - id: 1
+                          name: "Новый лид"
+                          color: "#2196F3"
+                          sort_order: 1
+                          is_system: true
+                          is_final: false
+                          clients_count: 5
+                        - id: 8
+                          name: "Сделка закрыта"
+                          color: "#4CAF50"
+                          sort_order: 8
+                          is_system: true
+                          is_final: true
+                          clients_count: 2
+                        - id: 9
+                          name: "Отказ"
+                          color: "#F44336"
+                          sort_order: 9
+                          is_system: true
+                          is_final: true
+                          clients_count: 1
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка получения стадий"
+                    error: "internal_error"
+
+    post:
+      summary: Создать новую стадию
+      tags:
+        - Воронка продаж
+      operationId: createStage
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Название стадии (до 100 символов)
+                  example: "Осмотр квартиры"
+                color:
+                  type: string
+                  description: Цвет в HEX формате
+                  example: "#FF5733"
+                  default: "#808080"
+                is_final:
+                  type: boolean
+                  default: false
+            examples:
+              new_stage:
+                value:
+                  name: "Осмотр квартиры"
+                  color: "#FF5733"
+      responses:
+        '201':
+          description: Стадия создана
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 201
+                    status: success
+                    data:
+                      stage:
+                        id: 10
+                        name: "Осмотр квартиры"
+                        color: "#FF5733"
+                        sort_order: 10
+                        is_system: false
+                        is_final: false
+                        clients_count: 0
+                      message: "Стадия создана"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                empty_name:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Название стадии обязательно"
+                    error: "validation_error"
+                bad_color:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Неверный формат цвета (ожидается HEX, например #FF5733)"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Конфликт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                duplicate:
+                  value:
+                    code: 409
+                    status: error
+                    message: "Стадия с таким названием уже существует"
+                    error: "conflict"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/clients/stages/{id}:
+    put:
+      summary: Обновить стадию
+      tags:
+        - Воронка продаж
+      operationId: updateStage
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                color:
+                  type: string
+                is_final:
+                  type: boolean
+            examples:
+              rename:
+                value:
+                  name: "Повторный показ"
+                  color: "#00BCD4"
+      responses:
+        '200':
+          description: Стадия обновлена
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      stage:
+                        id: 5
+                        name: "Повторный показ"
+                        color: "#00BCD4"
+                        sort_order: 5
+                        is_system: false
+                        is_final: false
+                        clients_count: 2
+                      message: "Стадия обновлена"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Стадия не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    code: 404
+                    status: error
+                    message: "Стадия не найдена"
+                    error: "not_found"
+        '409':
+          description: Конфликт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                duplicate:
+                  value:
+                    code: 409
+                    status: error
+                    message: "Стадия с таким названием уже существует"
+                    error: "conflict"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Удалить стадию
+      description: |
+        Системные стадии удалить нельзя. Нельзя удалить стадию с клиентами.
+      tags:
+        - Воронка продаж
+      operationId: deleteStage
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Стадия удалена
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      message: "Стадия удалена"
+        '400':
+          description: Ошибка удаления
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                system_stage:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Системную стадию нельзя удалить"
+                    error: "validation_error"
+                has_clients:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Нельзя удалить стадию с клиентами (3). Сначала переместите клиентов."
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Стадия не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/clients/stages/reorder:
+    put:
+      summary: Изменить порядок стадий
+      tags:
+        - Воронка продаж
+      operationId: reorderStages
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - order
+              properties:
+                order:
+                  type: array
+                  items:
+                    type: integer
+                  description: Массив ID стадий в нужном порядке
+                  example: [1, 2, 3, 10, 4, 5, 6, 7, 8, 9]
+            examples:
+              reorder:
+                value:
+                  order: [1, 2, 3, 10, 4, 5, 6, 7, 8, 9]
+      responses:
+        '200':
+          description: Порядок обновлён
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      message: "Порядок стадий обновлён"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                empty:
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указан порядок стадий"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Стадия не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  value:
+                    code: 404
+                    status: error
+                    message: "Одна или несколько стадий не найдены"
+                    error: "not_found"
         '500':
           description: Внутренняя ошибка сервера
           content:

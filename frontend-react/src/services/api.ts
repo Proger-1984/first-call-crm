@@ -1084,6 +1084,188 @@ export const adminUsersApi = {
     api.post<ApiResponse<ExitImpersonateResponse>>('/admin/users/exit-impersonate', { admin_id: adminId }),
 };
 
+// ============================================================================
+// Clients CRM API (клиенты, воронка, подборки)
+// ============================================================================
+
+import type {
+  Client,
+  ClientFilters,
+  ClientStats,
+  PipelineColumn,
+  PipelineStage,
+  ClientListingStatus,
+} from '../types/client';
+
+export const clientsApi = {
+  /**
+   * Получить список клиентов с фильтрами
+   * GET /api/v1/clients
+   */
+  getList: (filters: ClientFilters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.page) params.append('page', String(filters.page));
+    if (filters.per_page) params.append('per_page', String(filters.per_page));
+    if (filters.sort) params.append('sort', filters.sort);
+    if (filters.order) params.append('order', filters.order);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.client_type) params.append('client_type', filters.client_type);
+    if (filters.stage_id) params.append('stage_id', String(filters.stage_id));
+    if (filters.is_archived !== undefined) params.append('is_archived', String(filters.is_archived));
+    if (filters.source_type) params.append('source_type', filters.source_type);
+    const queryString = params.toString();
+    return api.get<ApiResponse<{
+      clients: Client[];
+      pagination: { page: number; per_page: number; total: number; total_pages: number };
+    }>>(`/clients${queryString ? `?${queryString}` : ''}`);
+  },
+
+  /**
+   * Получить карточку клиента
+   * GET /api/v1/clients/{id}
+   */
+  getById: (id: number) =>
+    api.get<ApiResponse<{ client: Client }>>(`/clients/${id}`),
+
+  /**
+   * Создать клиента
+   * POST /api/v1/clients
+   */
+  create: (data: Partial<Client>) =>
+    api.post<ApiResponse<{ client: Client; message: string }>>('/clients', data),
+
+  /**
+   * Обновить клиента
+   * PUT /api/v1/clients/{id}
+   */
+  update: (id: number, data: Partial<Client>) =>
+    api.put<ApiResponse<{ client: Client; message: string }>>(`/clients/${id}`, data),
+
+  /**
+   * Архивировать/разархивировать клиента
+   * PATCH /api/v1/clients/{id}/archive
+   */
+  archive: (id: number, isArchived: boolean) =>
+    api.patch<ApiResponse<{ client: Client; message: string }>>(`/clients/${id}/archive`, { is_archived: isArchived }),
+
+  /**
+   * Удалить клиента
+   * DELETE /api/v1/clients/{id}
+   */
+  delete: (id: number) =>
+    api.delete<ApiResponse<{ message: string }>>(`/clients/${id}`),
+
+  /**
+   * Переместить клиента на другую стадию
+   * PATCH /api/v1/clients/{id}/stage
+   */
+  moveStage: (id: number, stageId: number) =>
+    api.patch<ApiResponse<{ client: Client; message: string }>>(`/clients/${id}/stage`, { stage_id: stageId }),
+
+  /**
+   * Получить kanban-доску (стадии + клиенты)
+   * GET /api/v1/clients/pipeline
+   */
+  getPipeline: () =>
+    api.get<ApiResponse<{ pipeline: PipelineColumn[] }>>('/clients/pipeline'),
+
+  /**
+   * Получить статистику по клиентам
+   * GET /api/v1/clients/stats
+   */
+  getStats: () =>
+    api.get<ApiResponse<ClientStats>>('/clients/stats'),
+
+  // === Подборки (привязка объявлений) ===
+
+  /**
+   * Добавить объявление в подборку клиента
+   * POST /api/v1/clients/{id}/listings
+   */
+  addListing: (clientId: number, listingId: number, comment?: string) =>
+    api.post<ApiResponse<{ client_listing: any; message: string }>>(`/clients/${clientId}/listings`, {
+      listing_id: listingId,
+      comment,
+    }),
+
+  /**
+   * Удалить объявление из подборки
+   * DELETE /api/v1/clients/{id}/listings/{listing_id}
+   */
+  removeListing: (clientId: number, listingId: number) =>
+    api.delete<ApiResponse<{ message: string }>>(`/clients/${clientId}/listings/${listingId}`),
+
+  /**
+   * Обновить статус объявления в подборке
+   * PATCH /api/v1/clients/{id}/listings/{listing_id}
+   */
+  updateListingStatus: (clientId: number, listingId: number, status: ClientListingStatus, comment?: string) =>
+    api.patch<ApiResponse<{ client_listing: any; message: string }>>(`/clients/${clientId}/listings/${listingId}`, {
+      status,
+      comment,
+    }),
+
+  // === Критерии поиска ===
+
+  /**
+   * Добавить критерий поиска
+   * POST /api/v1/clients/{id}/criteria
+   */
+  addCriteria: (clientId: number, data: Record<string, any>) =>
+    api.post<ApiResponse<{ criteria: any; message: string }>>(`/clients/${clientId}/criteria`, data),
+
+  /**
+   * Обновить критерий поиска
+   * PUT /api/v1/clients/criteria/{id}
+   */
+  updateCriteria: (criteriaId: number, data: Record<string, any>) =>
+    api.put<ApiResponse<{ message: string }>>(`/clients/criteria/${criteriaId}`, data),
+
+  /**
+   * Удалить критерий поиска
+   * DELETE /api/v1/clients/criteria/{id}
+   */
+  deleteCriteria: (criteriaId: number) =>
+    api.delete<ApiResponse<{ message: string }>>(`/clients/criteria/${criteriaId}`),
+
+  // === Стадии воронки ===
+
+  /**
+   * Получить все стадии
+   * GET /api/v1/clients/stages
+   */
+  getStages: () =>
+    api.get<ApiResponse<{ stages: PipelineStage[] }>>('/clients/stages'),
+
+  /**
+   * Создать стадию
+   * POST /api/v1/clients/stages
+   */
+  createStage: (name: string, color: string = '#808080', isFinal: boolean = false) =>
+    api.post<ApiResponse<{ stage: PipelineStage; message: string }>>('/clients/stages', { name, color, is_final: isFinal }),
+
+  /**
+   * Обновить стадию
+   * PUT /api/v1/clients/stages/{id}
+   */
+  updateStage: (id: number, data: { name?: string; color?: string; is_final?: boolean }) =>
+    api.put<ApiResponse<{ stage: PipelineStage; message: string }>>(`/clients/stages/${id}`, data),
+
+  /**
+   * Удалить стадию
+   * DELETE /api/v1/clients/stages/{id}
+   */
+  deleteStage: (id: number) =>
+    api.delete<ApiResponse<{ message: string }>>(`/clients/stages/${id}`),
+
+  /**
+   * Изменить порядок стадий
+   * PUT /api/v1/clients/stages/reorder
+   */
+  reorderStages: (order: number[]) =>
+    api.put<ApiResponse<{ message: string }>>('/clients/stages/reorder', { order }),
+};
+
 // === SOURCE AUTH API (авторизация на источниках: CIAN, Avito) ===
 
 export interface SourceAuthStatus {

@@ -1,0 +1,200 @@
+/* ===========================================
+   Настройки стадий воронки
+   =========================================== */
+
+.stage-settings-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 80vh;
+  background: var(--bg-primary, #fff);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-settings-content {
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+/* Список стадий */
+.stages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.stage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg-secondary, #f8f9fa);
+}
+
+.stage-row:hover {
+  background: var(--bg-hover, #f0f0f0);
+}
+
+.stage-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.stage-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stage-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.system-badge,
+.final-badge {
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+
+.system-badge {
+  background: #E3F2FD;
+  color: #1565C0;
+}
+
+.final-badge {
+  background: #F3E5F5;
+  color: #7B1FA2;
+}
+
+.clients-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #aaa);
+  margin-left: auto;
+  padding: 0 4px;
+}
+
+.stage-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #333);
+}
+
+.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.icon-btn.danger:hover:not(:disabled) {
+  background: #FFEBEE;
+  color: #F44336;
+}
+
+.icon-btn .material-icons {
+  font-size: 16px;
+}
+
+/* Форма редактирования inline */
+.stage-edit-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.color-picker {
+  width: 32px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.name-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.name-input:focus {
+  border-color: var(--primary-color, #2196F3);
+}
+
+.save-btn,
+.cancel-edit-btn {
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.save-btn {
+  color: #4CAF50;
+}
+
+.save-btn:hover {
+  background: #E8F5E9;
+}
+
+.cancel-edit-btn {
+  color: var(--text-secondary, #888);
+}
+
+.cancel-edit-btn:hover {
+  background: var(--bg-hover, #f0f0f0);
+}
+
+.save-btn .material-icons,
+.cancel-edit-btn .material-icons {
+  font-size: 18px;
+}
+
+/* Форма создания */
+.create-stage-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--border-color, #e0e0e0);
+  border-radius: 8px;
+}
+
+.create-stage-form .btn-primary {
+  white-space: nowrap;
+}

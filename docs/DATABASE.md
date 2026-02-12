@@ -13,7 +13,7 @@
 - Username: `postgres`
 - Password: `postgres`
 
-**Всего таблиц:** 28 (не считая `spatial_ref_sys`)
+**Всего таблиц:** 32 (не считая `spatial_ref_sys`)
 
 ---
 
@@ -753,10 +753,135 @@
 
 ---
 
+### 29. pipeline_stages — Стадии воронки продаж
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `user_id` | INT NOT NULL FK | Ссылка на users (владелец) |
+| `name` | VARCHAR(100) NOT NULL | Название стадии |
+| `color` | VARCHAR(7) DEFAULT '#808080' | Цвет в HEX |
+| `sort_order` | SMALLINT DEFAULT 0 | Порядок сортировки |
+| `is_system` | BOOLEAN DEFAULT false | Системная стадия (нельзя удалить) |
+| `is_final` | BOOLEAN DEFAULT false | Финальная стадия (сделка/отказ) |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:** `user_id` -> `users(id)` ON DELETE CASCADE
+
+**Индексы:**
+- `pipeline_stages_user_name_unique` (UNIQUE on `user_id`, `name`)
+- `pipeline_stages_user_sort_index` (`user_id`, `sort_order`)
+
+**Стадии по умолчанию:** Новый лид, Первый контакт, Квалификация, Подбор объектов, Показ, Переговоры, Задаток, Сделка закрыта, Отказ
+
+---
+
+### 30. clients — Карточка клиента CRM
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `user_id` | INT NOT NULL FK | Ссылка на users (агент-владелец) |
+| `pipeline_stage_id` | INT NOT NULL FK | Ссылка на pipeline_stages |
+| `name` | VARCHAR(255) NOT NULL | ФИО клиента |
+| `phone` | VARCHAR(20) NULL | Основной телефон |
+| `phone_secondary` | VARCHAR(20) NULL | Дополнительный телефон |
+| `email` | VARCHAR(255) NULL | Email |
+| `telegram_username` | VARCHAR(100) NULL | Telegram username |
+| `client_type` | VARCHAR(20) DEFAULT 'buyer' | buyer/seller/renter/landlord |
+| `source_type` | VARCHAR(50) NULL | Откуда пришёл |
+| `source_details` | VARCHAR(255) NULL | Детали источника |
+| `budget_min` | NUMERIC NULL | Минимальный бюджет |
+| `budget_max` | NUMERIC NULL | Максимальный бюджет |
+| `comment` | TEXT NULL | Комментарий агента |
+| `is_archived` | BOOLEAN DEFAULT false | В архиве |
+| `last_contact_at` | TIMESTAMP NULL | Дата последнего контакта |
+| `next_contact_at` | TIMESTAMP NULL | Дата следующего контакта |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:**
+- `user_id` -> `users(id)` ON DELETE CASCADE
+- `pipeline_stage_id` -> `pipeline_stages(id)` ON DELETE RESTRICT
+
+**Индексы:**
+- `clients_user_archived_index` (`user_id`, `is_archived`)
+- `clients_user_stage_index` (`user_id`, `pipeline_stage_id`)
+- `clients_user_type_index` (`user_id`, `client_type`)
+- `clients_phone_index` (`phone`)
+
+---
+
+### 31. client_search_criteria — Критерии поиска клиента
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `client_id` | INT NOT NULL FK | Ссылка на clients |
+| `category_id` | INT NULL FK | Категория недвижимости |
+| `location_id` | INT NULL FK | Локация |
+| `room_ids` | JSONB NULL | Типы комнат (массив ID) |
+| `price_min` | NUMERIC NULL | Минимальная цена |
+| `price_max` | NUMERIC NULL | Максимальная цена |
+| `area_min` | NUMERIC NULL | Минимальная площадь |
+| `area_max` | NUMERIC NULL | Максимальная площадь |
+| `floor_min` | SMALLINT NULL | Минимальный этаж |
+| `floor_max` | SMALLINT NULL | Максимальный этаж |
+| `metro_ids` | JSONB NULL | Станции метро (массив ID) |
+| `districts` | JSONB NULL | Районы (массив строк) |
+| `notes` | TEXT NULL | Примечания |
+| `is_active` | BOOLEAN DEFAULT true | Активен ли критерий |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:**
+- `client_id` -> `clients(id)` ON DELETE CASCADE
+- `category_id` -> `categories(id)` ON DELETE SET NULL
+- `location_id` -> `locations(id)` ON DELETE SET NULL
+
+**Индексы:**
+- `client_search_criteria_client_index` (`client_id`)
+- `client_search_criteria_cat_loc_active_index` (`category_id`, `location_id`, `is_active`)
+
+---
+
+### 32. client_listings — Привязка объявлений к клиенту
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | BIGSERIAL PK | Первичный ключ |
+| `client_id` | INT NOT NULL FK | Ссылка на clients |
+| `listing_id` | INT NOT NULL FK | Ссылка на listings |
+| `status` | VARCHAR(20) DEFAULT 'proposed' | proposed/showed/liked/rejected |
+| `comment` | VARCHAR(500) NULL | Комментарий агента |
+| `showed_at` | TIMESTAMP NULL | Дата показа |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:**
+- `client_id` -> `clients(id)` ON DELETE CASCADE
+- `listing_id` -> `listings(id)` ON DELETE CASCADE
+
+**Индексы:**
+- `client_listings_client_listing_unique` (UNIQUE on `client_id`, `listing_id`)
+- `client_listings_client_status_index` (`client_id`, `status`)
+- `client_listings_listing_index` (`listing_id`)
+
+---
+
 ## Внешние ключи
 
 | Таблица | Колонка | Ссылается на |
 |---------|---------|--------------|
+| client_listings | client_id | clients(id) |
+| client_listings | listing_id | listings(id) |
+| client_search_criteria | client_id | clients(id) |
+| client_search_criteria | category_id | categories(id) |
+| client_search_criteria | location_id | locations(id) |
+| clients | user_id | users(id) |
+| clients | pipeline_stage_id | pipeline_stages(id) |
+| pipeline_stages | user_id | users(id) |
 | agent_listings | user_id | users(id) |
 | agent_listings | listing_id | listings(id) |
 | agent_listings | call_status_id | call_statuses(id) |
@@ -863,6 +988,10 @@ docker exec -it slim_php-cli php db/migrations/run.php
 48. `20260208000002` — create user_source_cookies table
 49. `20260208000003` — create bookmarklet_tokens table
 50. `20260208100001` — drop bookmarklet_tokens table
+51. `20260212000001` — create pipeline_stages table
+52. `20260212000002` — create clients table
+53. `20260212000003` — create client_search_criteria table
+54. `20260212000004` — create client_listings table
 
 ---
 

@@ -13,9 +13,12 @@ use App\Services\UserService;
 use App\Services\ListingFilterService;
 use App\Services\PhotoTaskService;
 use App\Services\QrCodeService;
+use App\Services\ClientService;
 use App\Services\SourceAuthService;
 use App\Controllers\AnalyticsController;
 use App\Controllers\AuthController;
+use App\Controllers\ClientController;
+use App\Controllers\PipelineStageController;
 use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
 use App\Controllers\ListingController;
@@ -95,7 +98,11 @@ return function (array $config) {
         SourceAuthService::class => factory(function (ContainerInterface $c) {
             return new SourceAuthService($c->get(LoggerInterface::class));
         }),
-        
+
+        ClientService::class => factory(function (ContainerInterface $c) {
+            return new ClientService();
+        }),
+
         /** Контроллеры */
         AuthController::class => factory(function (ContainerInterface $c) {
             return new AuthController($c);
@@ -135,7 +142,17 @@ return function (array $config) {
                 $c->get(LoggerInterface::class)
             );
         }),
-        
+
+        ClientController::class => factory(function (ContainerInterface $c) {
+            return new ClientController(
+                $c->get(ClientService::class)
+            );
+        }),
+
+        PipelineStageController::class => factory(function (ContainerInterface $c) {
+            return new PipelineStageController();
+        }),
+
         /** Конфигурация */
         'config' => factory(function () use ($config) {
             return $config;

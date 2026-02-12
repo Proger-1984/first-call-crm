@@ -4,12 +4,14 @@ use App\Controllers\AdminSubscriptionController;
 use App\Controllers\AdminUserController;
 use App\Controllers\AnalyticsController;
 use App\Controllers\AuthController;
+use App\Controllers\ClientController;
 use App\Controllers\FavoriteController;
 use App\Controllers\FavoriteStatusController;
 use App\Controllers\FilterController;
 use App\Controllers\ListingController;
 use App\Controllers\LocationPolygonController;
 use App\Controllers\PhotoTaskController;
+use App\Controllers\PipelineStageController;
 use App\Controllers\SourceAuthController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\TelegramAuthController;
@@ -236,6 +238,56 @@ return function (App $app) {
             $group->put('/statuses/reorder', [FavoriteStatusController::class, 'reorder']);
             $group->put('/statuses/{id:[0-9]+}', [FavoriteStatusController::class, 'update']);
             $group->delete('/statuses/{id:[0-9]+}', [FavoriteStatusController::class, 'delete']);
+        })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
+
+        /** Маршруты CRM — управление клиентами
+         * Список клиентов с фильтрами — index
+         * Карточка клиента — show
+         * Создание клиента — create
+         * Обновление клиента — update
+         * Архивирование — archive
+         * Удаление — delete
+         * Перемещение по воронке — moveStage
+         * Kanban-доска — getPipeline
+         * Статистика — getStats
+         * Подборки объявлений — addListing, removeListing, updateListingStatus
+         * Критерии поиска — addCriteria, updateCriteria, deleteCriteria
+         * Стадии воронки — PipelineStageController (CRUD + reorder)
+         *
+         * Требует активную подписку (SubscriptionMiddleware)
+         */
+        $group->group('/clients', function (RouteCollectorProxy $group) {
+            // Стадии воронки (до /{id} чтобы /stages не перехватывался)
+            $group->get('/stages', [PipelineStageController::class, 'index']);
+            $group->post('/stages', [PipelineStageController::class, 'create']);
+            $group->put('/stages/reorder', [PipelineStageController::class, 'reorder']);
+            $group->put('/stages/{id:[0-9]+}', [PipelineStageController::class, 'update']);
+            $group->delete('/stages/{id:[0-9]+}', [PipelineStageController::class, 'delete']);
+
+            // Kanban, статистика (до /{id})
+            $group->get('/pipeline', [ClientController::class, 'getPipeline']);
+            $group->get('/stats', [ClientController::class, 'getStats']);
+
+            // Критерии поиска (общие маршруты)
+            $group->put('/criteria/{id:[0-9]+}', [ClientController::class, 'updateCriteria']);
+            $group->delete('/criteria/{id:[0-9]+}', [ClientController::class, 'deleteCriteria']);
+
+            // CRUD клиентов
+            $group->get('', [ClientController::class, 'index']);
+            $group->post('', [ClientController::class, 'create']);
+            $group->get('/{id:[0-9]+}', [ClientController::class, 'show']);
+            $group->put('/{id:[0-9]+}', [ClientController::class, 'update']);
+            $group->delete('/{id:[0-9]+}', [ClientController::class, 'delete']);
+            $group->patch('/{id:[0-9]+}/archive', [ClientController::class, 'archive']);
+            $group->patch('/{id:[0-9]+}/stage', [ClientController::class, 'moveStage']);
+
+            // Подборки объявлений
+            $group->post('/{id:[0-9]+}/listings', [ClientController::class, 'addListing']);
+            $group->delete('/{id:[0-9]+}/listings/{listing_id:[0-9]+}', [ClientController::class, 'removeListing']);
+            $group->patch('/{id:[0-9]+}/listings/{listing_id:[0-9]+}', [ClientController::class, 'updateListingStatus']);
+
+            // Критерии поиска клиента
+            $group->post('/{id:[0-9]+}/criteria', [ClientController::class, 'addCriteria']);
         })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
 
         /** Маршруты для авторизации на источниках (CIAN, Avito)

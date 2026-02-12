@@ -1,0 +1,157 @@
+/* ===========================================
+   Форма клиента (модальное окно)
+   =========================================== */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.client-form-modal {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  background: var(--bg-primary, #fff);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.close-btn {
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+}
+
+.close-btn:hover {
+  background: var(--bg-hover, #f0f0f0);
+}
+
+/* Форма */
+.client-form {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-error {
+  padding: 10px 14px;
+  background: #FFEBEE;
+  color: #C62828;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-field.full {
+  flex: 1 1 100%;
+}
+
+.form-field label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary, #666);
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: var(--text-primary, #1a1a1a);
+  background: var(--bg-primary, #fff);
+  transition: border-color 0.2s;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: var(--primary-color, #2196F3);
+}
+
+.form-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Кнопки */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.btn-cancel {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary, #666);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-cancel:hover {
+  background: var(--bg-hover, #f5f5f5);
+}
+
+/* Адаптивность */
+@media (max-width: 640px) {
+  .form-row {
+    flex-direction: column;
+  }
+
+  .client-form-modal {
+    max-height: 95vh;
+  }
+}

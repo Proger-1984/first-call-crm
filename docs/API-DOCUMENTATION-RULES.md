@@ -5,7 +5,7 @@
 Документация API ведётся в формате **OpenAPI 3.0** (файл `docs/api/openapi.yaml`).
 Просмотр через ReDoc: `docs/api/redoc.html` → http://localhost:8080/redoc.html
 
-Описаны 13 групп эндпоинтов (58 операций):
+Описаны 15 групп эндпоинтов (78 операций):
 - Аутентификация (`/auth/*`)
 - Пользователь (`/me/*`)
 - Подписки (`/subscriptions/*`)
@@ -19,6 +19,8 @@
 - Обработка фото (`/photo-tasks/*`)
 - Admin Users (`/admin/users/*`)
 - Source Auth (`/source-auth/*`)
+- Клиенты (`/clients/*`)
+- Воронка продаж (`/clients/stages/*`)
 
 ---
 
