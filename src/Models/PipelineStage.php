@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Capsule\Manager as DB;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -97,16 +98,18 @@ class PipelineStage extends Model
      */
     public static function createDefaultStages(int $userId): Collection
     {
-        foreach (self::DEFAULT_STAGES as $sortOrder => $stageData) {
-            self::create([
-                'user_id' => $userId,
-                'name' => $stageData['name'],
-                'color' => $stageData['color'],
-                'sort_order' => $sortOrder + 1,
-                'is_system' => $stageData['is_system'],
-                'is_final' => $stageData['is_final'],
-            ]);
-        }
+        DB::connection()->transaction(function () use ($userId) {
+            foreach (self::DEFAULT_STAGES as $sortOrder => $stageData) {
+                self::create([
+                    'user_id' => $userId,
+                    'name' => $stageData['name'],
+                    'color' => $stageData['color'],
+                    'sort_order' => $sortOrder + 1,
+                    'is_system' => $stageData['is_system'],
+                    'is_final' => $stageData['is_final'],
+                ]);
+            }
+        });
 
         return self::getByUser($userId);
     }

@@ -11,7 +11,9 @@ use App\Models\Listing;
 use App\Models\PipelineStage;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Database\Capsule\Manager as DB;
 use Illuminate\Database\Eloquent\Collection;
+use InvalidArgumentException;
 
 /**
  * Сервис бизнес-логики CRM-модуля (клиенты, воронка, подборки)
@@ -75,11 +77,13 @@ class ClientService
         // Поиск по имени, телефону, email
         $search = $params['search'] ?? null;
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'ILIKE', "%{$search}%")
-                    ->orWhere('phone', 'ILIKE', "%{$search}%")
-                    ->orWhere('email', 'ILIKE', "%{$search}%")
-                    ->orWhere('telegram_username', 'ILIKE', "%{$search}%");
+            // Экранируем спецсимволы LIKE (%, _, \)
+            $escapedSearch = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+            $query->where(function ($q) use ($escapedSearch) {
+                $q->where('name', 'ILIKE', "%{$escapedSearch}%")
+                    ->orWhere('phone', 'ILIKE', "%{$escapedSearch}%")
+                    ->orWhere('email', 'ILIKE', "%{$escapedSearch}%")
+                    ->orWhere('telegram_username', 'ILIKE', "%{$escapedSearch}%");
             });
         }
 
@@ -275,7 +279,19 @@ class ClientService
      */
     public function getPipelineSummary(int $userId): array
     {
-        $stages = PipelineStage::getOrCreateForUser($userId);
+        // Используем withCount вместо N+1 запросов
+        $stages = PipelineStage::where('user_id', $userId)
+            ->withCount(['clients' => fn($query) => $query->where('is_archived', false)])
+            ->orderBy('sort_order')
+            ->get();
+
+        if ($stages->isEmpty()) {
+            PipelineStage::createDefaultStages($userId);
+            $stages = PipelineStage::where('user_id', $userId)
+                ->withCount(['clients' => fn($query) => $query->where('is_archived', false)])
+                ->orderBy('sort_order')
+                ->get();
+        }
 
         return $stages->map(function (PipelineStage $stage) {
             return [
@@ -285,7 +301,7 @@ class ClientService
                 'sort_order' => $stage->sort_order,
                 'is_system' => $stage->is_system,
                 'is_final' => $stage->is_final,
-                'clients_count' => $stage->getClientsCount(),
+                'clients_count' => $stage->clients_count,
             ];
         })->toArray();
     }
@@ -300,11 +316,15 @@ class ClientService
     {
         $stages = PipelineStage::getOrCreateForUser($userId);
 
-        return $stages->map(function (PipelineStage $stage) {
-            $clients = Client::where('pipeline_stage_id', $stage->id)
-                ->where('is_archived', false)
-                ->orderBy('updated_at', 'desc')
-                ->get();
+        // Загружаем всех активных клиентов одним запросом, группируем по стадии
+        $clientsByStage = Client::where('user_id', $userId)
+            ->where('is_archived', false)
+            ->orderBy('updated_at', 'desc')
+            ->get()
+            ->groupBy('pipeline_stage_id');
+
+        return $stages->map(function (PipelineStage $stage) use ($clientsByStage) {
+            $stageClients = $clientsByStage->get($stage->id, collect());
 
             return [
                 'id' => $stage->id,
@@ -313,7 +333,7 @@ class ClientService
                 'sort_order' => $stage->sort_order,
                 'is_system' => $stage->is_system,
                 'is_final' => $stage->is_final,
-                'clients' => $clients->map(fn(Client $client) => $this->formatClientShort($client))->toArray(),
+                'clients' => $stageClients->map(fn(Client $client) => $this->formatClientShort($client))->toArray(),
             ];
         })->toArray();
     }
@@ -330,34 +350,34 @@ class ClientService
      */
     public function getStats(int $userId): array
     {
-        $totalActive = Client::where('user_id', $userId)->active()->count();
-        $totalArchived = Client::where('user_id', $userId)->archived()->count();
+        $now = Carbon::now();
+        $weekAgo = $now->copy()->subDays(7);
 
-        // Количество по типам
-        $byType = [];
-        foreach (Client::ALLOWED_TYPES as $type) {
-            $byType[$type] = Client::where('user_id', $userId)->active()->byType($type)->count();
-        }
-
-        // Новые за последние 7 дней
-        $newThisWeek = Client::where('user_id', $userId)
-            ->active()
-            ->where('created_at', '>=', Carbon::now()->subDays(7))
-            ->count();
-
-        // Требуют контакта (next_contact_at в прошлом)
-        $overdueContacts = Client::where('user_id', $userId)
-            ->active()
-            ->whereNotNull('next_contact_at')
-            ->where('next_contact_at', '<', Carbon::now())
-            ->count();
+        // Один запрос с условными подсчётами вместо 8 отдельных COUNT
+        $stats = Client::where('user_id', $userId)
+            ->selectRaw("
+                COUNT(*) FILTER (WHERE is_archived = false) as total_active,
+                COUNT(*) FILTER (WHERE is_archived = true) as total_archived,
+                COUNT(*) FILTER (WHERE is_archived = false AND client_type = 'buyer') as type_buyer,
+                COUNT(*) FILTER (WHERE is_archived = false AND client_type = 'seller') as type_seller,
+                COUNT(*) FILTER (WHERE is_archived = false AND client_type = 'renter') as type_renter,
+                COUNT(*) FILTER (WHERE is_archived = false AND client_type = 'landlord') as type_landlord,
+                COUNT(*) FILTER (WHERE is_archived = false AND created_at >= ?) as new_this_week,
+                COUNT(*) FILTER (WHERE is_archived = false AND next_contact_at IS NOT NULL AND next_contact_at < ?) as overdue_contacts
+            ", [$weekAgo, $now])
+            ->first();
 
         return [
-            'total_active' => $totalActive,
-            'total_archived' => $totalArchived,
-            'by_type' => $byType,
-            'new_this_week' => $newThisWeek,
-            'overdue_contacts' => $overdueContacts,
+            'total_active' => (int)$stats->total_active,
+            'total_archived' => (int)$stats->total_archived,
+            'by_type' => [
+                Client::TYPE_BUYER => (int)$stats->type_buyer,
+                Client::TYPE_SELLER => (int)$stats->type_seller,
+                Client::TYPE_RENTER => (int)$stats->type_renter,
+                Client::TYPE_LANDLORD => (int)$stats->type_landlord,
+            ],
+            'new_this_week' => (int)$stats->new_this_week,
+            'overdue_contacts' => (int)$stats->overdue_contacts,
         ];
     }
 
@@ -450,7 +470,7 @@ class ClientService
         // Проверяем, что объявление существует
         $listing = Listing::find($listingId);
         if (!$listing) {
-            throw new Exception('Объявление не найдено');
+            throw new InvalidArgumentException('Объявление не найдено');
         }
 
         // Проверяем уникальность
@@ -459,7 +479,7 @@ class ClientService
             ->first();
 
         if ($existing) {
-            throw new Exception('Объявление уже привязано к этому клиенту');
+            throw new InvalidArgumentException('Объявление уже привязано к этому клиенту');
         }
 
         return ClientListing::create([
@@ -484,7 +504,7 @@ class ClientService
             ->first();
 
         if (!$clientListing) {
-            throw new Exception('Привязка не найдена');
+            throw new InvalidArgumentException('Привязка не найдена');
         }
 
         return (bool)$clientListing->delete();
@@ -502,7 +522,7 @@ class ClientService
     public function updateListingStatus(int $clientId, int $listingId, string $status, ?string $comment = null): ClientListing
     {
         if (!in_array($status, ClientListing::ALLOWED_STATUSES, true)) {
-            throw new Exception('Недопустимый статус');
+            throw new InvalidArgumentException('Недопустимый статус');
         }
 
         $clientListing = ClientListing::where('client_id', $clientId)
@@ -510,7 +530,7 @@ class ClientService
             ->first();
 
         if (!$clientListing) {
-            throw new Exception('Привязка не найдена');
+            throw new InvalidArgumentException('Привязка не найдена');
         }
 
         $updateData = ['status' => $status];

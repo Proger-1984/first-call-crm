@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Models\PipelineStage;
 use App\Traits\ResponseTrait;
 use Exception;
+use Illuminate\Database\Capsule\Manager as DB;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -31,7 +32,19 @@ class PipelineStageController
                 return $this->respondWithError($response, 'Требуется авторизация', 'unauthorized', 401);
             }
 
-            $stages = PipelineStage::getOrCreateForUser($userId);
+            // Используем withCount вместо N+1 запросов getClientsCount()
+            $stages = PipelineStage::where('user_id', $userId)
+                ->withCount(['clients' => fn($query) => $query->where('is_archived', false)])
+                ->orderBy('sort_order')
+                ->get();
+
+            if ($stages->isEmpty()) {
+                PipelineStage::createDefaultStages($userId);
+                $stages = PipelineStage::where('user_id', $userId)
+                    ->withCount(['clients' => fn($query) => $query->where('is_archived', false)])
+                    ->orderBy('sort_order')
+                    ->get();
+            }
 
             $stagesData = $stages->map(function (PipelineStage $stage) {
                 return [
@@ -41,7 +54,7 @@ class PipelineStageController
                     'sort_order' => $stage->sort_order,
                     'is_system' => $stage->is_system,
                     'is_final' => $stage->is_final,
-                    'clients_count' => $stage->getClientsCount(),
+                    'clients_count' => $stage->clients_count,
                 ];
             })->toArray();
 
@@ -259,12 +272,23 @@ class PipelineStageController
                 return $this->respondWithError($response, 'Системную стадию нельзя удалить', 'validation_error', 400);
             }
 
-            // Проверяем, есть ли клиенты на этой стадии
-            $clientsCount = $stage->getClientsCount();
-            if ($clientsCount > 0) {
+            // Проверяем, есть ли клиенты на этой стадии (включая архивных)
+            $activeCount = $stage->clients()->where('is_archived', false)->count();
+            $archivedCount = $stage->clients()->where('is_archived', true)->count();
+            $totalCount = $activeCount + $archivedCount;
+
+            if ($totalCount > 0) {
+                $details = [];
+                if ($activeCount > 0) {
+                    $details[] = "активных: {$activeCount}";
+                }
+                if ($archivedCount > 0) {
+                    $details[] = "архивных: {$archivedCount}";
+                }
+                $detailsStr = implode(', ', $details);
                 return $this->respondWithError(
                     $response,
-                    "Нельзя удалить стадию с клиентами ({$clientsCount}). Сначала переместите клиентов.",
+                    "Нельзя удалить стадию с клиентами ({$detailsStr}). Сначала переместите клиентов.",
                     'validation_error',
                     400
                 );
@@ -311,18 +335,27 @@ class PipelineStageController
                 ->pluck('id')
                 ->toArray();
 
-            foreach ($order as $stageId) {
-                if (!in_array((int)$stageId, $userStageIds, true)) {
+            $orderIds = array_map('intval', $order);
+
+            foreach ($orderIds as $stageId) {
+                if (!in_array($stageId, $userStageIds, true)) {
                     return $this->respondWithError($response, 'Одна или несколько стадий не найдены', 'not_found', 404);
                 }
             }
 
-            // Обновляем порядок
-            foreach ($order as $index => $stageId) {
-                PipelineStage::where('id', (int)$stageId)
-                    ->where('user_id', $userId)
-                    ->update(['sort_order' => $index + 1]);
+            // Проверяем, что переданы все стадии пользователя (иначе часть сохранит старый sort_order)
+            if (count($orderIds) !== count($userStageIds)) {
+                return $this->respondWithError($response, 'Необходимо передать все стадии для изменения порядка', 'validation_error', 400);
             }
+
+            // Обновляем порядок в транзакции
+            DB::connection()->transaction(function () use ($orderIds, $userId) {
+                foreach ($orderIds as $index => $stageId) {
+                    PipelineStage::where('id', $stageId)
+                        ->where('user_id', $userId)
+                        ->update(['sort_order' => $index + 1]);
+                }
+            });
 
             return $this->respondWithData($response, [
                 'code' => 200,

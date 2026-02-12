@@ -10,6 +10,7 @@ use App\Models\ClientSearchCriteria;
 use App\Services\ClientService;
 use App\Traits\ResponseTrait;
 use Exception;
+use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -431,8 +432,10 @@ class ClientController
                 ],
             ], 201);
 
-        } catch (Exception $exception) {
+        } catch (InvalidArgumentException $exception) {
             return $this->respondWithError($response, $exception->getMessage(), 'validation_error', 400);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка добавления объявления в подборку', 'internal_error', 500);
         }
     }
 
@@ -473,8 +476,10 @@ class ClientController
                 ],
             ], 200);
 
-        } catch (Exception $exception) {
+        } catch (InvalidArgumentException $exception) {
             return $this->respondWithError($response, $exception->getMessage(), 'validation_error', 400);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка удаления объявления из подборки', 'internal_error', 500);
         }
     }
 
@@ -530,8 +535,10 @@ class ClientController
                 ],
             ], 200);
 
-        } catch (Exception $exception) {
+        } catch (InvalidArgumentException $exception) {
             return $this->respondWithError($response, $exception->getMessage(), 'validation_error', 400);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка обновления статуса подборки', 'internal_error', 500);
         }
     }
 
@@ -618,7 +625,7 @@ class ClientController
 
             // Находим критерий и проверяем владельца через клиента
             $criteria = ClientSearchCriteria::with('client')->find($criteriaId);
-            if (!$criteria || $criteria->client->user_id !== $userId) {
+            if (!$criteria || !$criteria->client || $criteria->client->user_id !== $userId) {
                 return $this->respondWithError($response, 'Критерий не найден', 'not_found', 404);
             }
 
@@ -659,7 +666,7 @@ class ClientController
 
             // Находим критерий и проверяем владельца через клиента
             $criteria = ClientSearchCriteria::with('client')->find($criteriaId);
-            if (!$criteria || $criteria->client->user_id !== $userId) {
+            if (!$criteria || !$criteria->client || $criteria->client->user_id !== $userId) {
                 return $this->respondWithError($response, 'Критерий не найден', 'not_found', 404);
             }
 
