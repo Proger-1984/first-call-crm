@@ -48,8 +48,8 @@ class ClientController
                 'data' => $result,
             ], 200);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка получения списка клиентов: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка получения списка клиентов', 'internal_error', 500);
         }
     }
 
@@ -86,8 +86,8 @@ class ClientController
                 ],
             ], 200);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка получения клиента: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка получения клиента', 'internal_error', 500);
         }
     }
 
@@ -105,7 +105,7 @@ class ClientController
                 return $this->respondWithError($response, 'Требуется авторизация', 'unauthorized', 401);
             }
 
-            $body = $request->getParsedBody();
+            $body = (array)($request->getParsedBody() ?? []);
 
             // Валидация обязательных полей
             $name = trim($body['name'] ?? '');
@@ -128,8 +128,10 @@ class ClientController
                 ],
             ], 201);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка создания клиента: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (InvalidArgumentException $exception) {
+            return $this->respondWithError($response, $exception->getMessage(), 'validation_error', 400);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка создания клиента', 'internal_error', 500);
         }
     }
 
@@ -157,7 +159,7 @@ class ClientController
                 return $this->respondWithError($response, 'Клиент не найден', 'not_found', 404);
             }
 
-            $body = $request->getParsedBody();
+            $body = (array)($request->getParsedBody() ?? []);
 
             // Валидация имени, если передано
             if (isset($body['name'])) {
@@ -181,8 +183,10 @@ class ClientController
                 ],
             ], 200);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка обновления клиента: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (InvalidArgumentException $exception) {
+            return $this->respondWithError($response, $exception->getMessage(), 'validation_error', 400);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка обновления клиента', 'internal_error', 500);
         }
     }
 
@@ -210,7 +214,7 @@ class ClientController
                 return $this->respondWithError($response, 'Клиент не найден', 'not_found', 404);
             }
 
-            $body = $request->getParsedBody();
+            $body = (array)($request->getParsedBody() ?? []);
             $archive = filter_var($body['is_archived'] ?? true, FILTER_VALIDATE_BOOLEAN);
 
             $client = $this->clientService->toggleArchive($client, $archive);
@@ -226,8 +230,8 @@ class ClientController
                 ],
             ], 200);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка архивирования клиента: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка архивирования клиента', 'internal_error', 500);
         }
     }
 
@@ -265,8 +269,8 @@ class ClientController
                 ],
             ], 200);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка удаления клиента: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка удаления клиента', 'internal_error', 500);
         }
     }
 
@@ -294,7 +298,7 @@ class ClientController
                 return $this->respondWithError($response, 'Клиент не найден', 'not_found', 404);
             }
 
-            $body = $request->getParsedBody();
+            $body = (array)($request->getParsedBody() ?? []);
             $stageId = (int)($body['stage_id'] ?? 0);
             if ($stageId <= 0) {
                 return $this->respondWithError($response, 'Не указана стадия', 'validation_error', 400);
@@ -311,8 +315,10 @@ class ClientController
                 ],
             ], 200);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка перемещения клиента: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (InvalidArgumentException $exception) {
+            return $this->respondWithError($response, $exception->getMessage(), 'validation_error', 400);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка перемещения клиента', 'internal_error', 500);
         }
     }
 
@@ -340,8 +346,8 @@ class ClientController
                 ],
             ], 200);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка получения воронки: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка получения воронки', 'internal_error', 500);
         }
     }
 
@@ -367,8 +373,8 @@ class ClientController
                 'data' => $stats,
             ], 200);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка получения статистики: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка получения статистики', 'internal_error', 500);
         }
     }
 
@@ -401,7 +407,7 @@ class ClientController
                 return $this->respondWithError($response, 'Клиент не найден', 'not_found', 404);
             }
 
-            $body = $request->getParsedBody();
+            $body = (array)($request->getParsedBody() ?? []);
             $listingId = (int)($body['listing_id'] ?? 0);
             if ($listingId <= 0) {
                 return $this->respondWithError($response, 'Не указан ID объявления', 'validation_error', 400);
@@ -510,7 +516,7 @@ class ClientController
                 return $this->respondWithError($response, 'Клиент не найден', 'not_found', 404);
             }
 
-            $body = $request->getParsedBody();
+            $body = (array)($request->getParsedBody() ?? []);
             $status = $body['status'] ?? '';
             if (empty($status)) {
                 return $this->respondWithError($response, 'Не указан статус', 'validation_error', 400);
@@ -571,7 +577,7 @@ class ClientController
                 return $this->respondWithError($response, 'Клиент не найден', 'not_found', 404);
             }
 
-            $body = $request->getParsedBody();
+            $body = (array)($request->getParsedBody() ?? []);
             $criteria = $this->clientService->addSearchCriteria($clientId, $body);
             $criteria->load(['category', 'location']);
 
@@ -599,8 +605,10 @@ class ClientController
                 ],
             ], 201);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка добавления критерия: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (InvalidArgumentException $exception) {
+            return $this->respondWithError($response, $exception->getMessage(), 'validation_error', 400);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка добавления критерия', 'internal_error', 500);
         }
     }
 
@@ -629,7 +637,7 @@ class ClientController
                 return $this->respondWithError($response, 'Критерий не найден', 'not_found', 404);
             }
 
-            $body = $request->getParsedBody();
+            $body = (array)($request->getParsedBody() ?? []);
             $criteria = $this->clientService->updateSearchCriteria($criteria, $body);
 
             return $this->respondWithData($response, [
@@ -640,8 +648,8 @@ class ClientController
                 ],
             ], 200);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка обновления критерия: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка обновления критерия', 'internal_error', 500);
         }
     }
 
@@ -680,8 +688,8 @@ class ClientController
                 ],
             ], 200);
 
-        } catch (Exception $exception) {
-            return $this->respondWithError($response, 'Ошибка удаления критерия: ' . $exception->getMessage(), 'internal_error', 500);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка удаления критерия', 'internal_error', 500);
         }
     }
 }

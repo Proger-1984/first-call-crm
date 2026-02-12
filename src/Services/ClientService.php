@@ -134,14 +134,14 @@ class ClientService
         if (!$stageId) {
             $firstStage = PipelineStage::getFirstStage($userId);
             if (!$firstStage) {
-                throw new Exception('Не удалось создать стадии воронки');
+                throw new InvalidArgumentException('Не удалось создать стадии воронки');
             }
             $stageId = $firstStage->id;
         }
 
         // Проверяем, что стадия принадлежит пользователю
         if (!PipelineStage::belongsToUser((int)$stageId, $userId)) {
-            throw new Exception('Стадия воронки не найдена');
+            throw new InvalidArgumentException('Стадия воронки не найдена');
         }
 
         $client = Client::create([
@@ -158,7 +158,7 @@ class ClientService
             'budget_min' => isset($data['budget_min']) ? (float)$data['budget_min'] : null,
             'budget_max' => isset($data['budget_max']) ? (float)$data['budget_max'] : null,
             'comment' => $data['comment'] ?? null,
-            'next_contact_at' => isset($data['next_contact_at']) ? Carbon::parse($data['next_contact_at']) : null,
+            'next_contact_at' => isset($data['next_contact_at']) ? $this->safeParseDate($data['next_contact_at']) : null,
         ]);
 
         $client->load('pipelineStage');
@@ -210,10 +210,10 @@ class ClientService
             $updateData['comment'] = $data['comment'];
         }
         if (array_key_exists('next_contact_at', $data)) {
-            $updateData['next_contact_at'] = $data['next_contact_at'] ? Carbon::parse($data['next_contact_at']) : null;
+            $updateData['next_contact_at'] = $data['next_contact_at'] ? $this->safeParseDate($data['next_contact_at']) : null;
         }
         if (array_key_exists('last_contact_at', $data)) {
-            $updateData['last_contact_at'] = $data['last_contact_at'] ? Carbon::parse($data['last_contact_at']) : null;
+            $updateData['last_contact_at'] = $data['last_contact_at'] ? $this->safeParseDate($data['last_contact_at']) : null;
         }
 
         if (!empty($updateData)) {
@@ -235,7 +235,7 @@ class ClientService
     public function moveToStage(Client $client, int $stageId, int $userId): Client
     {
         if (!PipelineStage::belongsToUser($stageId, $userId)) {
-            throw new Exception('Стадия воронки не найдена');
+            throw new InvalidArgumentException('Стадия воронки не найдена');
         }
 
         $client->update(['pipeline_stage_id' => $stageId]);
@@ -394,10 +394,21 @@ class ClientService
      */
     public function addSearchCriteria(int $clientId, array $data): ClientSearchCriteria
     {
+        // Проверяем существование category_id и location_id (FK constraint)
+        $categoryId = isset($data['category_id']) ? (int)$data['category_id'] : null;
+        if ($categoryId !== null && !\App\Models\Category::find($categoryId)) {
+            throw new InvalidArgumentException('Категория не найдена');
+        }
+
+        $locationId = isset($data['location_id']) ? (int)$data['location_id'] : null;
+        if ($locationId !== null && !\App\Models\Location::find($locationId)) {
+            throw new InvalidArgumentException('Локация не найдена');
+        }
+
         return ClientSearchCriteria::create([
             'client_id' => $clientId,
-            'category_id' => $data['category_id'] ?? null,
-            'location_id' => $data['location_id'] ?? null,
+            'category_id' => $categoryId,
+            'location_id' => $locationId,
             'room_ids' => $data['room_ids'] ?? null,
             'price_min' => isset($data['price_min']) ? (float)$data['price_min'] : null,
             'price_max' => isset($data['price_max']) ? (float)$data['price_max'] : null,
@@ -548,6 +559,26 @@ class ClientService
         $clientListing->load('listing');
 
         return $clientListing;
+    }
+
+    // ==========================================
+    // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    // ==========================================
+
+    /**
+     * Безопасный парсинг даты — возвращает понятную ошибку при невалидном формате
+     *
+     * @param string $value
+     * @return Carbon
+     * @throws InvalidArgumentException
+     */
+    private function safeParseDate(string $value): Carbon
+    {
+        try {
+            return Carbon::parse($value);
+        } catch (\Exception $exception) {
+            throw new InvalidArgumentException("Неверный формат даты: {$value}");
+        }
     }
 
     // ==========================================
