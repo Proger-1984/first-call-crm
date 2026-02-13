@@ -359,30 +359,33 @@
   table-layout: fixed;
 }
 
-/* Фиксированные ширины колонок: Адрес | Цена | Тип | Собственник | Клиенты | Стадия | Создан | Действия */
+/* Фиксированные ширины колонок: ☑ | Адрес | Цена | Тип | Собственник | Клиенты | Стадия | Создан | Действия */
 .properties-table th:nth-child(1),
-.properties-table td:nth-child(1) { width: 20%; }
+.properties-table td:nth-child(1) { width: 40px; min-width: 40px; max-width: 40px; }
 
 .properties-table th:nth-child(2),
-.properties-table td:nth-child(2) { width: 12%; }
+.properties-table td:nth-child(2) { width: 20%; }
 
 .properties-table th:nth-child(3),
-.properties-table td:nth-child(3) { width: 10%; }
+.properties-table td:nth-child(3) { width: 11%; }
 
 .properties-table th:nth-child(4),
-.properties-table td:nth-child(4) { width: 15%; }
+.properties-table td:nth-child(4) { width: 9%; }
 
 .properties-table th:nth-child(5),
-.properties-table td:nth-child(5) { width: 10%; }
+.properties-table td:nth-child(5) { width: 14%; }
 
 .properties-table th:nth-child(6),
-.properties-table td:nth-child(6) { width: 13%; }
+.properties-table td:nth-child(6) { width: 9%; }
 
 .properties-table th:nth-child(7),
 .properties-table td:nth-child(7) { width: 12%; }
 
 .properties-table th:nth-child(8),
-.properties-table td:nth-child(8) { width: 8%; }
+.properties-table td:nth-child(8) { width: 11%; }
+
+.properties-table th:nth-child(9),
+.properties-table td:nth-child(9) { width: 7%; }
 
 .properties-table thead th {
   position: sticky;
@@ -586,6 +589,111 @@
 .properties-page .error-state button,
 .properties-page .empty-state button {
   margin-top: 12px;
+}
+
+/* ===========================================
+   Адаптивность
+   =========================================== */
+
+/* ===========================================
+   Чекбокс выбора объектов
+   =========================================== */
+
+.properties-table .cell-checkbox {
+  text-align: center;
+  padding: 12px 8px;
+  cursor: default;
+}
+
+.properties-table .cell-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* Выделенная строка */
+.properties-table tbody tr.selected {
+  background: var(--primary-light) !important;
+}
+
+.properties-table tbody tr.selected:hover {
+  background: var(--primary-50) !important;
+}
+
+/* ===========================================
+   Панель массовых действий (sticky bottom)
+   =========================================== */
+
+.bulk-action-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--bg-card);
+  border-top: 2px solid var(--primary);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 var(--border-radius-lg) var(--border-radius-lg);
+  z-index: 20;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bulk-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bulk-actions .btn .material-icons {
+  font-size: 16px;
+}
+
+.bulk-close {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.bulk-close:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
+.bulk-close .material-icons {
+  font-size: 20px;
 }
 
 /* ===========================================

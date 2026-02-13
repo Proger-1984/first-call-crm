@@ -39,6 +39,7 @@ info:
     - `/api/v1/clients/*`
     - `/api/v1/properties/*`
     - `/api/v1/contacts/*`
+    - `/api/v1/reminders/*`
 
     **Эндпоинты, доступные без подписки:**
     - `/api/v1/me/info`, `/api/v1/me/status`, `/api/v1/me/download-info`, `/api/v1/me/download/android`
@@ -81,6 +82,12 @@ tags:
     description: CRM v2 — управление объектами недвижимости
   - name: Контакты
     description: CRM v2 — справочник контактов
+  - name: Взаимодействия
+    description: CRM v2 — таймлайн взаимодействий (звонки, встречи, показы, заметки)
+  - name: Напоминания
+    description: CRM v2 — напоминания с Telegram-уведомлениями
+  - name: Массовые операции
+    description: CRM v2 — массовые действия с объектами недвижимости
 
 servers:
   - url: http://localhost:8080
@@ -11229,3 +11236,1208 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  # ===========================================
+  # Взаимодействия (Таймлайн CRM v2)
+  # ===========================================
+
+  /api/v1/properties/{id}/interactions:
+    get:
+      summary: Таймлайн по объекту
+      description: |
+        Возвращает хронологию всех взаимодействий по объекту (все связки с контактами).
+        Поддерживает пагинацию через limit/offset.
+
+        ## Права доступа
+        Требуется активная подписка. Объект должен принадлежать текущему пользователю.
+      tags:
+        - Взаимодействия
+      operationId: interactionGetByProperty
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта недвижимости
+          example: 5
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+          description: Количество записей (1-100)
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Смещение для пагинации
+      responses:
+        '200':
+          description: Таймлайн по объекту
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Таймлайн с данными
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      interactions:
+                        - id: 1
+                          object_client_id: 3
+                          user_id: 1
+                          type: "call"
+                          description: "Обсудили условия показа"
+                          metadata: null
+                          interaction_at: "2026-02-14T10:30:00+00:00"
+                          created_at: "2026-02-14T10:30:00+00:00"
+                          user:
+                            id: 1
+                            name: "Сергей Викторович"
+                          contact:
+                            id: 2
+                            name: "Иванов Иван"
+                        - id: 2
+                          object_client_id: 3
+                          user_id: 1
+                          type: "stage_change"
+                          description: "Стадия изменена: Новый → Показ"
+                          metadata:
+                            old_stage_id: 1
+                            new_stage_id: 3
+                            old_stage_name: "Новый"
+                            new_stage_name: "Показ"
+                          interaction_at: "2026-02-14T11:00:00+00:00"
+                          created_at: "2026-02-14T11:00:00+00:00"
+                          user:
+                            id: 1
+                            name: "Сергей Викторович"
+                          contact:
+                            id: 2
+                            name: "Иванов Иван"
+                      total: 2
+                empty:
+                  summary: Пустой таймлайн
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      interactions: []
+                      total: 0
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_id:
+                  summary: Не указан ID объекта
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указан ID объекта"
+                    error: validation_error
+                not_found:
+                  summary: Объект не найден
+                  value:
+                    code: 400
+                    status: error
+                    message: "Объект не найден"
+                    error: validation_error
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: unauthorized
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка получения таймлайна"
+                    error: internal_error
+
+  /api/v1/contacts/{id}/interactions:
+    get:
+      summary: Таймлайн по контакту
+      description: |
+        Возвращает хронологию всех взаимодействий с контактом (все связки с объектами).
+        Поддерживает пагинацию через limit/offset.
+
+        ## Права доступа
+        Требуется активная подписка. Контакт должен принадлежать текущему пользователю.
+      tags:
+        - Взаимодействия
+      operationId: interactionGetByContact
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+          example: 2
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+          description: Количество записей (1-100)
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Смещение для пагинации
+      responses:
+        '200':
+          description: Таймлайн по контакту
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Таймлайн с данными
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      interactions:
+                        - id: 3
+                          object_client_id: 5
+                          user_id: 1
+                          type: "meeting"
+                          description: "Встреча на объекте, обсудили ремонт"
+                          metadata: null
+                          interaction_at: "2026-02-13T14:00:00+00:00"
+                          created_at: "2026-02-13T14:00:00+00:00"
+                          user:
+                            id: 1
+                            name: "Сергей Викторович"
+                          property:
+                            id: 7
+                            address: "Москва, ул. Ленина, 15"
+                      total: 1
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_id:
+                  summary: Не указан ID контакта
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указан ID контакта"
+                    error: validation_error
+                not_found:
+                  summary: Контакт не найден
+                  value:
+                    code: 400
+                    status: error
+                    message: "Контакт не найден"
+                    error: validation_error
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: unauthorized
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка получения таймлайна"
+                    error: internal_error
+
+  /api/v1/properties/{id}/contacts/{contact_id}/interactions:
+    get:
+      summary: Таймлайн конкретной связки
+      description: |
+        Возвращает хронологию взаимодействий для конкретной связки объект+контакт.
+        Поддерживает пагинацию через limit/offset.
+
+        ## Права доступа
+        Требуется активная подписка. Объект должен принадлежать текущему пользователю.
+      tags:
+        - Взаимодействия
+      operationId: interactionGetByObjectClient
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта недвижимости
+          example: 5
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+          example: 2
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+          description: Количество записей (1-100)
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Смещение для пагинации
+      responses:
+        '200':
+          description: Таймлайн связки
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Таймлайн с данными
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      interactions:
+                        - id: 4
+                          object_client_id: 3
+                          user_id: 1
+                          type: "showing"
+                          description: "Показ квартиры, клиент заинтересован"
+                          metadata: null
+                          interaction_at: "2026-02-14T15:00:00+00:00"
+                          created_at: "2026-02-14T15:00:00+00:00"
+                          user:
+                            id: 1
+                            name: "Сергей Викторович"
+                      total: 1
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_ids:
+                  summary: Не указаны ID
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указаны ID объекта или контакта"
+                    error: validation_error
+                object_not_found:
+                  summary: Объект не найден
+                  value:
+                    code: 400
+                    status: error
+                    message: "Объект не найден"
+                    error: validation_error
+                link_not_found:
+                  summary: Связка не найдена
+                  value:
+                    code: 400
+                    status: error
+                    message: "Связка не найдена"
+                    error: validation_error
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: unauthorized
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка получения таймлайна"
+                    error: internal_error
+
+    post:
+      summary: Создать взаимодействие
+      description: |
+        Создаёт запись о взаимодействии для связки объект+контакт.
+
+        ## Типы взаимодействий
+        - `call` — Звонок
+        - `meeting` — Встреча
+        - `showing` — Показ
+        - `message` — Сообщение
+        - `note` — Заметка
+
+        Тип `stage_change` создаётся автоматически при смене стадии и недоступен для ручного создания.
+
+        ## Побочные эффекты
+        При создании взаимодействий типа `call`, `meeting`, `showing` обновляется `last_contact_at` у связки.
+
+        ## Права доступа
+        Требуется активная подписка. Объект должен принадлежать текущему пользователю.
+      tags:
+        - Взаимодействия
+      operationId: interactionCreate
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта недвижимости
+          example: 5
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+          example: 2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  description: |
+                    Тип взаимодействия:
+                    - call: Звонок
+                    - meeting: Встреча
+                    - showing: Показ
+                    - message: Сообщение
+                    - note: Заметка
+                  enum: [call, meeting, showing, message, note]
+                  example: "call"
+                description:
+                  type: string
+                  nullable: true
+                  description: Описание взаимодействия
+                  example: "Обсудили условия аренды, клиент попросил скидку"
+                interaction_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: Дата/время взаимодействия (по умолчанию — текущий момент)
+                  example: "2026-02-14T10:30:00Z"
+                metadata:
+                  type: object
+                  nullable: true
+                  description: Произвольные дополнительные данные (JSON)
+                  example: null
+            examples:
+              call:
+                summary: Запись о звонке
+                value:
+                  type: "call"
+                  description: "Обсудили условия аренды"
+                  interaction_at: "2026-02-14T10:30:00Z"
+              note:
+                summary: Заметка
+                value:
+                  type: "note"
+                  description: "Клиент просил перезвонить в понедельник"
+      responses:
+        '201':
+          description: Взаимодействие создано
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Взаимодействие создано
+                  value:
+                    code: 201
+                    status: success
+                    data:
+                      interaction:
+                        id: 10
+                        object_client_id: 3
+                        user_id: 1
+                        type: "call"
+                        description: "Обсудили условия аренды"
+                        metadata: null
+                        interaction_at: "2026-02-14T10:30:00+00:00"
+                        created_at: "2026-02-14T10:30:05+00:00"
+                        user:
+                          id: 1
+                          name: "Сергей Викторович"
+                        contact:
+                          id: 2
+                          name: "Иванов Иван"
+                        property:
+                          id: 5
+                          address: "Москва, ул. Пушкина, 10"
+                      message: "Взаимодействие создано"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_type:
+                  summary: Не указан тип
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указан тип взаимодействия"
+                    error: validation_error
+                invalid_type:
+                  summary: Недопустимый тип
+                  value:
+                    code: 400
+                    status: error
+                    message: "Недопустимый тип взаимодействия"
+                    error: validation_error
+                missing_ids:
+                  summary: Не указаны ID
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указаны ID объекта или контакта"
+                    error: validation_error
+                object_not_found:
+                  summary: Объект не найден
+                  value:
+                    code: 400
+                    status: error
+                    message: "Объект не найден"
+                    error: validation_error
+                link_not_found:
+                  summary: Связка не найдена
+                  value:
+                    code: 400
+                    status: error
+                    message: "Связка не найдена"
+                    error: validation_error
+                invalid_date:
+                  summary: Неверный формат даты
+                  value:
+                    code: 400
+                    status: error
+                    message: "Неверный формат даты"
+                    error: validation_error
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: unauthorized
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка создания взаимодействия"
+                    error: internal_error
+
+  # ===========================================
+  # Напоминания (CRM v2)
+  # ===========================================
+
+  /api/v1/reminders:
+    get:
+      summary: Все напоминания пользователя
+      description: |
+        Возвращает все неотправленные будущие напоминания текущего пользователя.
+        Отсортировано по дате напоминания (ближайшие первыми).
+
+        ## Права доступа
+        Требуется активная подписка.
+      tags:
+        - Напоминания
+      operationId: reminderIndex
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Список напоминаний
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Напоминания с данными
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      reminders:
+                        - id: 1
+                          object_client_id: 3
+                          user_id: 1
+                          remind_at: "2026-02-15T09:00:00.000Z"
+                          message: "Перезвонить Иванову по поводу показа"
+                          is_sent: false
+                          sent_at: null
+                          property:
+                            id: 5
+                            address: "Москва, ул. Пушкина, 10"
+                            title: "2к квартира 65м²"
+                          contact:
+                            id: 2
+                            name: "Иванов Иван"
+                            phone: "+7 999 123-45-67"
+                          pipeline_stage:
+                            id: 3
+                            name: "Показ"
+                            color: "#ff9800"
+                          created_at: "2026-02-14T12:00:00.000Z"
+                empty:
+                  summary: Нет напоминаний
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      reminders: []
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: unauthorized
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка получения напоминаний"
+                    error: internal_error
+
+  /api/v1/reminders/{id}:
+    delete:
+      summary: Удалить напоминание
+      description: |
+        Удаляет напоминание по ID. Можно удалять только свои напоминания.
+
+        ## Права доступа
+        Требуется активная подписка. Напоминание должно принадлежать текущему пользователю.
+      tags:
+        - Напоминания
+      operationId: reminderDelete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID напоминания
+          example: 1
+      responses:
+        '200':
+          description: Напоминание удалено
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Напоминание удалено
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      message: "Напоминание удалено"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_id:
+                  summary: Не указан ID
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указан ID напоминания"
+                    error: validation_error
+        '404':
+          description: Напоминание не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  summary: Напоминание не найдено
+                  value:
+                    code: 404
+                    status: error
+                    message: "Напоминание не найдено"
+                    error: not_found
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: unauthorized
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка удаления напоминания"
+                    error: internal_error
+
+  /api/v1/properties/{id}/contacts/{contact_id}/reminders:
+    get:
+      summary: Напоминания по связке
+      description: |
+        Возвращает неотправленные напоминания для конкретной связки объект+контакт.
+        Отсортировано по дате напоминания (ближайшие первыми).
+
+        ## Права доступа
+        Требуется активная подписка. Объект должен принадлежать текущему пользователю.
+      tags:
+        - Напоминания
+      operationId: reminderGetByObjectClient
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта недвижимости
+          example: 5
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+          example: 2
+      responses:
+        '200':
+          description: Список напоминаний по связке
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Напоминания по связке
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      reminders:
+                        - id: 5
+                          object_client_id: 3
+                          user_id: 1
+                          remind_at: "2026-02-16T10:00:00.000Z"
+                          message: "Подготовить документы для сделки"
+                          is_sent: false
+                          sent_at: null
+                          created_at: "2026-02-14T15:00:00.000Z"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_ids:
+                  summary: Не указаны ID
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указаны ID объекта или контакта"
+                    error: validation_error
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: unauthorized
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка получения напоминаний"
+                    error: internal_error
+
+    post:
+      summary: Создать напоминание
+      description: |
+        Создаёт напоминание для связки объект+контакт.
+        При наступлении времени напоминания, пользователю будет отправлено уведомление в Telegram.
+
+        ## Формат Telegram-уведомления
+        ```
+        🔔 Напоминание CRM
+        📍 Объект: {address}
+        👤 Контакт: {contact_name}, {phone}
+        📋 Стадия: {stage_name}
+        💬 {message}
+        ```
+
+        ## Ограничения
+        - Дата напоминания должна быть в будущем
+        - Текст напоминания обязателен
+
+        ## Права доступа
+        Требуется активная подписка. Объект должен принадлежать текущему пользователю.
+      tags:
+        - Напоминания
+      operationId: reminderCreate
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта недвижимости
+          example: 5
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+          example: 2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - remind_at
+                - message
+              properties:
+                remind_at:
+                  type: string
+                  format: date-time
+                  description: Дата и время напоминания (должна быть в будущем)
+                  example: "2026-02-15T09:00:00Z"
+                message:
+                  type: string
+                  description: Текст напоминания
+                  example: "Перезвонить Иванову по поводу показа"
+            examples:
+              create:
+                summary: Создание напоминания
+                value:
+                  remind_at: "2026-02-15T09:00:00Z"
+                  message: "Перезвонить Иванову по поводу показа"
+      responses:
+        '201':
+          description: Напоминание создано
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Напоминание создано
+                  value:
+                    code: 201
+                    status: success
+                    data:
+                      reminder:
+                        id: 10
+                        object_client_id: 3
+                        user_id: 1
+                        remind_at: "2026-02-15T09:00:00.000Z"
+                        message: "Перезвонить Иванову по поводу показа"
+                        is_sent: false
+                        sent_at: null
+                        property:
+                          id: 5
+                          address: "Москва, ул. Пушкина, 10"
+                          title: "2к квартира 65м²"
+                        contact:
+                          id: 2
+                          name: "Иванов Иван"
+                          phone: "+7 999 123-45-67"
+                        pipeline_stage:
+                          id: 3
+                          name: "Показ"
+                          color: "#ff9800"
+                        created_at: "2026-02-14T12:00:00.000Z"
+                      message: "Напоминание создано"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_remind_at:
+                  summary: Не указана дата
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указана дата напоминания"
+                    error: validation_error
+                missing_message:
+                  summary: Не указан текст
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указан текст напоминания"
+                    error: validation_error
+                past_date:
+                  summary: Дата в прошлом
+                  value:
+                    code: 400
+                    status: error
+                    message: "Дата напоминания должна быть в будущем"
+                    error: validation_error
+                link_not_found:
+                  summary: Связка не найдена
+                  value:
+                    code: 400
+                    status: error
+                    message: "Связка объект+контакт не найдена"
+                    error: validation_error
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: unauthorized
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка создания напоминания"
+                    error: internal_error
+
+  # ===========================================
+  # Массовые операции (CRM v2)
+  # ===========================================
+
+  /api/v1/properties/bulk-action:
+    post:
+      summary: Массовое действие с объектами
+      description: |
+        Выполняет массовое действие над выбранными объектами недвижимости.
+
+        ## Доступные действия
+        - `archive` — Архивировать объекты (is_archived = true)
+        - `unarchive` — Восстановить из архива (is_archived = false)
+        - `delete` — Удалить объекты
+        - `change_deal_type` — Сменить тип сделки (требует `params.deal_type`)
+
+        ## Ограничения
+        - Максимум 100 объектов за одну операцию
+        - Все объекты должны принадлежать текущему пользователю
+
+        ## Права доступа
+        Требуется активная подписка.
+      tags:
+        - Массовые операции
+      operationId: propertyBulkAction
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+                - property_ids
+              properties:
+                action:
+                  type: string
+                  description: |
+                    Действие:
+                    - archive: Архивировать
+                    - unarchive: Восстановить из архива
+                    - delete: Удалить
+                    - change_deal_type: Сменить тип сделки
+                  enum: [archive, unarchive, delete, change_deal_type]
+                  example: "archive"
+                property_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: Массив ID объектов (максимум 100)
+                  example: [1, 2, 3]
+                params:
+                  type: object
+                  description: Дополнительные параметры (для change_deal_type)
+                  properties:
+                    deal_type:
+                      type: string
+                      enum: [sale, rent]
+                      description: Новый тип сделки
+                      example: "sale"
+            examples:
+              archive:
+                summary: Архивировать объекты
+                value:
+                  action: "archive"
+                  property_ids: [1, 2, 3]
+              change_deal_type:
+                summary: Сменить тип сделки
+                value:
+                  action: "change_deal_type"
+                  property_ids: [5, 7]
+                  params:
+                    deal_type: "rent"
+              delete:
+                summary: Удалить объекты
+                value:
+                  action: "delete"
+                  property_ids: [10, 11]
+      responses:
+        '200':
+          description: Массовое действие выполнено
+          content:
+            application/json:
+              examples:
+                archive:
+                  summary: Объекты архивированы
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      affected: 3
+                      message: "Архивировано объектов: 3"
+                delete:
+                  summary: Объекты удалены
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      affected: 2
+                      message: "Удалено объектов: 2"
+                change_deal_type:
+                  summary: Тип сделки изменён
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      affected: 2
+                      message: "Изменён тип сделки для объектов: 2"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_action:
+                  summary: Не указано действие
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указано действие"
+                    error: validation_error
+                invalid_action:
+                  summary: Недопустимое действие
+                  value:
+                    code: 400
+                    status: error
+                    message: "Недопустимое действие"
+                    error: validation_error
+                missing_ids:
+                  summary: Не указаны объекты
+                  value:
+                    code: 400
+                    status: error
+                    message: "Не указаны объекты"
+                    error: validation_error
+                too_many:
+                  summary: Превышен лимит
+                  value:
+                    code: 400
+                    status: error
+                    message: "Максимум 100 объектов за раз"
+                    error: validation_error
+                not_found:
+                  summary: Объекты не найдены
+                  value:
+                    code: 400
+                    status: error
+                    message: "Объекты не найдены"
+                    error: validation_error
+                invalid_deal_type:
+                  summary: Недопустимый тип сделки
+                  value:
+                    code: 400
+                    status: error
+                    message: "Недопустимый тип сделки"
+                    error: validation_error
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: unauthorized
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка массовой операции"
+                    error: internal_error

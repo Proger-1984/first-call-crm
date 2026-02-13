@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { contactsApi } from '../../services/api';
 import { ConfirmDialog } from '../../components/UI/ConfirmDialog';
 import { ContactForm } from './ContactForm';
+import { InteractionTimeline } from '../Properties/InteractionTimeline';
 import type { Contact, ObjectClientItem } from '../../types/property';
 import { DEAL_TYPE_LABELS } from '../../types/property';
 import './ContactCard.css';
@@ -199,6 +200,11 @@ export function ContactCard() {
             ) : (
               <p className="empty-text">Нет привязанных объектов</p>
             )}
+          </div>
+
+          {/* История взаимодействий */}
+          <div className="contact-info-section">
+            <InteractionTimeline contactId={contactId} />
           </div>
         </div>
 

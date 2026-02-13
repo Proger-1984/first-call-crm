@@ -732,6 +732,50 @@ class TelegramService
     }
     
     /**
+     * Отправляет CRM-напоминание пользователю через Telegram
+     *
+     * Формат:
+     * 🔔 Напоминание CRM
+     * 📍 Объект: {address}
+     * 👤 Контакт: {contact_name}, {phone}
+     * 📋 Стадия: {stage_name}
+     * 💬 {message}
+     *
+     * @param User $user Пользователь-получатель
+     * @param \App\Models\Reminder $reminder Напоминание с загруженными связями
+     * @return bool Успешность отправки
+     * @throws GuzzleException
+     */
+    public function notifyCrmReminder(User $user, \App\Models\Reminder $reminder): bool
+    {
+        $property = $reminder->objectClient?->property;
+        $contact = $reminder->objectClient?->contact;
+        $stage = $reminder->objectClient?->pipelineStage;
+
+        $address = $property?->address ?? $property?->title ?? 'Не указан';
+        $contactName = $contact?->name ?? 'Не указан';
+        $contactPhone = $contact?->phone ?? '';
+        $stageName = $stage?->name ?? '—';
+
+        $message = "🔔 <b>Напоминание CRM</b>\n\n" .
+            "📍 <b>Объект:</b> {$address}\n" .
+            "👤 <b>Контакт:</b> {$contactName}" . ($contactPhone ? ", {$contactPhone}" : '') . "\n" .
+            "📋 <b>Стадия:</b> {$stageName}\n\n" .
+            "💬 {$reminder->message}";
+
+        $result = $this->sendMessage($user->telegram_id, $message);
+
+        // Обновляем статус блокировки бота
+        if ($result['success'] && $user->telegram_bot_blocked) {
+            $this->updateBotBlockedStatus($user, false);
+        } elseif ($result['blocked']) {
+            $this->updateBotBlockedStatus($user, true);
+        }
+
+        return $result['success'];
+    }
+
+    /**
      * Возвращает текстовое представление дней
      */
     private function getDaysText(int $days): string

@@ -6,6 +6,10 @@ import { ConfirmDialog } from '../../components/UI/ConfirmDialog';
 import { ContactPicker } from './ContactPicker';
 import { PropertyForm } from './PropertyForm';
 import { ContactForm } from '../Contacts/ContactForm';
+import { InteractionTimeline } from './InteractionTimeline';
+import { InteractionForm } from './InteractionForm';
+import { ReminderList } from './ReminderList';
+import { ReminderForm } from './ReminderForm';
 import type { Property, ObjectClientItem } from '../../types/property';
 import { DEAL_TYPE_LABELS } from '../../types/property';
 import './PropertyCard.css';
@@ -22,6 +26,10 @@ export function PropertyCard() {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [showCreateContactForm, setShowCreateContactForm] = useState(false);
+  const [showInteractionForm, setShowInteractionForm] = useState<{ propertyId: number; contactId: number } | null>(null);
+  const [interactionRefreshKey, setInteractionRefreshKey] = useState(0);
+  const [showReminderForm, setShowReminderForm] = useState<{ propertyId: number; contactId: number } | null>(null);
+  const [reminderRefreshKey, setReminderRefreshKey] = useState(0);
 
   // Диалог подтверждения
   const [dialog, setDialog] = useState<{
@@ -238,7 +246,7 @@ export function PropertyCard() {
           <div className="property-clients-section">
             <div className="section-header">
               <h3>Привязанные клиенты ({property.contacts_count || 0})</h3>
-              <button className="btn-primary btn-sm" onClick={() => setShowContactPicker(true)}>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowContactPicker(true)}>
                 <span className="material-icons">add</span>
                 Добавить клиента
               </button>
@@ -297,6 +305,37 @@ export function PropertyCard() {
             ) : (
               <p className="empty-text">Нет привязанных клиентов</p>
             )}
+          </div>
+
+          {/* Напоминания */}
+          {property.object_clients && property.object_clients.length > 0 && (
+            <div className="card-section">
+              <ReminderList
+                propertyId={propertyId}
+                contactId={property.object_clients[0].contact_id}
+                refreshKey={reminderRefreshKey}
+                onAdd={() => {
+                  const firstOc = property.object_clients![0];
+                  setShowReminderForm({ propertyId, contactId: firstOc.contact_id });
+                }}
+              />
+            </div>
+          )}
+
+          {/* История взаимодействий */}
+          <div className="card-section">
+            <InteractionTimeline
+              key={interactionRefreshKey}
+              propertyId={propertyId}
+              onAddInteraction={
+                property.object_clients && property.object_clients.length > 0
+                  ? () => {
+                      const firstOc = property.object_clients![0];
+                      setShowInteractionForm({ propertyId, contactId: firstOc.contact_id });
+                    }
+                  : undefined
+              }
+            />
           </div>
         </div>
 
@@ -420,6 +459,34 @@ export function PropertyCard() {
               }
             }
             loadProperty();
+          }}
+        />
+      )}
+
+      {/* Форма создания взаимодействия */}
+      {showInteractionForm && (
+        <InteractionForm
+          isOpen={true}
+          propertyId={showInteractionForm.propertyId}
+          contactId={showInteractionForm.contactId}
+          onClose={() => setShowInteractionForm(null)}
+          onSaved={() => {
+            setShowInteractionForm(null);
+            setInteractionRefreshKey(prev => prev + 1);
+          }}
+        />
+      )}
+
+      {/* Форма создания напоминания */}
+      {showReminderForm && (
+        <ReminderForm
+          isOpen={true}
+          propertyId={showReminderForm.propertyId}
+          contactId={showReminderForm.contactId}
+          onClose={() => setShowReminderForm(null)}
+          onSaved={() => {
+            setShowReminderForm(null);
+            setReminderRefreshKey(prev => prev + 1);
           }}
         />
       )}

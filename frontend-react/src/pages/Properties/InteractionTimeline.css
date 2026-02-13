@@ -1,0 +1,267 @@
+.interaction-timeline {
+  margin-top: 8px;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.timeline-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.timeline-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.timeline-empty {
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 16px 0;
+  text-align: center;
+}
+
+/* Вертикальная лента — скролл при большом количестве */
+.timeline-list {
+  position: relative;
+  padding-left: 32px;
+  padding-right: 5px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.timeline-list::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border-color, var(--border-light));
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding-bottom: 20px;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+/* Иконка */
+.timeline-icon {
+  position: absolute;
+  left: -32px;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-secondary, #f5f5f5);
+  border: 2px solid var(--border-color, var(--border));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.timeline-icon .material-icons {
+  font-size: 14px;
+  line-height: 1;
+  width: 14px;
+  height: 14px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* Цвета по типу */
+.timeline-item.type-call .timeline-icon {
+  background: #e3f2fd;
+  border-color: #2196f3;
+}
+.timeline-item.type-call .timeline-icon .material-icons { color: #2196f3; }
+
+.timeline-item.type-meeting .timeline-icon {
+  background: #e8f5e9;
+  border-color: #4caf50;
+}
+.timeline-item.type-meeting .timeline-icon .material-icons { color: #4caf50; }
+
+.timeline-item.type-showing .timeline-icon {
+  background: #fff3e0;
+  border-color: #ff9800;
+}
+.timeline-item.type-showing .timeline-icon .material-icons { color: #ff9800; }
+
+.timeline-item.type-message .timeline-icon {
+  background: #f3e5f5;
+  border-color: #9c27b0;
+}
+.timeline-item.type-message .timeline-icon .material-icons { color: #9c27b0; }
+
+.timeline-item.type-note .timeline-icon {
+  background: #f5f5f5;
+  border-color: #9e9e9e;
+}
+.timeline-item.type-note .timeline-icon .material-icons { color: #9e9e9e; }
+
+.timeline-item.type-stage_change .timeline-icon {
+  background: #fce4ec;
+  border-color: #e91e63;
+}
+.timeline-item.type-stage_change .timeline-icon .material-icons { color: #e91e63; }
+
+/* Контент */
+.timeline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.timeline-type-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.timeline-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.timeline-description {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin: 4px 0;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.timeline-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.timeline-meta span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.timeline-user::before {
+  content: '\e7fd'; /* person icon unicode */
+  font-family: 'Material Icons';
+  margin-right: 2px;
+  font-size: 12px;
+}
+
+/* Кнопка "Показать ещё" */
+.timeline-load-more {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px;
+  border: 1px dashed var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.timeline-load-more:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.timeline-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ===========================================
+   Форма создания: сетка выбора типа
+   =========================================== */
+
+.interaction-type-grid {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.interaction-type-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.interaction-type-btn .material-icons {
+  font-size: 14px;
+  line-height: 1;
+  width: 14px;
+  height: 14px;
+  text-align: center;
+  margin-top: 1px;
+}
+
+.interaction-type-btn:hover {
+  border-color: var(--text-muted);
+  background: var(--bg-main);
+}
+
+/* Активное состояние — цвет по типу */
+.interaction-type-btn.active {
+  color: #fff;
+  border-color: transparent;
+}
+
+.interaction-type-btn.active .material-icons {
+  color: #fff;
+}
+
+/* Цвета активных кнопок по типу */
+.interaction-type-btn[data-type="call"].active {
+  background: #2196f3;
+}
+.interaction-type-btn[data-type="meeting"].active {
+  background: #4caf50;
+}
+.interaction-type-btn[data-type="showing"].active {
+  background: #ff9800;
+}
+.interaction-type-btn[data-type="message"].active {
+  background: #9c27b0;
+}
+.interaction-type-btn[data-type="note"].active {
+  background: #9e9e9e;
+}

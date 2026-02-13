@@ -1,6 +1,6 @@
 # Схема базы данных First Call
 
-**Дата обновления:** 13 февраля 2026
+**Дата обновления:** 14 февраля 2026
 
 ## Обзор
 
@@ -13,7 +13,7 @@
 - Username: `postgres`
 - Password: `postgres`
 
-**Всего таблиц:** 35 (не считая `spatial_ref_sys`)
+**Всего таблиц:** 37 (не считая `spatial_ref_sys`)
 
 ---
 
@@ -962,6 +962,60 @@
 
 ---
 
+### 36. interactions — Таймлайн взаимодействий (CRM v2)
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | BIGSERIAL PK | Первичный ключ |
+| `object_client_id` | BIGINT NOT NULL FK | Ссылка на object_clients (связка объект+контакт) |
+| `user_id` | BIGINT NOT NULL FK | Ссылка на users (кто создал) |
+| `type` | VARCHAR(20) NOT NULL | Тип: `call`, `meeting`, `showing`, `message`, `note`, `stage_change` |
+| `description` | TEXT NULL | Описание взаимодействия |
+| `metadata` | JSONB NULL | Дополнительные данные (например, старая/новая стадия при stage_change) |
+| `interaction_at` | TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP | Дата/время взаимодействия |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:**
+- `object_client_id` -> `object_clients(id)` ON DELETE CASCADE
+- `user_id` -> `users(id)` ON DELETE CASCADE
+
+**Индексы:**
+- `interactions_oc_time_index` (`object_client_id`, `interaction_at`)
+- `interactions_user_index` (`user_id`)
+- `interactions_type_index` (`type`)
+
+**Примечание:** Хронология взаимодействий по связке объект+контакт. Записи типа `stage_change` создаются автоматически при перемещении карточки на kanban-доске.
+
+---
+
+### 37. reminders — Напоминания с Telegram-уведомлениями (CRM v2)
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | BIGSERIAL PK | Первичный ключ |
+| `object_client_id` | BIGINT NOT NULL FK | Ссылка на object_clients (связка объект+контакт) |
+| `user_id` | BIGINT NOT NULL FK | Ссылка на users (владелец напоминания) |
+| `remind_at` | TIMESTAMP NOT NULL | Дата/время напоминания |
+| `message` | TEXT NOT NULL | Текст напоминания |
+| `is_sent` | BOOLEAN NOT NULL DEFAULT false | Отправлено ли уведомление |
+| `sent_at` | TIMESTAMP NULL | Дата/время отправки уведомления |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:**
+- `object_client_id` -> `object_clients(id)` ON DELETE CASCADE
+- `user_id` -> `users(id)` ON DELETE CASCADE
+
+**Индексы:**
+- `idx_reminders_pending` (`is_sent`, `remind_at`)
+- `idx_reminders_object_client` (`object_client_id`)
+- `idx_reminders_user` (`user_id`, `is_sent`)
+
+**Примечание:** Напоминания привязаны к связке объект+контакт. Cron-команда `SendRemindersCommand` проверяет неотправленные напоминания и отправляет уведомления в Telegram.
+
+---
+
 ## Внешние ключи
 
 | Таблица | Колонка | Ссылается на |
@@ -974,6 +1028,10 @@
 | clients | user_id | users(id) |
 | clients | pipeline_stage_id | pipeline_stages(id) |
 | contacts | user_id | users(id) |
+| interactions | object_client_id | object_clients(id) |
+| interactions | user_id | users(id) |
+| reminders | object_client_id | object_clients(id) |
+| reminders | user_id | users(id) |
 | object_clients | property_id | properties(id) |
 | object_clients | contact_id | contacts(id) |
 | object_clients | pipeline_stage_id | pipeline_stages(id) |
@@ -1035,7 +1093,7 @@ make migrate
 docker exec -it slim_php-cli php db/migrations/run.php
 ```
 
-**Порядок миграций (58 всего):**
+**Порядок миграций (60 всего):**
 1. `20230101000001` — create users table
 2. `20230101000002` — create sources table
 3. `20230101000003` — create categories table
@@ -1094,6 +1152,8 @@ docker exec -it slim_php-cli php db/migrations/run.php
 56. `20260213000002` — create contacts table (CRM v2)
 57. `20260213000003` — create object_clients table (CRM v2)
 58. `20260213000004` — migrate clients to new model (CRM v2)
+59. `20260214000001` — create interactions table (CRM v2, таймлайн)
+60. `20260214000002` — create reminders table (CRM v2, напоминания)
 
 ---
 

@@ -7,6 +7,8 @@ import { Pagination } from '../../components/UI/Pagination';
 import { ConfirmDialog } from '../../components/UI/ConfirmDialog';
 import { PropertyForm } from './PropertyForm';
 import { Pipeline } from './Pipeline';
+import { InteractionForm } from './InteractionForm';
+import { ReminderForm } from './ReminderForm';
 import { FunnelChart } from '../Clients/FunnelChart';
 import { StageSettings } from '../Clients/StageSettings';
 import type {
@@ -49,7 +51,10 @@ export function Properties() {
     sortOrder, setSortOrder,
     perPage, setPerPage,
     resetFilters,
+    selectedPropertyIds, togglePropertyId, selectAllProperties, clearSelection,
   } = usePropertyStore();
+
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [stages, setStages] = useState<PipelineStage[]>([]);
@@ -76,6 +81,11 @@ export function Properties() {
 
   // Ключ для принудительного обновления Pipeline
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Быстрые формы из Pipeline kanban
+  const [pipelineFormTarget, setPipelineFormTarget] = useState<{ propertyId: number; contactId: number } | null>(null);
+  const [showPipelineInteraction, setShowPipelineInteraction] = useState(false);
+  const [showPipelineReminder, setShowPipelineReminder] = useState(false);
 
   // Диалог подтверждения
   const [dialog, setDialog] = useState<{
@@ -258,6 +268,45 @@ export function Properties() {
   /** Смена perPage */
   const handlePerPageChange = (newPerPage: number) => {
     setPerPage(newPerPage);
+  };
+
+  /** Массовое действие */
+  const handleBulkAction = async (action: string, params?: Record<string, any>) => {
+    if (selectedPropertyIds.length === 0) return;
+
+    const confirmMessages: Record<string, string> = {
+      archive: `Архивировать ${selectedPropertyIds.length} объектов?`,
+      unarchive: `Восстановить ${selectedPropertyIds.length} объектов?`,
+      delete: `Удалить ${selectedPropertyIds.length} объектов? Это действие нельзя отменить.`,
+      change_deal_type: `Изменить тип сделки для ${selectedPropertyIds.length} объектов?`,
+    };
+
+    setDialog({
+      title: 'Массовое действие',
+      message: confirmMessages[action] || 'Выполнить действие?',
+      confirmText: 'Подтвердить',
+      cancelText: 'Отмена',
+      variant: action === 'delete' ? 'danger' : 'warning',
+      onConfirm: async () => {
+        setDialog(null);
+        setBulkLoading(true);
+        try {
+          await propertiesApi.bulkAction(action, selectedPropertyIds, params);
+          clearSelection();
+          loadProperties();
+          loadStats();
+        } catch {
+          setDialog({
+            title: 'Ошибка',
+            message: 'Не удалось выполнить массовую операцию',
+            variant: 'danger',
+            onConfirm: () => setDialog(null),
+          });
+        } finally {
+          setBulkLoading(false);
+        }
+      },
+    });
   };
 
   /** Применить фильтры (кнопка или Enter) */
@@ -476,6 +525,14 @@ export function Properties() {
             stages={pipelineColumns}
             onMoveCard={handleMoveCard}
             onCardClick={openProperty}
+            onAddInteraction={(propertyId, contactId) => {
+              setPipelineFormTarget({ propertyId, contactId });
+              setShowPipelineInteraction(true);
+            }}
+            onAddReminder={(propertyId, contactId) => {
+              setPipelineFormTarget({ propertyId, contactId });
+              setShowPipelineReminder(true);
+            }}
           />
         )
       ) : showFunnel && stages.length > 0 ? (
@@ -513,6 +570,13 @@ export function Properties() {
                 <table className="properties-table">
                   <thead>
                     <tr>
+                      <th className="cell-checkbox" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={properties.length > 0 && properties.every(p => selectedPropertyIds.includes(p.id))}
+                          onChange={() => selectAllProperties(properties.map(p => p.id))}
+                        />
+                      </th>
                       <th
                         className={`sortable ${sortField === 'address' ? 'sorted' : ''}`}
                         onClick={() => handleSort('address')}
@@ -567,9 +631,16 @@ export function Properties() {
                       return (
                         <tr
                           key={property.id}
-                          className={property.is_archived ? 'archived' : ''}
+                          className={`${property.is_archived ? 'archived' : ''} ${selectedPropertyIds.includes(property.id) ? 'selected' : ''}`}
                           onClick={() => openProperty(property.id)}
                         >
+                          <td className="cell-checkbox" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedPropertyIds.includes(property.id)}
+                              onChange={() => togglePropertyId(property.id)}
+                            />
+                          </td>
                           <td className="cell-address">
                             <div className="cell-address-inner">
                               <span className="property-title">
@@ -654,6 +725,59 @@ export function Properties() {
                 </table>
               </div>
 
+              {/* Bulk-action bar */}
+              {selectedPropertyIds.length > 0 && (
+                <div className="bulk-action-bar">
+                  <span className="bulk-count">Выбрано: {selectedPropertyIds.length}</span>
+                  <div className="bulk-actions">
+                    {showArchived ? (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        disabled={bulkLoading}
+                        onClick={() => handleBulkAction('unarchive')}
+                      >
+                        <span className="material-icons">unarchive</span>
+                        Восстановить
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        disabled={bulkLoading}
+                        onClick={() => handleBulkAction('archive')}
+                      >
+                        <span className="material-icons">archive</span>
+                        В архив
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-outline btn-sm"
+                      disabled={bulkLoading}
+                      onClick={() => handleBulkAction('change_deal_type', { deal_type: 'sale' })}
+                    >
+                      Продажа
+                    </button>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      disabled={bulkLoading}
+                      onClick={() => handleBulkAction('change_deal_type', { deal_type: 'rent' })}
+                    >
+                      Аренда
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      disabled={bulkLoading}
+                      onClick={() => handleBulkAction('delete')}
+                    >
+                      <span className="material-icons">delete_outline</span>
+                      Удалить
+                    </button>
+                  </div>
+                  <button className="bulk-close" onClick={clearSelection}>
+                    <span className="material-icons">close</span>
+                  </button>
+                </div>
+              )}
+
               {/* Пагинация */}
               {pagination.total_pages > 0 && (
                 <Pagination
@@ -698,6 +822,26 @@ export function Properties() {
           onConfirm={dialog.onConfirm}
           onCancel={() => setDialog(null)}
         />
+      )}
+
+      {/* Быстрые формы из Pipeline */}
+      {pipelineFormTarget && (
+        <>
+          <InteractionForm
+            isOpen={showPipelineInteraction}
+            propertyId={pipelineFormTarget.propertyId}
+            contactId={pipelineFormTarget.contactId}
+            onClose={() => { setShowPipelineInteraction(false); setPipelineFormTarget(null); }}
+            onSaved={() => { setShowPipelineInteraction(false); setPipelineFormTarget(null); }}
+          />
+          <ReminderForm
+            isOpen={showPipelineReminder}
+            propertyId={pipelineFormTarget.propertyId}
+            contactId={pipelineFormTarget.contactId}
+            onClose={() => { setShowPipelineReminder(false); setPipelineFormTarget(null); }}
+            onSaved={() => { setShowPipelineReminder(false); setPipelineFormTarget(null); }}
+          />
+        </>
       )}
     </div>
   );

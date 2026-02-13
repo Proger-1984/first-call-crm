@@ -259,6 +259,53 @@ class PropertyController
     }
 
     // ==========================================
+    // МАССОВЫЕ ОПЕРАЦИИ
+    // ==========================================
+
+    /**
+     * Массовая операция с объектами
+     *
+     * POST /api/v1/properties/bulk-action
+     */
+    public function bulkAction(Request $request, Response $response): Response
+    {
+        try {
+            $userId = $request->getAttribute('userId');
+
+            if (!$userId) {
+                return $this->respondWithError($response, 'Требуется авторизация', 'unauthorized', 401);
+            }
+
+            $body = (array)($request->getParsedBody() ?? []);
+
+            $action = $body['action'] ?? '';
+            if (empty($action)) {
+                return $this->respondWithError($response, 'Не указано действие', 'validation_error', 400);
+            }
+
+            $propertyIds = $body['property_ids'] ?? [];
+            if (!is_array($propertyIds) || empty($propertyIds)) {
+                return $this->respondWithError($response, 'Не указаны объекты', 'validation_error', 400);
+            }
+
+            $params = $body['params'] ?? [];
+
+            $result = $this->propertyService->bulkAction($userId, $action, $propertyIds, $params);
+
+            return $this->respondWithData($response, [
+                'code' => 200,
+                'status' => 'success',
+                'data' => $result,
+            ], 200);
+
+        } catch (InvalidArgumentException $exception) {
+            return $this->respondWithError($response, $exception->getMessage(), 'validation_error', 400);
+        } catch (Exception) {
+            return $this->respondWithError($response, 'Ошибка массовой операции', 'internal_error', 500);
+        }
+    }
+
+    // ==========================================
     // ВОРОНКА + СТАТИСТИКА
     // ==========================================
 

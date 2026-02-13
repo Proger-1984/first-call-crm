@@ -262,9 +262,16 @@
   font-weight: 500;
 }
 
+/* Ячейка с кнопкой отвязки — центрируем */
+.property-clients-table td:last-child {
+  text-align: center;
+  width: 40px;
+}
+
 .remove-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   padding: 4px;
   border: none;
   background: transparent;

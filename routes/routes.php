@@ -7,6 +7,8 @@ use App\Controllers\AuthController;
 use App\Controllers\ClientController;
 use App\Controllers\PropertyController;
 use App\Controllers\ContactController;
+use App\Controllers\InteractionController;
+use App\Controllers\ReminderController;
 use App\Controllers\FavoriteController;
 use App\Controllers\FavoriteStatusController;
 use App\Controllers\FilterController;
@@ -259,9 +261,10 @@ return function (App $app) {
          * Требует активную подписку (SubscriptionMiddleware)
          */
         $group->group('/properties', function (RouteCollectorProxy $group) {
-            // Kanban, статистика (до /{id})
+            // Kanban, статистика, массовые операции (до /{id})
             $group->get('/pipeline', [PropertyController::class, 'getPipeline']);
             $group->get('/stats', [PropertyController::class, 'getStats']);
+            $group->post('/bulk-action', [PropertyController::class, 'bulkAction']);
 
             // CRUD объектов
             $group->get('', [PropertyController::class, 'index']);
@@ -271,11 +274,22 @@ return function (App $app) {
             $group->delete('/{id:[0-9]+}', [PropertyController::class, 'delete']);
             $group->patch('/{id:[0-9]+}/archive', [PropertyController::class, 'archive']);
 
+            // Таймлайн по объекту
+            $group->get('/{id:[0-9]+}/interactions', [InteractionController::class, 'getByProperty']);
+
             // Связки объект+контакт
             $group->post('/{id:[0-9]+}/contacts', [PropertyController::class, 'attachContact']);
             $group->delete('/{id:[0-9]+}/contacts/{contact_id:[0-9]+}', [PropertyController::class, 'detachContact']);
             $group->patch('/{id:[0-9]+}/contacts/{contact_id:[0-9]+}/stage', [PropertyController::class, 'moveContactStage']);
             $group->patch('/{id:[0-9]+}/contacts/{contact_id:[0-9]+}', [PropertyController::class, 'updateContact']);
+
+            // Таймлайн и взаимодействия по связке
+            $group->get('/{id:[0-9]+}/contacts/{contact_id:[0-9]+}/interactions', [InteractionController::class, 'getByObjectClient']);
+            $group->post('/{id:[0-9]+}/contacts/{contact_id:[0-9]+}/interactions', [InteractionController::class, 'create']);
+
+            // Напоминания по связке
+            $group->get('/{id:[0-9]+}/contacts/{contact_id:[0-9]+}/reminders', [ReminderController::class, 'getByObjectClient']);
+            $group->post('/{id:[0-9]+}/contacts/{contact_id:[0-9]+}/reminders', [ReminderController::class, 'create']);
         })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
 
         /** Маршруты CRM — справочник контактов (новая модель)
@@ -295,6 +309,20 @@ return function (App $app) {
             $group->get('/{id:[0-9]+}', [ContactController::class, 'show']);
             $group->put('/{id:[0-9]+}', [ContactController::class, 'update']);
             $group->delete('/{id:[0-9]+}', [ContactController::class, 'delete']);
+
+            // Таймлайн по контакту
+            $group->get('/{id:[0-9]+}/interactions', [InteractionController::class, 'getByContact']);
+        })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
+
+        /** Маршруты CRM — напоминания
+         * Список напоминаний пользователя — index
+         * Удаление — delete
+         *
+         * Требует активную подписку (SubscriptionMiddleware)
+         */
+        $group->group('/reminders', function (RouteCollectorProxy $group) {
+            $group->get('', [ReminderController::class, 'index']);
+            $group->delete('/{id:[0-9]+}', [ReminderController::class, 'delete']);
         })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
 
         /** Маршруты CRM — управление клиентами (DEPRECATED — старая модель)

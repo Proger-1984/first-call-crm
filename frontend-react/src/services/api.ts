@@ -1277,6 +1277,8 @@ import type {
   PropertyFilters,
   ContactFilters,
   ObjectClientItem,
+  Interaction,
+  Reminder,
 } from '../types/property';
 
 export const propertiesApi = {
@@ -1368,6 +1370,17 @@ export const propertiesApi = {
    */
   updateContact: (propertyId: number, contactId: number, data: Record<string, any>) =>
     api.patch<ApiResponse<{ message: string }>>(`/properties/${propertyId}/contacts/${contactId}`, data),
+
+  /**
+   * Массовая операция с объектами
+   * POST /api/v1/properties/bulk-action
+   */
+  bulkAction: (action: string, propertyIds: number[], params?: Record<string, any>) =>
+    api.post<ApiResponse<{ affected: number; message: string }>>('/properties/bulk-action', {
+      action,
+      property_ids: propertyIds,
+      params,
+    }),
 };
 
 // === CONTACTS API (справочник контактов — новая CRM модель) ===
@@ -1414,6 +1427,81 @@ export const contactsApi = {
    */
   search: (query: string) =>
     api.get<ApiResponse<{ contacts: CrmContact[] }>>('/contacts/search', { params: { q: query } }),
+};
+
+// === INTERACTIONS API (таймлайн взаимодействий) ===
+
+export const interactionsApi = {
+  /**
+   * Таймлайн по объекту (все связки)
+   * GET /api/v1/properties/{id}/interactions
+   */
+  getByProperty: (propertyId: number, limit = 50, offset = 0) =>
+    api.get<ApiResponse<{ interactions: Interaction[]; total: number }>>(`/properties/${propertyId}/interactions`, {
+      params: { limit, offset },
+    }),
+
+  /**
+   * Таймлайн по контакту
+   * GET /api/v1/contacts/{id}/interactions
+   */
+  getByContact: (contactId: number, limit = 50, offset = 0) =>
+    api.get<ApiResponse<{ interactions: Interaction[]; total: number }>>(`/contacts/${contactId}/interactions`, {
+      params: { limit, offset },
+    }),
+
+  /**
+   * Таймлайн конкретной связки объект+контакт
+   * GET /api/v1/properties/{id}/contacts/{contactId}/interactions
+   */
+  getByObjectClient: (propertyId: number, contactId: number, limit = 50, offset = 0) =>
+    api.get<ApiResponse<{ interactions: Interaction[]; total: number }>>(`/properties/${propertyId}/contacts/${contactId}/interactions`, {
+      params: { limit, offset },
+    }),
+
+  /**
+   * Создать взаимодействие
+   * POST /api/v1/properties/{id}/contacts/{contactId}/interactions
+   */
+  create: (propertyId: number, contactId: number, data: {
+    type: string;
+    description?: string;
+    interaction_at?: string;
+    metadata?: Record<string, any>;
+  }) =>
+    api.post<ApiResponse<{ interaction: Interaction; message: string }>>(`/properties/${propertyId}/contacts/${contactId}/interactions`, data),
+};
+
+// === REMINDERS API (напоминания CRM) ===
+
+export const remindersApi = {
+  /**
+   * Все напоминания текущего пользователя
+   * GET /api/v1/reminders
+   */
+  getAll: () =>
+    api.get<ApiResponse<{ reminders: Reminder[] }>>('/reminders'),
+
+  /**
+   * Напоминания по связке
+   * GET /api/v1/properties/{id}/contacts/{contactId}/reminders
+   */
+  getByObjectClient: (propertyId: number, contactId: number) =>
+    api.get<ApiResponse<{ reminders: Reminder[] }>>(`/properties/${propertyId}/contacts/${contactId}/reminders`),
+
+  /**
+   * Создать напоминание
+   * POST /api/v1/properties/{id}/contacts/{contactId}/reminders
+   */
+  create: (propertyId: number, contactId: number, data: { remind_at: string; message: string }) =>
+    api.post<ApiResponse<{ reminder: Reminder; message: string }>>(`/properties/${propertyId}/contacts/${contactId}/reminders`, data),
+
+  /**
+   * Удалить напоминание
+   * DELETE /api/v1/reminders/{id}
+   */
+  delete: (reminderId: number) =>
+    api.delete<ApiResponse<{ message: string }>>(`/reminders/${reminderId}`),
 };
 
 // === SOURCE AUTH API (авторизация на источниках: CIAN, Avito) ===

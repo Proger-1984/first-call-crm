@@ -305,6 +305,98 @@ class PropertyService
     }
 
     // ==========================================
+    // МАССОВЫЕ ОПЕРАЦИИ
+    // ==========================================
+
+    /** Максимальное количество объектов за одну массовую операцию */
+    private const BULK_LIMIT = 100;
+
+    /** Допустимые массовые действия */
+    private const BULK_ACTIONS = ['archive', 'unarchive', 'delete', 'change_deal_type'];
+
+    /**
+     * Выполнить массовую операцию над объектами
+     *
+     * @param int $userId
+     * @param string $action Действие: archive, unarchive, delete, change_deal_type
+     * @param array $propertyIds Массив ID объектов
+     * @param array $params Дополнительные параметры (deal_type для change_deal_type)
+     * @return array{affected: int, message: string}
+     */
+    public function bulkAction(int $userId, string $action, array $propertyIds, array $params = []): array
+    {
+        if (!in_array($action, self::BULK_ACTIONS, true)) {
+            throw new InvalidArgumentException('Недопустимое действие');
+        }
+
+        if (empty($propertyIds)) {
+            throw new InvalidArgumentException('Не указаны объекты');
+        }
+
+        if (count($propertyIds) > self::BULK_LIMIT) {
+            throw new InvalidArgumentException('Максимум ' . self::BULK_LIMIT . ' объектов за раз');
+        }
+
+        // Санитизация ID
+        $propertyIds = array_filter(array_map('intval', $propertyIds), fn(int $id) => $id > 0);
+
+        // Проверяем, что все объекты принадлежат пользователю
+        $properties = Property::where('user_id', $userId)
+            ->whereIn('id', $propertyIds)
+            ->get();
+
+        if ($properties->isEmpty()) {
+            throw new InvalidArgumentException('Объекты не найдены');
+        }
+
+        $affected = 0;
+
+        switch ($action) {
+            case 'archive':
+                $affected = Property::where('user_id', $userId)
+                    ->whereIn('id', $propertyIds)
+                    ->where('is_archived', false)
+                    ->update(['is_archived' => true]);
+                $message = "Архивировано объектов: {$affected}";
+                break;
+
+            case 'unarchive':
+                $affected = Property::where('user_id', $userId)
+                    ->whereIn('id', $propertyIds)
+                    ->where('is_archived', true)
+                    ->update(['is_archived' => false]);
+                $message = "Восстановлено объектов: {$affected}";
+                break;
+
+            case 'delete':
+                $affected = Property::where('user_id', $userId)
+                    ->whereIn('id', $propertyIds)
+                    ->delete();
+                $message = "Удалено объектов: {$affected}";
+                break;
+
+            case 'change_deal_type':
+                $dealType = $params['deal_type'] ?? '';
+                if (!in_array($dealType, Property::ALLOWED_DEAL_TYPES, true)) {
+                    throw new InvalidArgumentException('Недопустимый тип сделки');
+                }
+                $affected = Property::where('user_id', $userId)
+                    ->whereIn('id', $propertyIds)
+                    ->update(['deal_type' => $dealType]);
+                $message = "Изменён тип сделки для объектов: {$affected}";
+                break;
+
+            default:
+                $message = 'Действие не выполнено';
+        }
+
+        return [
+            'affected' => $affected,
+            'message' => $message,
+        ];
+    }
+
+    // ==========================================
     // ВОРОНКА (PIPELINE)
     // ==========================================
 

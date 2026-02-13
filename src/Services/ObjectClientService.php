@@ -10,12 +10,23 @@ use App\Models\PipelineStage;
 use App\Models\Property;
 use Carbon\Carbon;
 use InvalidArgumentException;
+use Psr\Container\ContainerInterface;
 
 /**
  * Сервис бизнес-логики CRM: связки объект+контакт
  */
 class ObjectClientService
 {
+    private ?InteractionService $interactionService = null;
+
+    /**
+     * Установить InteractionService (setter injection для избежания цикличной зависимости)
+     */
+    public function setInteractionService(InteractionService $interactionService): void
+    {
+        $this->interactionService = $interactionService;
+    }
+
     /**
      * Привязать контакт к объекту
      *
@@ -128,8 +139,15 @@ class ObjectClientService
             throw new InvalidArgumentException('Связка не найдена');
         }
 
+        $oldStageId = $objectClient->pipeline_stage_id;
+
         $objectClient->update(['pipeline_stage_id' => $stageId]);
         $objectClient->load(['contact', 'pipelineStage', 'property']);
+
+        // Логируем смену стадии в таймлайне
+        if ($this->interactionService && $oldStageId !== $stageId) {
+            $this->interactionService->logStageChange($objectClient, $userId, $oldStageId, $stageId);
+        }
 
         return $objectClient;
     }

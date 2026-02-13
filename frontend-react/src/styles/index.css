@@ -443,6 +443,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     color: var(--text-muted);
 }
 
+/* Группа поля формы (label + input) */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+/* Ошибка формы */
+.form-error {
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border-radius: var(--border-radius-sm);
+    font-size: 13px;
+}
+
 /* ============================================
    ГЛОБАЛЬНЫЕ КОМПОНЕНТЫ: Кнопки
    ============================================ */
@@ -508,6 +535,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     height: 15px;
 }
 
+.btn-xs {
+    padding: 4px 10px;
+    font-size: 11px;
+}
+
 .btn-secondary {
     background: var(--bg-main);
     color: var(--text-secondary);
@@ -563,6 +595,75 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.2s ease;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2,
+.modal-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.modal-header .material-icons {
+    font-size: 22px;
+    color: var(--primary);
+}
+
+.modal-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.modal-close:hover {
+    background: var(--bg-main);
+}
+
+.modal-close .material-icons {
+    font-size: 20px;
+    color: var(--text-secondary);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
 }
 
 /* ============================================
@@ -720,8 +821,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     background: transparent !important;
 }
 
-/* Кнопки внизу календаря */
-.flatpickr-innerContainer+div {
+/* Кнопки внизу календаря (исключаем секцию времени) */
+.flatpickr-innerContainer+div:not(.flatpickr-time) {
     display: flex;
     justify-content: space-between;
     padding: 10px 14px;
@@ -734,11 +835,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .flatpickr-time {
     border-top: 1px solid var(--border-light) !important;
     background: var(--bg-main) !important;
+    height: 44px !important;
+    overflow: visible !important;
 }
 
 .flatpickr-time input {
     color: var(--text-primary) !important;
     font-weight: 500 !important;
+    font-size: 14px !important;
+    height: 100% !important;
 }
 
 .flatpickr-time .flatpickr-am-pm {

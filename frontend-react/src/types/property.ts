@@ -167,3 +167,85 @@ export const DEAL_TYPE_LABELS: Record<DealType, string> = {
   sale: 'Продажа',
   rent: 'Аренда',
 };
+
+// ==========================================
+// ТАЙМЛАЙН ВЗАИМОДЕЙСТВИЙ
+// ==========================================
+
+/** Тип взаимодействия */
+export type InteractionType = 'call' | 'meeting' | 'showing' | 'message' | 'note' | 'stage_change';
+
+/** Метки типов взаимодействий */
+export const INTERACTION_TYPE_LABELS: Record<InteractionType, string> = {
+  call: 'Звонок',
+  meeting: 'Встреча',
+  showing: 'Показ',
+  message: 'Сообщение',
+  note: 'Заметка',
+  stage_change: 'Смена стадии',
+};
+
+/** Иконки типов взаимодействий (Material Icons) */
+export const INTERACTION_TYPE_ICONS: Record<InteractionType, string> = {
+  call: 'phone',
+  meeting: 'groups',
+  showing: 'visibility',
+  message: 'chat',
+  note: 'note',
+  stage_change: 'swap_horiz',
+};
+
+/** Взаимодействие (элемент таймлайна) */
+export interface Interaction {
+  id: number;
+  object_client_id: number;
+  user_id: number;
+  type: InteractionType;
+  description: string | null;
+  metadata: Record<string, any> | null;
+  interaction_at: string;
+  created_at: string;
+  user?: {
+    id: number;
+    name: string;
+  };
+  contact?: {
+    id: number;
+    name: string;
+  };
+  property?: {
+    id: number;
+    address: string | null;
+  };
+}
+
+// ==========================================
+// НАПОМИНАНИЯ
+// ==========================================
+
+/** Напоминание */
+export interface Reminder {
+  id: number;
+  object_client_id: number;
+  user_id: number;
+  remind_at: string;
+  message: string;
+  is_sent: boolean;
+  sent_at: string | null;
+  created_at: string;
+  property?: {
+    id: number;
+    address: string | null;
+    title: string | null;
+  };
+  contact?: {
+    id: number;
+    name: string;
+    phone: string | null;
+  };
+  pipeline_stage?: {
+    id: number;
+    name: string;
+    color: string;
+  };
+}

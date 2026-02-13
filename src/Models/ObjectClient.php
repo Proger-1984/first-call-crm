@@ -7,6 +7,7 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Модель связки Объект + Контакт (здесь живёт воронка)
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read Property $property
  * @property-read Contact $contact
  * @property-read PipelineStage $pipelineStage
+ * @property-read \Illuminate\Database\Eloquent\Collection|Interaction[] $interactions
  */
 class ObjectClient extends Model
 {
@@ -68,5 +70,13 @@ class ObjectClient extends Model
     public function pipelineStage(): BelongsTo
     {
         return $this->belongsTo(PipelineStage::class, 'pipeline_stage_id');
+    }
+
+    /**
+     * Взаимодействия (таймлайн)
+     */
+    public function interactions(): HasMany
+    {
+        return $this->hasMany(Interaction::class)->orderBy('interaction_at', 'desc');
     }
 }

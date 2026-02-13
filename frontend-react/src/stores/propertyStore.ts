@@ -13,6 +13,12 @@ interface PropertyState {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
 
+  /** Массовый выбор объектов */
+  selectedPropertyIds: number[];
+  togglePropertyId: (id: number) => void;
+  selectAllProperties: (ids: number[]) => void;
+  clearSelection: () => void;
+
   /** Фильтры */
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -48,6 +54,22 @@ export const usePropertyStore = create<PropertyState>()(
     (set, get) => ({
       viewMode: 'list',
       setViewMode: (viewMode) => set({ viewMode }),
+
+      selectedPropertyIds: [],
+      togglePropertyId: (id) => {
+        const current = get().selectedPropertyIds;
+        const next = current.includes(id)
+          ? current.filter((pid) => pid !== id)
+          : [...current, id];
+        set({ selectedPropertyIds: next });
+      },
+      selectAllProperties: (ids) => {
+        const current = get().selectedPropertyIds;
+        // Если все уже выбраны — снимаем все
+        const allSelected = ids.every(id => current.includes(id));
+        set({ selectedPropertyIds: allSelected ? [] : ids });
+      },
+      clearSelection: () => set({ selectedPropertyIds: [] }),
 
       searchQuery: '',
       setSearchQuery: (searchQuery) => set({ searchQuery }),

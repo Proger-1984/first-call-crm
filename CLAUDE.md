@@ -174,7 +174,7 @@ SubscriptionMiddleware проверяет наличие активной под
 
 ---
 
-## Основные таблицы БД (35 таблиц)
+## Основные таблицы БД (37 таблиц)
 
 | Таблица | Назначение | Записей |
 |---|---|---|
@@ -201,6 +201,8 @@ SubscriptionMiddleware проверяет наличие активной под
 | `properties` | Объекты недвижимости (CRM v2) | — |
 | `contacts` | Контакты покупателей/арендаторов (CRM v2) | — |
 | `object_clients` | Связка объект+контакт, воронка (CRM v2) | — |
+| `interactions` | Таймлайн взаимодействий CRM (звонки, встречи, показы) | — |
+| `reminders` | Напоминания с Telegram-уведомлениями (CRM) | — |
 
 Полная схема: `docs/DATABASE.md`
 
@@ -222,6 +224,15 @@ SubscriptionMiddleware проверяет наличие активной под
 | GET | `/api/v1/properties/pipeline` | Kanban-доска объектов |
 | GET | `/api/v1/contacts` | Справочник контактов (CRM) |
 | GET | `/api/v1/contacts/search` | Поиск контактов |
+| POST | `/api/v1/properties/bulk-action` | Массовые операции с объектами |
+| GET | `/api/v1/properties/{id}/interactions` | Таймлайн по объекту (все контакты) |
+| GET | `/api/v1/contacts/{id}/interactions` | Таймлайн по контакту (все объекты) |
+| GET | `/api/v1/properties/{id}/contacts/{contact_id}/interactions` | Таймлайн связки |
+| POST | `/api/v1/properties/{id}/contacts/{contact_id}/interactions` | Создать взаимодействие |
+| GET | `/api/v1/reminders` | Напоминания пользователя |
+| GET | `/api/v1/properties/{id}/contacts/{contact_id}/reminders` | Напоминания по связке |
+| POST | `/api/v1/properties/{id}/contacts/{contact_id}/reminders` | Создать напоминание |
+| DELETE | `/api/v1/reminders/{id}` | Удалить напоминание |
 
 Формат ответа: `{ code, status, message, data }`
 

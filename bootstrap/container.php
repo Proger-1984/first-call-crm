@@ -17,12 +17,16 @@ use App\Services\ClientService;
 use App\Services\PropertyService;
 use App\Services\ContactService;
 use App\Services\ObjectClientService;
+use App\Services\InteractionService;
+use App\Services\ReminderService;
 use App\Services\SourceAuthService;
 use App\Controllers\AnalyticsController;
 use App\Controllers\AuthController;
 use App\Controllers\ClientController;
 use App\Controllers\PropertyController;
 use App\Controllers\ContactController;
+use App\Controllers\InteractionController;
+use App\Controllers\ReminderController;
 use App\Controllers\PipelineStageController;
 use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
@@ -116,8 +120,18 @@ return function (array $config) {
             return new ContactService();
         }),
 
+        InteractionService::class => factory(function (ContainerInterface $c) {
+            return new InteractionService();
+        }),
+
+        ReminderService::class => factory(function (ContainerInterface $c) {
+            return new ReminderService();
+        }),
+
         ObjectClientService::class => factory(function (ContainerInterface $c) {
-            return new ObjectClientService();
+            $service = new ObjectClientService();
+            $service->setInteractionService($c->get(InteractionService::class));
+            return $service;
         }),
 
         /** Контроллеры */
@@ -177,6 +191,18 @@ return function (array $config) {
         ContactController::class => factory(function (ContainerInterface $c) {
             return new ContactController(
                 $c->get(ContactService::class)
+            );
+        }),
+
+        InteractionController::class => factory(function (ContainerInterface $c) {
+            return new InteractionController(
+                $c->get(InteractionService::class)
+            );
+        }),
+
+        ReminderController::class => factory(function (ContainerInterface $c) {
+            return new ReminderController(
+                $c->get(ReminderService::class)
             );
         }),
 

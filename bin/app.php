@@ -10,6 +10,7 @@ use App\Commands\NotifySubscriptionExpiringCommand;
 use App\Commands\NotifySubscriptionExpiredCommand;
 use App\Commands\ParseCianMultiThreadCommand;
 use App\Commands\PhotoTasksCommand;
+use App\Commands\SendRemindersCommand;
 use App\Commands\TransferListingsCommand;
 use App\Commands\UpdateExpiredSubscriptionsCommand;
 use Symfony\Component\Console\Application;
@@ -36,6 +37,7 @@ try {
         $container->get(\App\Services\PhotoTaskService::class),
         $container->get(\Psr\Log\LoggerInterface::class)
     ));
+    $cli->add(new SendRemindersCommand($container));
     
     $cli->run();
 

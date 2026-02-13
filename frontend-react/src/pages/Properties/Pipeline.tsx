@@ -11,6 +11,10 @@ interface PipelineProps {
   onMoveCard: (cardId: number, propertyId: number, contactId: number, newStageId: number) => void;
   /** Callback при клике на карточку (открытие карточки объекта) */
   onCardClick?: (propertyId: number) => void;
+  /** Callback для быстрого добавления взаимодействия */
+  onAddInteraction?: (propertyId: number, contactId: number) => void;
+  /** Callback для быстрого добавления напоминания */
+  onAddReminder?: (propertyId: number, contactId: number) => void;
 }
 
 /** Относительная дата: "через Xд.", "Xд. назад", "сегодня" */
@@ -52,7 +56,7 @@ function getPropertySummary(property: PipelineCard['property']): string {
   return parts.length > 0 ? parts.join(', ') : (property.title || 'Без описания');
 }
 
-export function Pipeline({ stages, onMoveCard, onCardClick }: PipelineProps) {
+export function Pipeline({ stages, onMoveCard, onCardClick, onAddInteraction, onAddReminder }: PipelineProps) {
   const [columns, setColumns] = useState<PipelineColumn[]>(stages);
 
   // Drag-n-drop
@@ -237,6 +241,30 @@ export function Pipeline({ stages, onMoveCard, onCardClick }: PipelineProps) {
                   <div className={`pipeline-card-next-contact ${isOverdue(card.next_contact_at) ? 'overdue' : ''}`}>
                     <span className="material-icons">schedule</span>
                     {getRelativeTime(card.next_contact_at)}
+                  </div>
+                )}
+
+                {/* Быстрые действия */}
+                {(onAddInteraction || onAddReminder) && (
+                  <div className="pipeline-card-actions">
+                    {onAddInteraction && (
+                      <button
+                        className="pipeline-action-btn"
+                        title="Добавить взаимодействие"
+                        onClick={(event) => { event.stopPropagation(); onAddInteraction(card.property_id, card.contact_id); }}
+                      >
+                        <span className="material-icons">forum</span>
+                      </button>
+                    )}
+                    {onAddReminder && (
+                      <button
+                        className="pipeline-action-btn"
+                        title="Создать напоминание"
+                        onClick={(event) => { event.stopPropagation(); onAddReminder(card.property_id, card.contact_id); }}
+                      >
+                        <span className="material-icons">notifications</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
