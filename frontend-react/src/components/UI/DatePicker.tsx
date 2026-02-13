@@ -8,17 +8,36 @@ interface DatePickerProps {
   value?: string;
   onChange?: (date: string) => void;
   className?: string;
+  /** Включить выбор времени */
+  enableTime?: boolean;
+  /** Формат даты (по умолчанию d.m.Y или d.m.Y H:i при enableTime) */
+  dateFormat?: string;
+  /** 24-часовой формат времени (по умолчанию true) */
+  time_24hr?: boolean;
 }
 
-export function DatePicker({ placeholder = 'дд.мм.гггг', value, onChange, className = '' }: DatePickerProps) {
+export function DatePicker({
+  placeholder = 'дд.мм.гггг',
+  value,
+  onChange,
+  className = '',
+  enableTime = false,
+  dateFormat,
+  time_24hr = true,
+}: DatePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const fpRef = useRef<flatpickr.Instance | null>(null);
+
+  const resolvedFormat = dateFormat || (enableTime ? 'd.m.Y H:i' : 'd.m.Y');
+  const resolvedPlaceholder = placeholder || (enableTime ? 'дд.мм.гггг чч:мм' : 'дд.мм.гггг');
 
   useEffect(() => {
     if (inputRef.current && !fpRef.current) {
       fpRef.current = flatpickr(inputRef.current, {
         locale: Russian,
-        dateFormat: 'd.m.Y',
+        dateFormat: resolvedFormat,
+        enableTime,
+        time_24hr,
         allowInput: true,
         disableMobile: true,
         onChange: (selectedDates, dateStr) => {
@@ -31,7 +50,7 @@ export function DatePicker({ placeholder = 'дд.мм.гггг', value, onChange
       fpRef.current?.destroy();
       fpRef.current = null;
     };
-  }, [onChange]);
+  }, [onChange, enableTime, resolvedFormat, time_24hr]);
 
   useEffect(() => {
     if (fpRef.current) {
@@ -49,7 +68,7 @@ export function DatePicker({ placeholder = 'дд.мм.гггг', value, onChange
       ref={inputRef}
       type="text"
       className={`form-control ${className}`}
-      placeholder={placeholder}
+      placeholder={resolvedPlaceholder}
       defaultValue={value}
     />
   );

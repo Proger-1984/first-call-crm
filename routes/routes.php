@@ -5,6 +5,8 @@ use App\Controllers\AdminUserController;
 use App\Controllers\AnalyticsController;
 use App\Controllers\AuthController;
 use App\Controllers\ClientController;
+use App\Controllers\PropertyController;
+use App\Controllers\ContactController;
 use App\Controllers\FavoriteController;
 use App\Controllers\FavoriteStatusController;
 use App\Controllers\FilterController;
@@ -240,7 +242,62 @@ return function (App $app) {
             $group->delete('/statuses/{id:[0-9]+}', [FavoriteStatusController::class, 'delete']);
         })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
 
-        /** Маршруты CRM — управление клиентами
+        /** Маршруты CRM — объекты недвижимости (новая модель)
+         * Список объектов — index
+         * Карточка объекта — show
+         * Создание — create
+         * Обновление — update
+         * Удаление — delete
+         * Архивирование — archive
+         * Kanban-доска — getPipeline
+         * Статистика — getStats
+         * Привязка контакта — attachContact
+         * Отвязка контакта — detachContact
+         * Смена стадии связки — moveContactStage
+         * Обновление связки — updateContact
+         *
+         * Требует активную подписку (SubscriptionMiddleware)
+         */
+        $group->group('/properties', function (RouteCollectorProxy $group) {
+            // Kanban, статистика (до /{id})
+            $group->get('/pipeline', [PropertyController::class, 'getPipeline']);
+            $group->get('/stats', [PropertyController::class, 'getStats']);
+
+            // CRUD объектов
+            $group->get('', [PropertyController::class, 'index']);
+            $group->post('', [PropertyController::class, 'create']);
+            $group->get('/{id:[0-9]+}', [PropertyController::class, 'show']);
+            $group->put('/{id:[0-9]+}', [PropertyController::class, 'update']);
+            $group->delete('/{id:[0-9]+}', [PropertyController::class, 'delete']);
+            $group->patch('/{id:[0-9]+}/archive', [PropertyController::class, 'archive']);
+
+            // Связки объект+контакт
+            $group->post('/{id:[0-9]+}/contacts', [PropertyController::class, 'attachContact']);
+            $group->delete('/{id:[0-9]+}/contacts/{contact_id:[0-9]+}', [PropertyController::class, 'detachContact']);
+            $group->patch('/{id:[0-9]+}/contacts/{contact_id:[0-9]+}/stage', [PropertyController::class, 'moveContactStage']);
+            $group->patch('/{id:[0-9]+}/contacts/{contact_id:[0-9]+}', [PropertyController::class, 'updateContact']);
+        })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
+
+        /** Маршруты CRM — справочник контактов (новая модель)
+         * Список контактов — index
+         * Поиск контактов — search
+         * Карточка контакта — show
+         * Создание — create
+         * Обновление — update
+         * Удаление — delete
+         *
+         * Требует активную подписку (SubscriptionMiddleware)
+         */
+        $group->group('/contacts', function (RouteCollectorProxy $group) {
+            $group->get('/search', [ContactController::class, 'search']);
+            $group->get('', [ContactController::class, 'index']);
+            $group->post('', [ContactController::class, 'create']);
+            $group->get('/{id:[0-9]+}', [ContactController::class, 'show']);
+            $group->put('/{id:[0-9]+}', [ContactController::class, 'update']);
+            $group->delete('/{id:[0-9]+}', [ContactController::class, 'delete']);
+        })->add(new SubscriptionMiddleware())->add(new AuthMiddleware($container));
+
+        /** Маршруты CRM — управление клиентами (DEPRECATED — старая модель)
          * Список клиентов с фильтрами — index
          * Карточка клиента — show
          * Создание клиента — create

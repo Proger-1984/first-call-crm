@@ -6,11 +6,12 @@
   width: 100%;
   max-width: 560px;
   max-height: 80vh;
-  background: var(--bg-primary, #fff);
-  border-radius: 16px;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  animation: slideUp 0.2s ease;
 }
 
 .stage-settings-content {
@@ -24,6 +25,18 @@
   flex-direction: column;
   gap: 4px;
   margin-bottom: 16px;
+  min-height: 100px;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .stage-row {
@@ -31,12 +44,15 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--bg-secondary, #f8f9fa);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-main);
+  animation: fadeSlideIn 0.2s ease-out;
+  transition: border-color var(--transition-fast);
+  border: 2px solid transparent;
 }
 
 .stage-row:hover {
-  background: var(--bg-hover, #f0f0f0);
+  background: var(--primary-50);
 }
 
 .stage-info {
@@ -54,16 +70,16 @@
 }
 
 .stage-name {
-  font-size: 0.875rem;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--text-primary, #1a1a1a);
+  color: var(--text-primary);
 }
 
 .system-badge,
 .final-badge {
   padding: 1px 6px;
-  border-radius: 6px;
-  font-size: 0.65rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 10px;
   font-weight: 500;
 }
 
@@ -77,11 +93,37 @@
   color: #7B1FA2;
 }
 
-.clients-count {
-  font-size: 0.75rem;
-  color: var(--text-secondary, #aaa);
+/* Бейдж количества клиентов */
+.clients-count-badge {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: var(--border-radius-sm);
   margin-left: auto;
-  padding: 0 4px;
+  white-space: nowrap;
+}
+
+/* Drag handle */
+.drag-handle {
+  font-size: 16px;
+  color: var(--text-muted);
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Drag-n-drop стили */
+.stage-row.stage-dragging {
+  opacity: 0.4;
+}
+
+.stage-row.stage-drag-over {
+  border-top: 2px solid var(--primary);
 }
 
 .stage-actions {
@@ -96,16 +138,16 @@
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius-sm);
   background: transparent;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .icon-btn:hover:not(:disabled) {
-  background: var(--bg-primary, #fff);
-  color: var(--text-primary, #333);
+  background: var(--bg-card);
+  color: var(--text-primary);
 }
 
 .icon-btn:disabled {
@@ -114,8 +156,8 @@
 }
 
 .icon-btn.danger:hover:not(:disabled) {
-  background: #FFEBEE;
-  color: #F44336;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .icon-btn .material-icons {
@@ -134,8 +176,8 @@
   width: 32px;
   height: 32px;
   padding: 2px;
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -143,14 +185,16 @@
 .name-input {
   flex: 1;
   padding: 6px 10px;
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 6px;
-  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
   outline: none;
+  transition: border-color var(--transition-fast);
 }
 
 .name-input:focus {
-  border-color: var(--primary-color, #2196F3);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
 }
 
 .save-btn,
@@ -159,25 +203,26 @@
   align-items: center;
   padding: 4px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius-sm);
   background: transparent;
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .save-btn {
-  color: #4CAF50;
+  color: var(--success);
 }
 
 .save-btn:hover {
-  background: #E8F5E9;
+  background: var(--success-bg);
 }
 
 .cancel-edit-btn {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .cancel-edit-btn:hover {
-  background: var(--bg-hover, #f0f0f0);
+  background: var(--primary-50);
 }
 
 .save-btn .material-icons,
@@ -191,10 +236,13 @@
   align-items: center;
   gap: 8px;
   padding: 12px;
-  border: 1px dashed var(--border-color, #e0e0e0);
-  border-radius: 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--border-radius-sm);
 }
 
+/* Баг #7: Кнопка "Добавить" не должна обрезаться */
 .create-stage-form .btn-primary {
+  min-width: 100px;
+  flex-shrink: 0;
   white-space: nowrap;
 }

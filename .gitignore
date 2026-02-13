@@ -125,3 +125,7 @@ storage/downloads/*
 
 # GitHub токен
 .github-token
+
+# Тестовые скриншоты и снапшоты
+*.png
+img/

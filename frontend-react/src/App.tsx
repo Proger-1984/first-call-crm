@@ -9,6 +9,8 @@ import { Settings } from './pages/Settings';
 import { Tariffs } from './pages/Tariffs';
 import { Favorites } from './pages/Favorites';
 import { Clients, ClientCard } from './pages/Clients';
+import { Properties, PropertyCard } from './pages/Properties';
+import { Contacts, ContactCard } from './pages/Contacts';
 import { Billing } from './pages/Billing';
 import { AdminBilling } from './pages/AdminBilling';
 import { AdminUsers } from './pages/AdminUsers';
@@ -54,8 +56,13 @@ function AppContent() {
         <Route path="profile" element={<SubscriptionRoute><Profile /></SubscriptionRoute>} />
         <Route path="settings" element={<SubscriptionRoute><Settings /></SubscriptionRoute>} />
         <Route path="favorites" element={<SubscriptionRoute><Favorites /></SubscriptionRoute>} />
-        <Route path="clients" element={<SubscriptionRoute><Clients /></SubscriptionRoute>} />
-        <Route path="clients/:id" element={<SubscriptionRoute><ClientCard /></SubscriptionRoute>} />
+        <Route path="properties" element={<SubscriptionRoute><Properties /></SubscriptionRoute>} />
+        <Route path="properties/:id" element={<SubscriptionRoute><PropertyCard /></SubscriptionRoute>} />
+        <Route path="contacts" element={<SubscriptionRoute><Contacts /></SubscriptionRoute>} />
+        <Route path="contacts/:id" element={<SubscriptionRoute><ContactCard /></SubscriptionRoute>} />
+        {/* Редирект со старого маршрута */}
+        <Route path="clients" element={<Navigate to="/properties" replace />} />
+        <Route path="clients/:id" element={<Navigate to="/properties" replace />} />
 
         {/* Маршруты доступные всегда (без подписки) */}
         <Route path="tariffs" element={<Tariffs />} />

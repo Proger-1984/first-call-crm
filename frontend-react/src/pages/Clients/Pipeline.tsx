@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { clientsApi } from '../../services/api';
-import type { PipelineColumn, ClientShort, ClientType } from '../../types/client';
+import { ConfirmDialog } from '../../components/UI/ConfirmDialog';
+import type { PipelineColumn, ClientShort } from '../../types/client';
 import { CLIENT_TYPE_LABELS } from '../../types/client';
 import './Pipeline.css';
 
@@ -8,12 +9,26 @@ interface PipelineProps {
   stages: any[];
   onClientClick: (clientId: number) => void;
   onRefresh: () => void;
+  /** Ключ для принудительного обновления при создании/удалении клиента */
+  refreshKey?: number;
 }
 
-export function Pipeline({ onClientClick, onRefresh }: PipelineProps) {
+export function Pipeline({ onClientClick, onRefresh, refreshKey }: PipelineProps) {
   const [columns, setColumns] = useState<PipelineColumn[]>([]);
   const [loading, setLoading] = useState(true);
-  const [movingClientId, setMovingClientId] = useState<number | null>(null);
+
+  // Drag-n-drop
+  const dragClientRef = useRef<{ clientId: number; sourceColumnId: number } | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<number | null>(null);
+  const [draggingClientId, setDraggingClientId] = useState<number | null>(null);
+
+  // Диалог для ошибок
+  const [dialog, setDialog] = useState<{
+    title: string;
+    message: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null);
 
   /** Загрузка данных kanban */
   const loadPipeline = useCallback(async () => {
@@ -30,20 +45,65 @@ export function Pipeline({ onClientClick, onRefresh }: PipelineProps) {
 
   useEffect(() => {
     loadPipeline();
-  }, [loadPipeline]);
+  }, [loadPipeline, refreshKey]);
 
-  /** Перемещение клиента на другую стадию */
-  const moveClient = async (clientId: number, targetStageId: number) => {
-    setMovingClientId(clientId);
+  /** Перемещение клиента на другую стадию (оптимистичное) */
+  const moveClient = async (clientId: number, sourceColumnId: number, targetStageId: number) => {
+    if (sourceColumnId === targetStageId) return;
+
+    // Оптимистичное обновление: перемещаем клиента локально
+    setColumns(prevColumns => {
+      const newColumns = prevColumns.map(col => ({ ...col, clients: [...col.clients] }));
+      const sourceCol = newColumns.find(c => c.id === sourceColumnId);
+      const targetCol = newColumns.find(c => c.id === targetStageId);
+      if (!sourceCol || !targetCol) return prevColumns;
+
+      const clientIndex = sourceCol.clients.findIndex(c => c.id === clientId);
+      if (clientIndex === -1) return prevColumns;
+
+      const [movedClient] = sourceCol.clients.splice(clientIndex, 1);
+      targetCol.clients.push(movedClient);
+      return newColumns;
+    });
+
     try {
       await clientsApi.moveStage(clientId, targetStageId);
-      loadPipeline();
       onRefresh();
     } catch {
-      alert('Ошибка перемещения клиента');
-    } finally {
-      setMovingClientId(null);
+      // Откат при ошибке
+      loadPipeline();
+      setDialog({ title: 'Ошибка', message: 'Не удалось переместить клиента', variant: 'danger', onConfirm: () => setDialog(null) });
     }
+  };
+
+  /** Drag start */
+  const handleDragStart = (clientId: number, columnId: number) => {
+    dragClientRef.current = { clientId, sourceColumnId: columnId };
+    setDraggingClientId(clientId);
+  };
+
+  /** Drag over column */
+  const handleDragOverColumn = (e: React.DragEvent, columnId: number) => {
+    e.preventDefault();
+    setDragOverColumnId(columnId);
+  };
+
+  /** Drop on column */
+  const handleDropOnColumn = (targetColumnId: number) => {
+    const dragData = dragClientRef.current;
+    if (!dragData) return;
+
+    moveClient(dragData.clientId, dragData.sourceColumnId, targetColumnId);
+    dragClientRef.current = null;
+    setDragOverColumnId(null);
+    setDraggingClientId(null);
+  };
+
+  /** Drag end */
+  const handleDragEnd = () => {
+    dragClientRef.current = null;
+    setDragOverColumnId(null);
+    setDraggingClientId(null);
   };
 
   /** Форматирование бюджета */
@@ -83,7 +143,13 @@ export function Pipeline({ onClientClick, onRefresh }: PipelineProps) {
   return (
     <div className="pipeline-board">
       {columns.map(column => (
-        <div key={column.id} className="pipeline-column">
+        <div
+          key={column.id}
+          className={`pipeline-column ${dragOverColumnId === column.id ? 'drag-over' : ''}`}
+          onDragOver={(e) => handleDragOverColumn(e, column.id)}
+          onDragLeave={() => setDragOverColumnId(null)}
+          onDrop={() => handleDropOnColumn(column.id)}
+        >
           <div className="column-header" style={{ borderTopColor: column.color }}>
             <div className="column-title">
               <span className="column-dot" style={{ backgroundColor: column.color }} />
@@ -95,7 +161,10 @@ export function Pipeline({ onClientClick, onRefresh }: PipelineProps) {
             {column.clients.map(client => (
               <div
                 key={client.id}
-                className={`pipeline-card ${movingClientId === client.id ? 'moving' : ''}`}
+                className={`pipeline-card ${draggingClientId === client.id ? 'dragging' : ''}`}
+                draggable
+                onDragStart={() => handleDragStart(client.id, column.id)}
+                onDragEnd={handleDragEnd}
                 onClick={() => onClientClick(client.id)}
               >
                 <div className="card-name">{client.name}</div>
@@ -114,20 +183,6 @@ export function Pipeline({ onClientClick, onRefresh }: PipelineProps) {
                     {formatContactDate(client.next_contact_at)}
                   </div>
                 )}
-                {/* Кнопки перемещения */}
-                <div className="card-move-actions" onClick={(e) => e.stopPropagation()}>
-                  {columns.filter(c => c.id !== column.id).slice(0, 3).map(targetCol => (
-                    <button
-                      key={targetCol.id}
-                      className="move-btn"
-                      title={`Переместить в "${targetCol.name}"`}
-                      onClick={() => moveClient(client.id, targetCol.id)}
-                      style={{ borderColor: targetCol.color, color: targetCol.color }}
-                    >
-                      {targetCol.name.substring(0, 3)}
-                    </button>
-                  ))}
-                </div>
               </div>
             ))}
             {column.clients.length === 0 && (
@@ -136,6 +191,17 @@ export function Pipeline({ onClientClick, onRefresh }: PipelineProps) {
           </div>
         </div>
       ))}
+
+      {/* Диалог для ошибок */}
+      {dialog && (
+        <ConfirmDialog
+          title={dialog.title}
+          message={dialog.message}
+          variant={dialog.variant}
+          onConfirm={dialog.onConfirm}
+          onCancel={() => setDialog(null)}
+        />
+      )}
     </div>
   );
 }

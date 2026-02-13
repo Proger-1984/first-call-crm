@@ -1,0 +1,623 @@
+/* ===========================================
+   Объекты недвижимости — основная страница
+   =========================================== */
+
+.properties-page {
+  padding: 24px;
+}
+
+/* Заголовок */
+.properties-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.properties-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.properties-header-left h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.properties-stats-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.properties-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ===========================================
+   Баг 1 + Баг 8: Одинаковые кнопки-иконки,
+   увеличенные иконки в view-toggle
+   =========================================== */
+
+/* Кнопки view-toggle и btn-icon — одного размера 36x36 */
+.properties-header-right .view-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+.properties-header-right .view-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.properties-header-right .view-btn:hover {
+  background: var(--primary-50);
+}
+
+.properties-header-right .view-btn.active {
+  background: var(--primary);
+  color: white;
+}
+
+.properties-header-right .view-btn .material-icons {
+  font-size: 22px;
+}
+
+/* Кнопка настроек стадий — те же размеры 36x36 */
+.properties-header-right .btn-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.properties-header-right .btn-icon .material-icons {
+  font-size: 20px;
+}
+
+/* ===========================================
+   Фильтры — строка в стиле AdminBilling
+   =========================================== */
+
+.properties-filters {
+  padding: 16px 20px;
+}
+
+.properties-filters-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.properties-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.properties-filter-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Обёртка поиска с кнопкой сброса */
+.filter-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.filter-search-wrapper .filter-search-input {
+  min-width: 220px;
+  max-width: 300px;
+  padding-right: 30px;
+}
+
+.filter-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+
+.filter-search-clear:hover {
+  background: var(--text-muted);
+}
+
+.filter-search-clear .material-icons {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 1;
+}
+
+/* Кнопки "Применить" / "Сбросить" */
+.properties-filter-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Кнопка воронки */
+.properties-funnel-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 7px 12px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-left: auto;
+}
+
+.properties-funnel-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.properties-funnel-btn .material-icons {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 1;
+  transition: transform var(--transition-fast);
+}
+
+.properties-funnel-btn.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-50);
+}
+
+/* ===========================================
+   Чипы фильтров (тип сделки, стадии)
+   =========================================== */
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.filter-chip:hover {
+  border-color: var(--text-muted);
+}
+
+.filter-chip.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.filter-chip .chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.filter-chip .chip-clear {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+}
+
+.filter-chip .chip-clear:hover {
+  opacity: 1;
+}
+
+/* ===========================================
+   Бейджи типов сделки
+   =========================================== */
+
+.deal-badge {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: var(--border-radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.deal-sale {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+
+.deal-rent {
+  background: #E3F2FD;
+  color: #1565C0;
+}
+
+/* ===========================================
+   Чекбокс "Показать архив" в строке фильтров
+   =========================================== */
+
+.filter-checkbox-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg-card);
+  transition: all var(--transition-fast);
+}
+
+.filter-checkbox-inline:hover {
+  border-color: var(--text-muted);
+}
+
+.filter-checkbox-inline.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.filter-checkbox-inline input[type="checkbox"] {
+  accent-color: var(--primary);
+}
+
+/* ===========================================
+   Таблица объектов
+   =========================================== */
+
+.properties-table-wrapper {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 420px);
+  min-height: 400px;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+  margin-top: 16px;
+  transition: none;
+}
+
+/* Баг 3: Overlay при рефетче — предотвращает дёрганье */
+.table-refetch-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.6);
+  z-index: 5;
+  pointer-events: none;
+}
+
+.properties-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* Фиксированные ширины колонок: Адрес | Цена | Тип | Собственник | Клиенты | Стадия | Создан | Действия */
+.properties-table th:nth-child(1),
+.properties-table td:nth-child(1) { width: 20%; }
+
+.properties-table th:nth-child(2),
+.properties-table td:nth-child(2) { width: 12%; }
+
+.properties-table th:nth-child(3),
+.properties-table td:nth-child(3) { width: 10%; }
+
+.properties-table th:nth-child(4),
+.properties-table td:nth-child(4) { width: 15%; }
+
+.properties-table th:nth-child(5),
+.properties-table td:nth-child(5) { width: 10%; }
+
+.properties-table th:nth-child(6),
+.properties-table td:nth-child(6) { width: 13%; }
+
+.properties-table th:nth-child(7),
+.properties-table td:nth-child(7) { width: 12%; }
+
+.properties-table th:nth-child(8),
+.properties-table td:nth-child(8) { width: 8%; }
+
+.properties-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 12px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--bg-main);
+}
+
+/* Сортировка */
+.properties-table thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--transition-fast);
+}
+
+.properties-table thead th.sortable:hover {
+  color: var(--primary);
+}
+
+.properties-table thead th.sorted {
+  color: var(--primary);
+}
+
+.properties-table thead th .sort-icon {
+  font-size: 14px;
+  vertical-align: middle;
+  margin-left: 2px;
+  opacity: 0.5;
+}
+
+.properties-table thead th.sorted .sort-icon {
+  opacity: 1;
+}
+
+.properties-table tbody tr {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.properties-table tbody tr:hover {
+  background: var(--primary-50);
+}
+
+/* Чередующиеся строки */
+.properties-table tbody tr:nth-child(even) {
+  background: rgba(236, 242, 244, 0.4);
+}
+
+.properties-table tbody tr:nth-child(even):hover {
+  background: var(--primary-50);
+}
+
+.properties-table tbody tr.archived {
+  opacity: 0.6;
+}
+
+.properties-table td {
+  padding: 12px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ячейка адреса */
+.cell-address {
+  font-weight: 500;
+}
+
+.cell-address-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.cell-address-inner .property-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.cell-address-inner .property-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Ячейка цены */
+.cell-price {
+  font-weight: 500;
+}
+
+/* Ячейка собственника */
+.cell-owner {
+  color: var(--text-secondary);
+}
+
+.cell-owner-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.cell-owner-inner .owner-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.cell-owner-inner .owner-phone {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Ячейка клиентов */
+.cell-clients {
+  text-align: center;
+}
+
+.clients-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.clients-count-badge.empty {
+  background: var(--bg-main);
+  color: var(--text-muted);
+}
+
+/* Дата */
+.cell-date {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* ===========================================
+   Состояния (loading, error, empty)
+   — переиспользуем глобальные стили из Clients.css
+   =========================================== */
+
+.properties-page .loading-state,
+.properties-page .error-state,
+.properties-page .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+  margin-top: 16px;
+}
+
+.properties-page .loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+.properties-page .error-state .material-icons,
+.properties-page .empty-state .material-icons {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.properties-page .error-state button,
+.properties-page .empty-state button {
+  margin-top: 12px;
+}
+
+/* ===========================================
+   Адаптивность
+   =========================================== */
+
+@media (max-width: 768px) {
+  .properties-page {
+    padding: 16px;
+  }
+
+  .properties-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .properties-header-right {
+    justify-content: space-between;
+  }
+
+  .properties-table-wrapper {
+    max-height: none;
+    min-height: auto;
+  }
+
+  .properties-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-search-wrapper .filter-search-input {
+    min-width: 100%;
+    max-width: 100%;
+  }
+}

@@ -1,0 +1,270 @@
+/* ===========================================
+   Форма объекта недвижимости (модальное окно)
+   =========================================== */
+
+/* .modal-overlay — глобальные стили в styles/index.css */
+
+.property-form-modal {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.2s ease;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.close-btn {
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.close-btn:hover {
+  background: var(--primary-50);
+  color: var(--text-primary);
+}
+
+/* Табы переключения режима */
+.form-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-light);
+  padding: 0 24px;
+  background: var(--bg-card);
+}
+
+.form-tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.form-tab:hover {
+  color: var(--text-primary);
+}
+
+.form-tab.active {
+  border-bottom-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Форма */
+.property-form {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-error {
+  padding: 10px 14px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-field.full {
+  flex: 1 1 100%;
+}
+
+.form-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  transition: border-color var(--transition-fast);
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.form-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Radio-группа для типа сделки */
+.radio-group {
+  display: flex;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.radio-option input[type="radio"] {
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+/* Подсказка для режима «Из базы» */
+.listing-mode-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+}
+
+/* Кнопки — стиль унифицирован с AdminBilling */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-main);
+  margin: 0 -24px -24px -24px;
+}
+
+.form-actions .btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.form-actions .btn-cancel:hover {
+  background: var(--border-light);
+}
+
+.form-actions .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: var(--primary);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.form-actions .btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+.form-actions .btn-primary:disabled,
+.form-actions .btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-actions .btn-primary .material-icons,
+.form-actions .btn-cancel .material-icons {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+}
+
+/* Разделитель секций */
+.form-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+  margin-top: 4px;
+}
+
+/* Адаптивность */
+@media (max-width: 640px) {
+  .form-row {
+    flex-direction: column;
+  }
+
+  .property-form-modal {
+    max-height: 95vh;
+  }
+
+  .form-tabs {
+    padding: 0 16px;
+  }
+
+  .form-tab {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+}

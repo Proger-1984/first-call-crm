@@ -14,10 +14,15 @@ use App\Services\ListingFilterService;
 use App\Services\PhotoTaskService;
 use App\Services\QrCodeService;
 use App\Services\ClientService;
+use App\Services\PropertyService;
+use App\Services\ContactService;
+use App\Services\ObjectClientService;
 use App\Services\SourceAuthService;
 use App\Controllers\AnalyticsController;
 use App\Controllers\AuthController;
 use App\Controllers\ClientController;
+use App\Controllers\PropertyController;
+use App\Controllers\ContactController;
 use App\Controllers\PipelineStageController;
 use App\Controllers\TelegramAuthController;
 use App\Controllers\UserController;
@@ -103,6 +108,18 @@ return function (array $config) {
             return new ClientService();
         }),
 
+        PropertyService::class => factory(function (ContainerInterface $c) {
+            return new PropertyService();
+        }),
+
+        ContactService::class => factory(function (ContainerInterface $c) {
+            return new ContactService();
+        }),
+
+        ObjectClientService::class => factory(function (ContainerInterface $c) {
+            return new ObjectClientService();
+        }),
+
         /** Контроллеры */
         AuthController::class => factory(function (ContainerInterface $c) {
             return new AuthController($c);
@@ -146,6 +163,20 @@ return function (array $config) {
         ClientController::class => factory(function (ContainerInterface $c) {
             return new ClientController(
                 $c->get(ClientService::class)
+            );
+        }),
+
+        PropertyController::class => factory(function (ContainerInterface $c) {
+            return new PropertyController(
+                $c->get(PropertyService::class),
+                $c->get(ObjectClientService::class),
+                $c->get(ContactService::class)
+            );
+        }),
+
+        ContactController::class => factory(function (ContainerInterface $c) {
+            return new ContactController(
+                $c->get(ContactService::class)
             );
         }),
 

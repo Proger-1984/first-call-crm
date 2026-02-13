@@ -1,0 +1,237 @@
+/* ===========================================
+   Kanban-доска объектов (Properties Pipeline)
+   Карточки: пара объект + контакт
+   =========================================== */
+
+.pipeline-board {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 16px;
+  min-height: 400px;
+}
+
+.pipeline-column {
+  flex: 0 0 280px;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 3px solid;
+  background: var(--bg-card);
+}
+
+.column-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.column-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.column-count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg-main);
+  color: var(--text-secondary);
+}
+
+.column-cards {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Карточка kanban */
+.pipeline-card {
+  padding: 12px;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.pipeline-card:hover {
+  border-color: var(--border);
+  box-shadow: var(--shadow-md);
+}
+
+/* Drag-n-drop: карточка перетаскивается */
+.pipeline-card.dragging {
+  opacity: 0.4;
+  border: 1px dashed var(--border);
+  box-shadow: none;
+}
+
+/* --- Секция объекта (верхняя) --- */
+.pipeline-card-property {
+  margin-bottom: 0;
+}
+
+.card-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.card-address {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.card-price {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Бейдж типа сделки (Продажа / Аренда) */
+.pipeline-card-deal-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: var(--border-radius-sm);
+  font-weight: 500;
+}
+
+.pipeline-card-deal-badge.deal-sale {
+  background: var(--primary-light);
+  color: var(--primary-hover);
+}
+
+.pipeline-card-deal-badge.deal-rent {
+  background: var(--accent-light);
+  color: var(--accent-hover);
+}
+
+/* --- Секция контакта (нижняя, с бордером сверху) --- */
+.pipeline-card-contact {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pipeline-card .contact-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.contact-icon {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+  color: var(--text-muted);
+}
+
+.contact-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.contact-phone {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* --- Дата следующего контакта --- */
+.pipeline-card-next-contact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.pipeline-card-next-contact .material-icons {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* Просроченная дата контакта */
+.pipeline-card-next-contact.overdue {
+  color: var(--danger);
+}
+
+/* Drag-n-drop: колонка — зона сброса */
+.pipeline-column.drag-over {
+  background: var(--primary-50);
+  outline: 2px dashed var(--primary);
+  outline-offset: -2px;
+}
+
+.column-empty {
+  padding: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Загрузка */
+.pipeline-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .pipeline-board {
+    gap: 8px;
+  }
+
+  .pipeline-column {
+    flex: 0 0 250px;
+    max-width: 250px;
+  }
+}

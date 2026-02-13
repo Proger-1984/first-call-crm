@@ -6,7 +6,7 @@ import { MultiSelect } from '../../components/UI/MultiSelect';
 import { DatePicker } from '../../components/UI/DatePicker';
 import { Tooltip } from '../../components/UI/Tooltip';
 import { Pagination } from '../../components/UI/Pagination';
-import { listingsApi, filtersApi, favoritesApi, photoTasksApi, type FilterOption } from '../../services/api';
+import { listingsApi, filtersApi, favoritesApi, photoTasksApi, propertiesApi, type FilterOption } from '../../services/api';
 import { useUIStore } from '../../stores/uiStore';
 import './Dashboard.css';
 
@@ -235,6 +235,30 @@ export function Dashboard() {
     description: '',
   });
 
+  // Множество listing_id, которые уже добавлены как объекты (Property)
+  const [addedPropertyListingIds, setAddedPropertyListingIds] = useState<Set<number>>(new Set());
+
+  // Загрузка listing_id уже добавленных объектов при монтировании
+  useEffect(() => {
+    const loadExistingPropertyListingIds = async () => {
+      try {
+        const response = await propertiesApi.getAll({ per_page: 1000, page: 1 });
+        const properties = response.data?.data?.properties || [];
+        const listingIds = new Set<number>(
+          properties
+            .filter((p: any) => p.listing_id != null)
+            .map((p: any) => p.listing_id as number)
+        );
+        if (listingIds.size > 0) {
+          setAddedPropertyListingIds(listingIds);
+        }
+      } catch {
+        // Не критично — кнопки будут показаны
+      }
+    };
+    loadExistingPropertyListingIds();
+  }, []);
+
   // Состояние фильтров (для UI) — хранят ID выбранных элементов
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [callStatusFilter, setCallStatusFilter] = useState<string[]>([]);
@@ -398,6 +422,17 @@ export function Dashboard() {
     e.stopPropagation();
     toggleFavoriteMutation.mutate(listingId);
   }, [toggleFavoriteMutation]);
+
+  // Обработчик добавления объекта (Property) из объявления
+  const handleAddProperty = useCallback(async (listingId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await propertiesApi.create({ listing_id: listingId, deal_type: 'sale' });
+      setAddedPropertyListingIds(prev => new Set([...prev, listingId]));
+    } catch (err) {
+      console.error('Ошибка при добавлении объекта:', err);
+    }
+  }, []);
 
   // Мутация для создания задачи обработки фото
   const createPhotoTaskMutation = useMutation({
@@ -799,6 +834,22 @@ export function Dashboard() {
                     </span>
                   </div>
                 </Tooltip>
+                {addedPropertyListingIds.has(listing.id) ? (
+                  <Tooltip content="Объект уже добавлен" position="top">
+                    <div className="listing-action added">
+                      <span className="material-icons">check_circle</span>
+                    </div>
+                  </Tooltip>
+                ) : (
+                  <Tooltip content="Добавить объект" position="top">
+                    <div
+                      className="listing-action"
+                      onClick={(e) => handleAddProperty(listing.id, e)}
+                    >
+                      <span className="material-icons">add_home</span>
+                    </div>
+                  </Tooltip>
+                )}
               </div>
             </div>
           </td>
@@ -1428,6 +1479,7 @@ export function Dashboard() {
           onPerPageChange={handlePerPageChange}
         />
       </div>
+
     </div>
   );
 }

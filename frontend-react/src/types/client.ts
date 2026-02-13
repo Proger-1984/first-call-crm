@@ -130,10 +130,10 @@ export interface ClientFilters {
 
 /** Метки типов клиентов (для UI) */
 export const CLIENT_TYPE_LABELS: Record<ClientType, string> = {
-  buyer: 'Покупатель',
+  landlord: 'Арендодатель',
   seller: 'Продавец',
   renter: 'Арендатор',
-  landlord: 'Арендодатель',
+  buyer: 'Покупатель',
 };
 
 /** Метки статусов привязки объявлений */

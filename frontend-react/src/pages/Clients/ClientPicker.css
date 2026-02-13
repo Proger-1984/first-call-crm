@@ -1,0 +1,109 @@
+/* ===========================================
+   Модалка привязки объявления к клиенту
+   =========================================== */
+
+.client-picker-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 80vh;
+  background: var(--bg-primary, #fff);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.client-picker-content {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Строка поиска */
+.client-search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.client-search-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.client-search-input:focus {
+  border-color: var(--primary-color, #2196F3);
+}
+
+/* Результаты */
+.client-picker-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.client-picker-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--bg-secondary, #f8f9fa);
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.client-picker-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.client-picker-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.client-picker-details {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.client-picker-type {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.client-picker-phone {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #888);
+}
+
+/* Ошибка */
+.client-picker-error {
+  padding: 10px;
+  background: #FFEBEE;
+  color: #C62828;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* Пусто */
+.client-picker-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #aaa);
+}

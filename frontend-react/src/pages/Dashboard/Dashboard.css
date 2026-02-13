@@ -126,245 +126,7 @@
     font-weight: 500;
 }
 
-/* Карточки */
-.card {
-    background: var(--bg-card);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--border-light);
-}
-
-/* Для карточки фильтров разрешаем overflow чтобы dropdown не обрезался */
-.filters-card {
-    overflow: visible;
-}
-
-.filters-card .card-body {
-    overflow: visible;
-}
-
-.card-header {
-    padding: 18px 22px;
-    border-bottom: 1px solid var(--border-light);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: linear-gradient(145deg, #ffffff 0%, #f8fbfc 100%);
-}
-
-.card-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    margin: 0;
-}
-
-.card-title .material-icons {
-    color: var(--primary);
-}
-
-.card-body {
-    padding: 22px;
-}
-
-/* Фильтры */
-.filters-card .card-header {
-    padding: 10px 18px;
-}
-
-.filters-card .card-title {
-    font-size: 14px;
-}
-
-.filters-card .card-title .material-icons {
-    font-size: 18px;
-}
-
-/* Группа кнопок в заголовке фильтров */
-.filter-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-shrink: 0;
-}
-
-.filter-toggle-btn {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-    color: var(--text-secondary);
-    background: transparent;
-    border: 1px solid var(--border);
-    padding: 7px 12px;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.filter-toggle-btn:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-.filter-toggle-btn .material-icons {
-    font-size: 16px;
-    transition: transform var(--transition-fast);
-}
-
-.filter-toggle-btn.collapsed .material-icons {
-    transform: rotate(-180deg);
-}
-
-.filters-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 18px;
-}
-
-.filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.filter-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-
-.filter-label-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
-}
-
-.filter-label-row .filter-label {
-    margin-bottom: 0;
-}
-
-.filter-reset-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    border: none;
-    background: var(--bg-secondary);
-    border-radius: 50%;
-    cursor: pointer;
-    color: var(--text-secondary);
-    transition: all var(--transition-fast);
-}
-
-.filter-reset-btn:hover {
-    background: var(--danger);
-    color: white;
-}
-
-.filter-reset-btn .material-icons {
-    font-size: 14px;
-}
-
-.filter-row {
-    display: flex;
-    gap: 8px;
-}
-
-.filter-row .form-control {
-    flex: 1;
-}
-
-.form-control {
-    width: 100%;
-    padding: 9px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius-sm);
-    font-size: 13px;
-    color: var(--text-primary);
-    background: var(--bg-card);
-    transition: all var(--transition-fast);
-}
-
-.form-control:hover {
-    border-color: var(--text-muted);
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-light);
-}
-
-.form-control::placeholder {
-    color: var(--text-muted);
-}
-
-.filter-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 18px;
-    padding-top: 18px;
-    border-top: 1px solid var(--border-light);
-}
-
-/* Кнопки */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    padding: 9px 18px;
-    font-size: 13px;
-    font-weight: 500;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    border: none;
-    text-decoration: none;
-}
-
-.btn .material-icons {
-    font-size: 17px;
-}
-
-.btn-primary {
-    background: var(--gradient-primary);
-    color: white;
-    box-shadow: 0 2px 8px rgba(132, 152, 115, 0.25);
-}
-
-.btn-primary:hover {
-    background: linear-gradient(135deg, #6b7f5c 0%, #8a9f78 100%) !important;
-    color: white !important;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(132, 152, 115, 0.35);
-}
-
-.btn-outline {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-}
-
-.btn-outline:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: var(--primary-50);
-}
-
-.btn-icon {
-    padding: 9px 14px;
-}
+/* Карточки — глобальные стили перенесены в styles/index.css */
 
 /* Таблица */
 .table-card.no-header {
@@ -430,14 +192,7 @@
     white-space: nowrap;
 }
 
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 12px;
-}
-
-.btn-sm .material-icons {
-    font-size: 15px;
-}
+/* .btn-sm — глобальные стили перенесены в styles/index.css */
 
 .table-container {
     overflow: auto;
@@ -508,12 +263,14 @@
 }
 
 .density-compact .listing-action {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
 }
 
 .density-compact .listing-action .material-icons {
-    font-size: 14px;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
 }
 
 .density-compact .call-action-btn {
@@ -523,6 +280,9 @@
 
 .density-compact .call-action-btn .material-icons {
     font-size: 14px;
+    width: 14px;
+    height: 14px;
+    line-height: 1;
 }
 
 .density-compact .date-cell .date {
@@ -736,7 +496,7 @@
 .listing-preview {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 10px;
     min-width: 180px;
 }
 
@@ -750,7 +510,7 @@
 
 .listing-actions {
     display: flex;
-    gap: 2px;
+    gap: 4px;
     opacity: 0.5;
     transition: opacity var(--transition-fast);
 }
@@ -760,15 +520,18 @@ tr:hover .listing-actions {
 }
 
 .listing-action {
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
     border-radius: 4px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all var(--transition-fast);
     color: var(--text-muted);
+    text-decoration: none;
+    line-height: 1;
+    padding: 0;
 }
 
 .listing-action:hover {
@@ -832,7 +595,22 @@ tr:hover .listing-actions {
 }
 
 .listing-action .material-icons {
-    font-size: 16px;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
+}
+
+/* Объект уже добавлен — серо-зелёная неактивная кнопка */
+.listing-action.added {
+    color: var(--success);
+    background: var(--success-bg);
+    cursor: default;
+}
+
+.listing-action.added:hover {
+    color: var(--success);
+    background: var(--success-bg);
 }
 
 /* Ячейка статуса */
@@ -864,6 +642,9 @@ tr:hover .listing-actions {
 
 .call-action-btn .material-icons {
     font-size: 18px;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
 }
 
 /* Адаптивность */
@@ -873,11 +654,7 @@ tr:hover .listing-actions {
     }
 }
 
-@media (max-width: 1200px) {
-    .filters-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
+/* Адаптивность фильтров перенесена в styles/index.css */
 
 @media (max-width: 992px) {
     .stats-cards {
@@ -889,32 +666,10 @@ tr:hover .listing-actions {
     .stats-cards {
         grid-template-columns: 1fr;
     }
-
-    .filters-grid {
-        grid-template-columns: 1fr;
-    }
-
 }
 
 /* ===== Модальное окно настройки столбцов ===== */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
+/* .modal-overlay, @keyframes fadeIn/slideUp — перенесены в styles/index.css */
 
 .modal {
     background: var(--bg-card);
@@ -926,17 +681,6 @@ tr:hover .listing-actions {
     display: flex;
     flex-direction: column;
     animation: slideUp 0.2s ease;
-}
-
-@keyframes slideUp {
-    from { 
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to { 
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 .modal-header {

@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { clientsApi } from '../../services/api';
+import { Tooltip } from '../../components/UI/Tooltip';
+import { ConfirmDialog } from '../../components/UI/ConfirmDialog';
 import { ClientForm } from './ClientForm';
 import { StageSettings } from './StageSettings';
+import { ListingPicker } from './ListingPicker';
 import type { Client, PipelineStage, ClientListingStatus } from '../../types/client';
 import { CLIENT_TYPE_LABELS, LISTING_STATUS_LABELS } from '../../types/client';
 import './ClientCard.css';
@@ -19,6 +22,17 @@ export function ClientCard() {
 
   const [showEditForm, setShowEditForm] = useState(false);
   const [showStageSettings, setShowStageSettings] = useState(false);
+  const [showListingPicker, setShowListingPicker] = useState(false);
+
+  // Диалог подтверждения
+  const [dialog, setDialog] = useState<{
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null);
 
   /** Загрузка клиента */
   const loadClient = useCallback(async () => {
@@ -50,13 +64,37 @@ export function ClientCard() {
     loadStages();
   }, [loadClient, loadStages]);
 
-  /** Изменить стадию */
+  /** Показать ошибку через диалог */
+  const showError = (message: string) => {
+    setDialog({ title: 'Ошибка', message, variant: 'danger', onConfirm: () => setDialog(null) });
+  };
+
+  /** Изменить стадию (оптимистичное обновление) */
   const handleStageChange = async (stageId: number) => {
+    if (!client) return;
+
+    // Находим целевую стадию
+    const targetStage = stages.find(s => s.id === stageId);
+    if (!targetStage || client.pipeline_stage?.id === stageId) return;
+
+    // Оптимистичное обновление: сразу меняем стадию локально
+    const previousStage = client.pipeline_stage;
+    setClient(prev => prev ? {
+      ...prev,
+      pipeline_stage: {
+        id: targetStage.id,
+        name: targetStage.name,
+        color: targetStage.color,
+        is_final: targetStage.is_final,
+      },
+    } : null);
+
     try {
       await clientsApi.moveStage(clientId, stageId);
-      loadClient();
     } catch {
-      alert('Ошибка смены стадии');
+      // Откат при ошибке
+      setClient(prev => prev ? { ...prev, pipeline_stage: previousStage } : null);
+      showError('Ошибка смены стадии');
     }
   };
 
@@ -66,7 +104,7 @@ export function ClientCard() {
       await clientsApi.removeListing(clientId, listingId);
       loadClient();
     } catch {
-      alert('Ошибка удаления');
+      showError('Ошибка удаления');
     }
   };
 
@@ -76,7 +114,7 @@ export function ClientCard() {
       await clientsApi.updateListingStatus(clientId, listingId, newStatus);
       loadClient();
     } catch {
-      alert('Ошибка обновления');
+      showError('Ошибка обновления');
     }
   };
 
@@ -86,7 +124,7 @@ export function ClientCard() {
       await clientsApi.deleteCriteria(criteriaId);
       loadClient();
     } catch {
-      alert('Ошибка удаления критерия');
+      showError('Ошибка удаления критерия');
     }
   };
 
@@ -98,19 +136,28 @@ export function ClientCard() {
       await clientsApi.archive(clientId, archive);
       loadClient();
     } catch {
-      alert('Ошибка');
+      showError('Не удалось выполнить операцию');
     }
   };
 
   /** Удалить клиента */
-  const handleDelete = async () => {
-    if (!confirm('Удалить клиента? Это действие нельзя отменить.')) return;
-    try {
-      await clientsApi.delete(clientId);
-      navigate('/clients');
-    } catch {
-      alert('Ошибка удаления');
-    }
+  const handleDelete = () => {
+    setDialog({
+      title: 'Удаление клиента',
+      message: 'Удалить клиента? Это действие нельзя отменить.',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      variant: 'danger',
+      onConfirm: async () => {
+        setDialog(null);
+        try {
+          await clientsApi.delete(clientId);
+          navigate('/clients');
+        } catch {
+          showError('Ошибка удаления');
+        }
+      },
+    });
   };
 
   /** Форматирование даты */
@@ -160,15 +207,21 @@ export function ClientCard() {
           Клиенты
         </button>
         <div className="card-top-actions">
-          <button className="action-btn" onClick={() => setShowEditForm(true)} title="Редактировать">
-            <span className="material-icons">edit</span>
-          </button>
-          <button className="action-btn" onClick={handleArchive} title={client.is_archived ? 'Восстановить' : 'В архив'}>
-            <span className="material-icons">{client.is_archived ? 'unarchive' : 'archive'}</span>
-          </button>
-          <button className="action-btn danger" onClick={handleDelete} title="Удалить">
-            <span className="material-icons">delete_outline</span>
-          </button>
+          <Tooltip content="Редактировать" position="bottom">
+            <button className="action-btn" onClick={() => setShowEditForm(true)}>
+              <span className="material-icons">edit</span>
+            </button>
+          </Tooltip>
+          <Tooltip content={client.is_archived ? 'Восстановить' : 'В архив'} position="bottom">
+            <button className="action-btn" onClick={handleArchive}>
+              <span className="material-icons">{client.is_archived ? 'unarchive' : 'archive'}</span>
+            </button>
+          </Tooltip>
+          <Tooltip content="Удалить" position="bottom">
+            <button className="action-btn danger" onClick={handleDelete}>
+              <span className="material-icons">delete_outline</span>
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -189,25 +242,31 @@ export function ClientCard() {
           <div className="card-section">
             <div className="section-header">
               <h3>Стадия воронки</h3>
-              <button className="settings-btn" onClick={() => setShowStageSettings(true)} title="Настроить стадии">
-                <span className="material-icons">settings</span>
-              </button>
+              <Tooltip content="Настроить стадии" position="top">
+                <button className="settings-btn" onClick={() => setShowStageSettings(true)}>
+                  <span className="material-icons">settings</span>
+                </button>
+              </Tooltip>
             </div>
             <div className="stage-selector">
-              {stages.map(stage => (
-                <button
-                  key={stage.id}
-                  className={`stage-option ${client.pipeline_stage?.id === stage.id ? 'active' : ''}`}
-                  style={{
-                    borderColor: stage.color,
-                    backgroundColor: client.pipeline_stage?.id === stage.id ? stage.color + '20' : 'transparent',
-                    color: stage.color,
-                  }}
-                  onClick={() => handleStageChange(stage.id)}
-                >
-                  {stage.name}
-                </button>
-              ))}
+              {stages.map(stage => {
+                const isActive = client.pipeline_stage?.id === stage.id;
+                return (
+                  <button
+                    key={stage.id}
+                    className={`stage-option ${isActive ? 'active' : ''}`}
+                    style={{
+                      borderColor: stage.color,
+                      backgroundColor: isActive ? stage.color : 'transparent',
+                      color: isActive ? '#fff' : stage.color,
+                      boxShadow: isActive ? `0 2px 8px ${stage.color}40` : 'none',
+                    }}
+                    onClick={() => handleStageChange(stage.id)}
+                  >
+                    {stage.name}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -256,7 +315,13 @@ export function ClientCard() {
 
           {/* Подборка объявлений */}
           <div className="card-section">
-            <h3>Подборка объявлений ({client.listings_count || 0})</h3>
+            <div className="section-header">
+              <h3>Подборка объявлений ({client.listings_count || 0})</h3>
+              <button className="btn-primary btn-sm" onClick={() => setShowListingPicker(true)}>
+                <span className="material-icons">add</span>
+                Добавить
+              </button>
+            </div>
             {client.listings && client.listings.length > 0 ? (
               <div className="listings-list">
                 {client.listings.map(cl => (
@@ -279,7 +344,7 @@ export function ClientCard() {
                       <select
                         value={cl.status}
                         onChange={(e) => handleListingStatusChange(cl.listing_id, e.target.value as ClientListingStatus)}
-                        className={`listing-status status-${cl.status}`}
+                        className={`filter-select listing-status status-${cl.status}`}
                       >
                         {Object.entries(LISTING_STATUS_LABELS).map(([value, label]) => (
                           <option key={value} value={value}>{label}</option>
@@ -383,6 +448,27 @@ export function ClientCard() {
         <StageSettings
           onClose={() => setShowStageSettings(false)}
           onSaved={() => { setShowStageSettings(false); loadStages(); }}
+        />
+      )}
+
+      {showListingPicker && (
+        <ListingPicker
+          clientId={clientId}
+          onClose={() => setShowListingPicker(false)}
+          onAdded={() => { setShowListingPicker(false); loadClient(); }}
+        />
+      )}
+
+      {/* Диалог подтверждения */}
+      {dialog && (
+        <ConfirmDialog
+          title={dialog.title}
+          message={dialog.message}
+          confirmText={dialog.confirmText}
+          cancelText={dialog.cancelText}
+          variant={dialog.variant}
+          onConfirm={dialog.onConfirm}
+          onCancel={() => setDialog(null)}
         />
       )}
     </div>

@@ -1,0 +1,19 @@
+/* ===========================================
+   График воронки (SVG)
+   =========================================== */
+
+.funnel-chart {
+  padding: 16px;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.funnel-svg {
+  width: 100%;
+  max-width: 600px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}

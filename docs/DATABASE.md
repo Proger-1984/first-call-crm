@@ -1,6 +1,6 @@
 # Схема базы данных First Call
 
-**Дата обновления:** 11 февраля 2026
+**Дата обновления:** 13 февраля 2026
 
 ## Обзор
 
@@ -13,7 +13,7 @@
 - Username: `postgres`
 - Password: `postgres`
 
-**Всего таблиц:** 32 (не считая `spatial_ref_sys`)
+**Всего таблиц:** 35 (не считая `spatial_ref_sys`)
 
 ---
 
@@ -870,6 +870,98 @@
 
 ---
 
+### 33. properties — Объекты недвижимости (CRM v2)
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | BIGSERIAL PK | Первичный ключ |
+| `user_id` | BIGINT NOT NULL FK | Ссылка на users (агент-владелец) |
+| `listing_id` | BIGINT NULL FK | Ссылка на listings (связь с парсером) |
+| `title` | VARCHAR(500) NULL | Название объекта |
+| `address` | VARCHAR(500) NULL | Адрес |
+| `price` | DECIMAL(15,2) NULL | Цена |
+| `rooms` | SMALLINT NULL | Количество комнат |
+| `area` | DECIMAL(10,2) NULL | Площадь, м² |
+| `floor` | SMALLINT NULL | Этаж |
+| `floors_total` | SMALLINT NULL | Этажей в доме |
+| `description` | TEXT NULL | Описание объекта |
+| `url` | VARCHAR(1000) NULL | Ссылка на объявление |
+| `deal_type` | VARCHAR(10) NOT NULL DEFAULT 'sale' | Тип сделки: `sale` / `rent` |
+| `owner_name` | VARCHAR(255) NULL | Имя собственника |
+| `owner_phone` | VARCHAR(20) NULL | Телефон собственника |
+| `owner_phone_secondary` | VARCHAR(20) NULL | Доп. телефон собственника |
+| `source_type` | VARCHAR(50) NULL | Источник: avito, cian, звонок и т.д. |
+| `source_details` | VARCHAR(255) NULL | Детали источника |
+| `comment` | TEXT NULL | Комментарий агента |
+| `is_archived` | BOOLEAN DEFAULT false | В архиве |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:**
+- `user_id` -> `users(id)` ON DELETE CASCADE
+- `listing_id` -> `listings(id)` ON DELETE SET NULL
+
+**Индексы:**
+- `properties_user_archived_index` (`user_id`, `is_archived`)
+- `properties_user_deal_type_index` (`user_id`, `deal_type`)
+- `properties_listing_index` (`listing_id`)
+- `properties_owner_phone_index` (`owner_phone`)
+
+---
+
+### 34. contacts — Контакты (CRM v2)
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | BIGSERIAL PK | Первичный ключ |
+| `user_id` | BIGINT NOT NULL FK | Ссылка на users (агент-владелец) |
+| `name` | VARCHAR(255) NOT NULL | ФИО контакта |
+| `phone` | VARCHAR(20) NULL | Основной телефон |
+| `phone_secondary` | VARCHAR(20) NULL | Дополнительный телефон |
+| `email` | VARCHAR(255) NULL | Email |
+| `telegram_username` | VARCHAR(100) NULL | Telegram username |
+| `comment` | TEXT NULL | Комментарий |
+| `is_archived` | BOOLEAN DEFAULT false | В архиве |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:** `user_id` -> `users(id)` ON DELETE CASCADE
+
+**Индексы:**
+- `contacts_user_archived_index` (`user_id`, `is_archived`)
+- `contacts_phone_index` (`phone`)
+
+---
+
+### 35. object_clients — Связка объект+контакт (CRM v2, воронка)
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | BIGSERIAL PK | Первичный ключ |
+| `property_id` | BIGINT NOT NULL FK | Ссылка на properties |
+| `contact_id` | BIGINT NOT NULL FK | Ссылка на contacts |
+| `pipeline_stage_id` | BIGINT NOT NULL FK | Ссылка на pipeline_stages (стадия воронки) |
+| `comment` | TEXT NULL | Комментарий к связке |
+| `next_contact_at` | TIMESTAMP NULL | Дата следующего контакта |
+| `last_contact_at` | TIMESTAMP NULL | Дата последнего контакта |
+| `created_at` | TIMESTAMP NULL | Дата создания |
+| `updated_at` | TIMESTAMP NULL | Дата обновления |
+
+**FK:**
+- `property_id` -> `properties(id)` ON DELETE CASCADE
+- `contact_id` -> `contacts(id)` ON DELETE CASCADE
+- `pipeline_stage_id` -> `pipeline_stages(id)` ON DELETE RESTRICT
+
+**Индексы:**
+- `object_clients_property_contact_unique` (UNIQUE on `property_id`, `contact_id`)
+- `object_clients_stage_index` (`pipeline_stage_id`)
+- `object_clients_contact_index` (`contact_id`)
+- `object_clients_next_contact_index` (`next_contact_at`)
+
+**Примечание:** Главная сущность воронки продаж. Kanban-карточка = пара (объект + контакт). Drag-n-drop перемещает эту связку между стадиями.
+
+---
+
 ## Внешние ключи
 
 | Таблица | Колонка | Ссылается на |
@@ -881,7 +973,13 @@
 | client_search_criteria | location_id | locations(id) |
 | clients | user_id | users(id) |
 | clients | pipeline_stage_id | pipeline_stages(id) |
+| contacts | user_id | users(id) |
+| object_clients | property_id | properties(id) |
+| object_clients | contact_id | contacts(id) |
+| object_clients | pipeline_stage_id | pipeline_stages(id) |
 | pipeline_stages | user_id | users(id) |
+| properties | user_id | users(id) |
+| properties | listing_id | listings(id) |
 | agent_listings | user_id | users(id) |
 | agent_listings | listing_id | listings(id) |
 | agent_listings | call_status_id | call_statuses(id) |
@@ -937,7 +1035,7 @@ make migrate
 docker exec -it slim_php-cli php db/migrations/run.php
 ```
 
-**Порядок миграций (51 всего):**
+**Порядок миграций (58 всего):**
 1. `20230101000001` — create users table
 2. `20230101000002` — create sources table
 3. `20230101000003` — create categories table
@@ -992,6 +1090,10 @@ docker exec -it slim_php-cli php db/migrations/run.php
 52. `20260212000002` — create clients table
 53. `20260212000003` — create client_search_criteria table
 54. `20260212000004` — create client_listings table
+55. `20260213000001` — create properties table (CRM v2)
+56. `20260213000002` — create contacts table (CRM v2)
+57. `20260213000003` — create object_clients table (CRM v2)
+58. `20260213000004` — migrate clients to new model (CRM v2)
 
 ---
 

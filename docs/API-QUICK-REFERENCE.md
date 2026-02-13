@@ -863,9 +863,224 @@ docker-compose exec postgres psql -U postgres -d slim_api
 
 ---
 
-## CRM — Клиенты
+## CRM — Объекты недвижимости (v2)
 
 > Требует `Authorization: Bearer <token>` + активная подписка (`SubscriptionMiddleware`)
+>
+> Новая модель CRM: Объект → Контакт → Связка (object_clients) с воронкой.
+
+### Список объектов
+```http
+GET /api/v1/properties?page=1&per_page=20&search=Ленина&deal_type=sale&stage_ids[]=1&stage_ids[]=2&is_archived=false&sort=created_at&order=desc
+
+Response: {
+  data: {
+    properties: [ { id, title, address, price, deal_type, owner_name, contacts_count, ... } ],
+    pagination: { total, page, per_page, total_pages }
+  }
+}
+```
+
+### Карточка объекта
+```http
+GET /api/v1/properties/{id}
+
+Response: {
+  data: {
+    property: {
+      id, title, address, price, rooms, area, floor, floors_total,
+      description, url, deal_type, owner_name, owner_phone, owner_phone_secondary,
+      source_type, source_details, comment, is_archived, listing_id,
+      object_clients: [ { id, contact_id, contact: {...}, pipeline_stage: {...}, next_contact_at } ],
+      listing: { id, url, external_id },
+      contacts_count, created_at, updated_at
+    }
+  }
+}
+```
+
+### Создать объект
+```http
+POST /api/v1/properties
+Content-Type: application/json
+
+{
+  "listing_id": "7852879731",       // ID объявления (external_id или internal id)
+  "title": "2к квартира на Ленина",
+  "address": "ул. Ленина 15",
+  "price": 5200000,
+  "rooms": 2,
+  "area": 65,
+  "floor": 15,
+  "floors_total": 17,
+  "deal_type": "sale",
+  "owner_name": "Петров И.И.",
+  "owner_phone": "+79001234567",
+  "source_type": "cian",
+  "comment": "Хороший вариант"
+}
+```
+Примечание: Если указан `listing_id`, данные объявления (адрес, цена, площадь, комнаты, этаж) подтягиваются автоматически. Поиск по `external_id`, затем по внутреннему ID.
+
+### Обновить объект
+```http
+PUT /api/v1/properties/{id}
+```
+
+### Удалить объект
+```http
+DELETE /api/v1/properties/{id}
+```
+
+### Архивировать/разархивировать
+```http
+PATCH /api/v1/properties/{id}/archive
+Content-Type: application/json
+
+{ "is_archived": true }
+```
+
+### Kanban-доска (стадии + пары объект+контакт)
+```http
+GET /api/v1/properties/pipeline
+
+Response: {
+  data: {
+    columns: [
+      {
+        id, name, color, sort_order, is_system, is_final,
+        cards: [ { id, property: {...}, contact: {...}, comment, next_contact_at } ]
+      }
+    ]
+  }
+}
+```
+Примечание: Карточка на kanban = пара (объект + контакт). Drag-n-drop перемещает связку `object_client`.
+
+### Статистика
+```http
+GET /api/v1/properties/stats
+
+Response: {
+  data: {
+    total, active, archived, sale_count, rent_count,
+    by_stage: [ { stage_id, stage_name, color, count } ]
+  }
+}
+```
+
+---
+
+## CRM — Связки объект+контакт
+
+### Привязать контакт к объекту
+```http
+POST /api/v1/properties/{id}/contacts
+Content-Type: application/json
+
+{ "contact_id": 5 }
+
+Response: { data: { object_client: { id, property_id, contact_id, pipeline_stage_id } } }
+```
+Примечание: Контакт привязывается с начальной стадией воронки (первая по sort_order).
+
+### Отвязать контакт
+```http
+DELETE /api/v1/properties/{id}/contacts/{contact_id}
+```
+
+### Сменить стадию связки (drag-n-drop на kanban)
+```http
+PATCH /api/v1/properties/{id}/contacts/{contact_id}/stage
+Content-Type: application/json
+
+{ "stage_id": 3 }
+```
+
+### Обновить связку (комментарий, дата контакта)
+```http
+PATCH /api/v1/properties/{id}/contacts/{contact_id}
+Content-Type: application/json
+
+{ "comment": "Обсудили условия", "next_contact_at": "2026-02-20 10:00:00" }
+```
+
+---
+
+## CRM — Справочник контактов (v2)
+
+> Требует `Authorization: Bearer <token>` + активная подписка (`SubscriptionMiddleware`)
+
+### Список контактов
+```http
+GET /api/v1/contacts?page=1&per_page=20&search=Иванов
+
+Response: {
+  data: {
+    contacts: [ { id, name, phone, email, telegram_username, properties_count, created_at } ],
+    pagination: { total, page, per_page, total_pages }
+  }
+}
+```
+
+### Поиск контактов (для модалки привязки)
+```http
+GET /api/v1/contacts/search?q=Иванов
+
+Response: {
+  data: {
+    contacts: [ { id, name, phone, email } ]
+  }
+}
+```
+
+### Карточка контакта
+```http
+GET /api/v1/contacts/{id}
+
+Response: {
+  data: {
+    contact: {
+      id, name, phone, phone_secondary, email, telegram_username, comment,
+      object_clients: [ { id, property: {...}, pipeline_stage: {...}, next_contact_at } ],
+      created_at, updated_at
+    }
+  }
+}
+```
+
+### Создать контакт
+```http
+POST /api/v1/contacts
+Content-Type: application/json
+
+{
+  "name": "Иванов Иван",
+  "phone": "+79001234567",
+  "email": "ivanov@mail.ru",
+  "telegram_username": "ivanov",
+  "comment": "Ищет 2к квартиру"
+}
+
+Response: { data: { contact: { id, name, phone, ... } } }
+```
+
+### Обновить контакт
+```http
+PUT /api/v1/contacts/{id}
+```
+
+### Удалить контакт
+```http
+DELETE /api/v1/contacts/{id}
+```
+
+---
+
+## CRM — Клиенты (DEPRECATED — старая модель v1)
+
+> **Устаревшие эндпоинты.** Используйте `/properties` и `/contacts` (v2).
+> Старые маршруты оставлены для обратной совместимости.
 
 ### Список клиентов
 ```http
@@ -893,95 +1108,18 @@ Content-Type: application/json
 }
 ```
 
-### Обновить клиента
+### Обновить / Удалить / Архивировать / Переместить
 ```http
 PUT /api/v1/clients/{id}
-```
-
-### Удалить клиента
-```http
 DELETE /api/v1/clients/{id}
-```
-
-### Архивировать/разархивировать
-```http
 PATCH /api/v1/clients/{id}/archive
-Content-Type: application/json
-
-{ "is_archived": true }
-```
-
-### Переместить по воронке
-```http
 PATCH /api/v1/clients/{id}/stage
-Content-Type: application/json
-
-{ "stage_id": 3 }
 ```
 
-### Kanban-доска (стадии + клиенты)
+### Kanban / Статистика
 ```http
 GET /api/v1/clients/pipeline
-```
-
-### Статистика
-```http
 GET /api/v1/clients/stats
-```
-
----
-
-## CRM — Подборки (привязка объявлений к клиенту)
-
-### Добавить объявление в подборку
-```http
-POST /api/v1/clients/{id}/listings
-Content-Type: application/json
-
-{ "listing_id": 123, "comment": "Хороший вариант" }
-```
-
-### Удалить из подборки
-```http
-DELETE /api/v1/clients/{id}/listings/{listing_id}
-```
-
-### Обновить статус объявления
-```http
-PATCH /api/v1/clients/{id}/listings/{listing_id}
-Content-Type: application/json
-
-{ "status": "showed" }
-```
-Допустимые статусы: `proposed`, `showed`, `liked`, `rejected`
-
----
-
-## CRM — Критерии поиска
-
-### Добавить критерий
-```http
-POST /api/v1/clients/{id}/criteria
-Content-Type: application/json
-
-{
-  "category_id": 1,
-  "location_id": 5,
-  "price_min": 3000000,
-  "price_max": 7000000,
-  "room_ids": [2, 3],
-  "notes": "Не первый и не последний этаж"
-}
-```
-
-### Обновить критерий
-```http
-PUT /api/v1/clients/criteria/{id}
-```
-
-### Удалить критерий
-```http
-DELETE /api/v1/clients/criteria/{id}
 ```
 
 ---

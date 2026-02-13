@@ -37,7 +37,9 @@ info:
     - `/api/v1/photo-tasks/*`
     - `/api/v1/favorites/*`
     - `/api/v1/clients/*`
-    
+    - `/api/v1/properties/*`
+    - `/api/v1/contacts/*`
+
     **Эндпоинты, доступные без подписки:**
     - `/api/v1/me/info`, `/api/v1/me/status`, `/api/v1/me/download-info`, `/api/v1/me/download/android`
     - `/api/v1/subscriptions/*`, `/api/v1/catalog/*`, `/api/v1/billing/*`
@@ -75,6 +77,10 @@ tags:
     description: Методы для управления клиентами CRM (карточки, воронка, подборки)
   - name: Воронка продаж
     description: Методы для управления стадиями воронки продаж
+  - name: Объекты недвижимости
+    description: CRM v2 — управление объектами недвижимости
+  - name: Контакты
+    description: CRM v2 — справочник контактов
 
 servers:
   - url: http://localhost:8080
@@ -820,6 +826,44 @@ components:
           type: integer
           description: Количество клиентов на стадии
           example: 5
+
+    PropertyShort:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        address: { type: string }
+        price: { type: number }
+        rooms: { type: integer }
+        area: { type: number }
+        deal_type: { type: string, enum: [sale, rent] }
+        owner_name: { type: string }
+        owner_phone: { type: string }
+        is_archived: { type: boolean }
+        contacts_count: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    ContactShort:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        telegram_username: { type: string }
+        properties_count: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    PipelineCard:
+      type: object
+      properties:
+        id: { type: integer }
+        property:
+          $ref: '#/components/schemas/PropertyShort'
+        contact:
+          $ref: '#/components/schemas/ContactShort'
+        comment: { type: string, nullable: true }
+        next_contact_at: { type: string, format: date-time, nullable: true }
 
 paths:
   /api/v1/auth/telegram:
@@ -2872,7 +2916,7 @@ paths:
         Обновляет настройку автоматического звонка пользователя.
         Требует аутентификации.
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -2946,7 +2990,7 @@ paths:
         Обновляет настройку автоматического звонка на поднятые объявления.
         Требует аутентификации.
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -9671,6 +9715,1514 @@ paths:
                     status: error
                     message: "Одна или несколько стадий не найдены"
                     error: "not_found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ==========================================
+  # CRM v2: ОБЪЕКТЫ НЕДВИЖИМОСТИ
+  # ==========================================
+
+  /api/v1/properties:
+    get:
+      summary: Получить список объектов недвижимости
+      description: |
+        Возвращает список объектов недвижимости с фильтрами и пагинацией.
+
+        ## Права доступа
+        Требуется активная подписка.
+
+        ## Фильтры
+        - `search` — поиск по адресу, собственнику, телефону (ILIKE)
+        - `deal_type` — тип сделки (sale/rent)
+        - `stage_ids[]` — множественный выбор стадий воронки
+        - `is_archived` — показать архивные (по умолчанию false)
+
+        ## Сортировка
+        - `sort` — поле (created_at, price, address, deal_type)
+        - `order` — направление (asc, desc)
+      tags:
+        - Объекты недвижимости
+      operationId: propertyIndex
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Номер страницы
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Записей на страницу
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Поиск по адресу, собственнику, телефону
+        - name: deal_type
+          in: query
+          schema:
+            type: string
+            enum: [sale, rent]
+          description: Тип сделки
+        - name: stage_ids[]
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+          description: Множественный выбор стадий воронки
+        - name: is_archived
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Показать архивные объекты
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at, price, address, deal_type]
+            default: created_at
+          description: Поле сортировки
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Направление сортировки
+      responses:
+        '200':
+          description: Список объектов получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      properties:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PropertyShort'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+              examples:
+                success:
+                  summary: Список объектов
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      properties:
+                        - id: 1
+                          title: "2к квартира на Ленина"
+                          address: "ул. Ленина 15, кв. 42"
+                          price: 5200000
+                          rooms: 2
+                          area: 65
+                          deal_type: "sale"
+                          owner_name: "Петров И.И."
+                          owner_phone: "+7 999 123-45-67"
+                          is_archived: false
+                          contacts_count: 2
+                          created_at: "2026-02-13T10:00:00Z"
+                      pagination:
+                        page: 1
+                        per_page: 20
+                        total: 1
+                        total_pages: 1
+                empty:
+                  summary: Пустой список
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      properties: []
+                      pagination:
+                        page: 1
+                        per_page: 20
+                        total: 0
+                        total_pages: 0
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  summary: Требуется авторизация
+                  value:
+                    code: 401
+                    status: error
+                    message: "Требуется авторизация"
+                    error: "unauthorized"
+        '403':
+          description: Нет активной подписки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                no_subscription:
+                  summary: Требуется подписка
+                  value:
+                    code: 403
+                    status: error
+                    message: "Для доступа к этому разделу необходима активная подписка"
+                    error: "subscription_required"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                internal:
+                  summary: Внутренняя ошибка
+                  value:
+                    code: 500
+                    status: error
+                    message: "Ошибка получения списка объектов"
+                    error: "internal_error"
+
+    post:
+      summary: Создать новый объект недвижимости
+      description: |
+        Создаёт новый объект. Два режима:
+        1. **Из базы объявлений:** передать `listing_id` (external_id или internal id). Данные (адрес, цена, площадь, комнаты, этаж) подтянутся автоматически.
+        2. **Ручной ввод:** заполнить поля вручную, `title` обязательно.
+
+        При поиске по `listing_id` сначала ищется по `external_id`, затем по внутреннему ID (если <= 2147483647).
+      tags:
+        - Объекты недвижимости
+      operationId: propertyCreate
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                listing_id:
+                  type: string
+                  nullable: true
+                  description: ID объявления (external_id или internal id)
+                  example: "7852879731"
+                title:
+                  type: string
+                  nullable: true
+                  description: Название объекта
+                  example: "2к квартира на Ленина"
+                address:
+                  type: string
+                  nullable: true
+                  example: "ул. Ленина 15, кв. 42"
+                price:
+                  type: number
+                  nullable: true
+                  example: 5200000
+                rooms:
+                  type: integer
+                  nullable: true
+                  example: 2
+                area:
+                  type: number
+                  nullable: true
+                  example: 65.5
+                floor:
+                  type: integer
+                  nullable: true
+                  example: 15
+                floors_total:
+                  type: integer
+                  nullable: true
+                  example: 17
+                deal_type:
+                  type: string
+                  enum: [sale, rent]
+                  default: sale
+                  example: "sale"
+                owner_name:
+                  type: string
+                  nullable: true
+                  example: "Петров И.И."
+                owner_phone:
+                  type: string
+                  nullable: true
+                  example: "+7 999 123-45-67"
+                owner_phone_secondary:
+                  type: string
+                  nullable: true
+                source_type:
+                  type: string
+                  nullable: true
+                  description: Источник (avito, cian, звонок и т.д.)
+                  example: "cian"
+                source_details:
+                  type: string
+                  nullable: true
+                comment:
+                  type: string
+                  nullable: true
+            examples:
+              from_listing:
+                summary: Создание из базы объявлений
+                value:
+                  listing_id: "7852879731"
+                  deal_type: "sale"
+                  owner_name: "Петров И.И."
+                  owner_phone: "+7 999 123-45-67"
+                  source_type: "cian"
+              manual:
+                summary: Ручной ввод
+                value:
+                  title: "2к квартира на Ленина"
+                  address: "ул. Ленина 15"
+                  price: 5200000
+                  rooms: 2
+                  area: 65
+                  floor: 15
+                  floors_total: 17
+                  deal_type: "sale"
+                  owner_name: "Петров И.И."
+                  owner_phone: "+7 999 123-45-67"
+      responses:
+        '201':
+          description: Объект создан
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Объект создан
+                  value:
+                    code: 201
+                    status: success
+                    data:
+                      property:
+                        id: 1
+                        title: "2к квартира на Ленина"
+                        address: "ул. Ленина 15"
+                        price: 5200000
+                        deal_type: "sale"
+                      message: "Объект создан"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                no_title:
+                  summary: Не указано название (ручной ввод)
+                  value:
+                    code: 400
+                    status: error
+                    message: "Укажите название объекта или ID объявления"
+                    error: "validation_error"
+                listing_not_found:
+                  summary: Объявление не найдено
+                  value:
+                    code: 400
+                    status: error
+                    message: "Объявление не найдено в базе"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/properties/pipeline:
+    get:
+      summary: Kanban-доска объектов
+      description: |
+        Возвращает стадии воронки с карточками. Каждая карточка — пара (объект + контакт).
+        Drag-n-drop перемещает связку `object_client` между стадиями.
+      tags:
+        - Объекты недвижимости
+      operationId: propertyPipeline
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Kanban-доска
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Kanban-доска с карточками
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      columns:
+                        - id: 1
+                          name: "Новый лид"
+                          color: "#2196F3"
+                          sort_order: 0
+                          is_system: true
+                          is_final: false
+                          cards:
+                            - id: 1
+                              property:
+                                id: 1
+                                title: "2к, 65м², 15 этаж"
+                                address: "ул. Ленина 15"
+                                price: 5200000
+                                deal_type: "sale"
+                              contact:
+                                id: 5
+                                name: "Иванов И.И."
+                                phone: "+7 999 123-45-67"
+                              comment: null
+                              next_contact_at: "2026-02-15T10:00:00Z"
+                        - id: 8
+                          name: "Сделка закрыта"
+                          color: "#4CAF50"
+                          sort_order: 7
+                          is_system: true
+                          is_final: true
+                          cards: []
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/properties/stats:
+    get:
+      summary: Статистика объектов
+      description: Возвращает общую статистику по объектам и распределение по стадиям воронки.
+      tags:
+        - Объекты недвижимости
+      operationId: propertyStats
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Статистика объектов
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Статистика
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      total: 15
+                      active: 12
+                      archived: 3
+                      sale_count: 8
+                      rent_count: 7
+                      by_stage:
+                        - stage_id: 1
+                          stage_name: "Новый лид"
+                          color: "#2196F3"
+                          count: 5
+                        - stage_id: 3
+                          stage_name: "Квалификация"
+                          color: "#9C27B0"
+                          count: 3
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/properties/{id}:
+    get:
+      summary: Карточка объекта
+      description: |
+        Возвращает полную информацию об объекте, включая привязанных клиентов со стадиями воронки,
+        данные собственника и связь с объявлением из парсера.
+      tags:
+        - Объекты недвижимости
+      operationId: propertyShow
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта
+      responses:
+        '200':
+          description: Карточка объекта
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Полная карточка объекта
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      property:
+                        id: 1
+                        title: "2к квартира на Ленина"
+                        address: "ул. Ленина 15, кв. 42"
+                        price: 5200000
+                        rooms: 2
+                        area: 65
+                        floor: 15
+                        floors_total: 17
+                        description: "Просторная квартира с ремонтом"
+                        url: "https://cian.ru/sale/flat/123456"
+                        deal_type: "sale"
+                        owner_name: "Петров И.И."
+                        owner_phone: "+7 999 123-45-67"
+                        owner_phone_secondary: null
+                        source_type: "cian"
+                        source_details: null
+                        comment: "Хороший вариант"
+                        is_archived: false
+                        listing_id: 526235
+                        listing:
+                          id: 526235
+                          url: "https://cian.ru/sale/flat/123456"
+                          external_id: "7852879731"
+                        contacts_count: 1
+                        object_clients:
+                          - id: 1
+                            contact_id: 5
+                            contact:
+                              name: "Иванов И.И."
+                              phone: "+7 999 111-22-33"
+                            pipeline_stage:
+                              id: 3
+                              name: "Квалификация"
+                              color: "#9C27B0"
+                            next_contact_at: "2026-02-15T10:00:00Z"
+                        created_at: "2026-02-13T10:00:00Z"
+                        updated_at: "2026-02-13T12:30:00Z"
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  summary: Объект не найден
+                  value:
+                    code: 404
+                    status: error
+                    message: "Объект не найден"
+                    error: "not_found"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Обновить объект
+      description: Обновляет данные объекта. Передавать только изменённые поля.
+      tags:
+        - Объекты недвижимости
+      operationId: propertyUpdate
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                address:
+                  type: string
+                price:
+                  type: number
+                rooms:
+                  type: integer
+                deal_type:
+                  type: string
+                  enum: [sale, rent]
+                owner_name:
+                  type: string
+                owner_phone:
+                  type: string
+                comment:
+                  type: string
+            examples:
+              update_price:
+                summary: Обновить цену
+                value:
+                  price: 4800000
+                  comment: "Скинули цену"
+      responses:
+        '200':
+          description: Объект обновлён
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Объект обновлён
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      property:
+                        id: 1
+                        title: "2к квартира на Ленина"
+                        price: 4800000
+                      message: "Объект обновлён"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Удалить объект
+      description: Удаляет объект и все связанные записи object_clients (CASCADE).
+      tags:
+        - Объекты недвижимости
+      operationId: propertyDelete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта
+      responses:
+        '200':
+          description: Объект удалён
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Объект удалён
+                  value:
+                    code: 200
+                    status: success
+                    message: "Объект удалён"
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/properties/{id}/archive:
+    patch:
+      summary: Архивировать/разархивировать объект
+      tags:
+        - Объекты недвижимости
+      operationId: propertyArchive
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - is_archived
+              properties:
+                is_archived:
+                  type: boolean
+                  description: true = архивировать, false = разархивировать
+            examples:
+              archive:
+                summary: Архивировать
+                value:
+                  is_archived: true
+              unarchive:
+                summary: Разархивировать
+                value:
+                  is_archived: false
+      responses:
+        '200':
+          description: Статус архива обновлён
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Объект архивирован
+                  value:
+                    code: 200
+                    status: success
+                    message: "Объект перемещён в архив"
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/properties/{id}/contacts:
+    post:
+      summary: Привязать контакт к объекту
+      description: |
+        Привязывает контакт к объекту. Контакт автоматически получает начальную стадию воронки
+        (первая по sort_order). Один контакт может быть привязан к одному объекту только один раз.
+      tags:
+        - Объекты недвижимости
+      operationId: propertyAttachContact
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - contact_id
+              properties:
+                contact_id:
+                  type: integer
+                  description: ID контакта для привязки
+                  example: 5
+            examples:
+              attach:
+                summary: Привязать контакт
+                value:
+                  contact_id: 5
+      responses:
+        '201':
+          description: Контакт привязан
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Контакт привязан
+                  value:
+                    code: 201
+                    status: success
+                    data:
+                      object_client:
+                        id: 1
+                        property_id: 1
+                        contact_id: 5
+                        pipeline_stage_id: 1
+                    message: "Контакт привязан к объекту"
+        '400':
+          description: Ошибка привязки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                already_attached:
+                  summary: Контакт уже привязан
+                  value:
+                    code: 400
+                    status: error
+                    message: "Контакт уже привязан к этому объекту"
+                    error: "validation_error"
+                contact_not_found:
+                  summary: Контакт не найден
+                  value:
+                    code: 400
+                    status: error
+                    message: "Контакт не найден"
+                    error: "validation_error"
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/properties/{id}/contacts/{contact_id}:
+    delete:
+      summary: Отвязать контакт от объекта
+      description: Удаляет связку object_client. Сам контакт и объект остаются.
+      tags:
+        - Объекты недвижимости
+      operationId: propertyDetachContact
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+      responses:
+        '200':
+          description: Контакт отвязан
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Контакт отвязан
+                  value:
+                    code: 200
+                    status: success
+                    message: "Контакт отвязан от объекта"
+        '404':
+          description: Связка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      summary: Обновить связку объект+контакт
+      description: Обновить комментарий и/или дату следующего контакта для связки.
+      tags:
+        - Объекты недвижимости
+      operationId: propertyUpdateContact
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                  nullable: true
+                  description: Комментарий к связке
+                next_contact_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: Дата следующего контакта
+            examples:
+              update:
+                summary: Обновить связку
+                value:
+                  comment: "Обсудили условия, ждёт одобрения"
+                  next_contact_at: "2026-02-20T10:00:00Z"
+      responses:
+        '200':
+          description: Связка обновлена
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Связка обновлена
+                  value:
+                    code: 200
+                    status: success
+                    message: "Связка обновлена"
+        '404':
+          description: Связка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/properties/{id}/contacts/{contact_id}/stage:
+    patch:
+      summary: Сменить стадию связки
+      description: |
+        Перемещает связку объект+контакт на другую стадию воронки.
+        Используется при drag-n-drop на kanban-доске.
+      tags:
+        - Объекты недвижимости
+      operationId: propertyMoveContactStage
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID объекта
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - stage_id
+              properties:
+                stage_id:
+                  type: integer
+                  description: ID новой стадии воронки
+                  example: 3
+            examples:
+              move:
+                summary: Перемещение на стадию
+                value:
+                  stage_id: 3
+      responses:
+        '200':
+          description: Стадия изменена
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Стадия изменена
+                  value:
+                    code: 200
+                    status: success
+                    message: "Стадия изменена"
+        '400':
+          description: Стадия не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_stage:
+                  summary: Стадия не найдена
+                  value:
+                    code: 400
+                    status: error
+                    message: "Стадия не найдена"
+                    error: "validation_error"
+        '404':
+          description: Связка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ==========================================
+  # CRM v2: КОНТАКТЫ
+  # ==========================================
+
+  /api/v1/contacts:
+    get:
+      summary: Получить список контактов
+      description: |
+        Возвращает справочник контактов с пагинацией и поиском.
+
+        ## Права доступа
+        Требуется активная подписка.
+
+        ## Поиск
+        - `search` — по имени, телефону, email (ILIKE)
+      tags:
+        - Контакты
+      operationId: contactIndex
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Номер страницы
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Записей на страницу
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Поиск по имени, телефону, email
+      responses:
+        '200':
+          description: Список контактов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      contacts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ContactShort'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+              examples:
+                success:
+                  summary: Список контактов
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      contacts:
+                        - id: 5
+                          name: "Иванов Иван Иванович"
+                          phone: "+7 999 111-22-33"
+                          email: "ivanov@mail.ru"
+                          telegram_username: "ivanov"
+                          properties_count: 2
+                          created_at: "2026-02-13T10:00:00Z"
+                      pagination:
+                        page: 1
+                        per_page: 20
+                        total: 1
+                        total_pages: 1
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Создать новый контакт
+      description: Создаёт контакт в справочнике. Имя обязательно.
+      tags:
+        - Контакты
+      operationId: contactCreate
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: ФИО контакта
+                  example: "Иванов Иван Иванович"
+                phone:
+                  type: string
+                  nullable: true
+                  example: "+7 999 111-22-33"
+                phone_secondary:
+                  type: string
+                  nullable: true
+                email:
+                  type: string
+                  nullable: true
+                  example: "ivanov@mail.ru"
+                telegram_username:
+                  type: string
+                  nullable: true
+                  example: "ivanov"
+                comment:
+                  type: string
+                  nullable: true
+            examples:
+              minimal:
+                summary: Минимальный набор полей
+                value:
+                  name: "Иванов Иван"
+              full:
+                summary: Полный набор полей
+                value:
+                  name: "Иванов Иван Иванович"
+                  phone: "+7 999 111-22-33"
+                  email: "ivanov@mail.ru"
+                  telegram_username: "ivanov"
+                  comment: "Ищет 2к квартиру в центре"
+      responses:
+        '201':
+          description: Контакт создан
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Контакт создан
+                  value:
+                    code: 201
+                    status: success
+                    data:
+                      contact:
+                        id: 5
+                        name: "Иванов Иван Иванович"
+                        phone: "+7 999 111-22-33"
+                    message: "Контакт создан"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                empty_name:
+                  summary: Имя не указано
+                  value:
+                    code: 400
+                    status: error
+                    message: "Имя контакта обязательно"
+                    error: "validation_error"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/contacts/search:
+    get:
+      summary: Поиск контактов
+      description: |
+        Поиск контактов по имени или телефону. Используется в модалке привязки контакта к объекту (ContactPicker).
+        Возвращает до 20 результатов.
+      tags:
+        - Контакты
+      operationId: contactSearch
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+          description: Строка поиска (мин. 2 символа)
+      responses:
+        '200':
+          description: Результаты поиска
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Найдены контакты
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      contacts:
+                        - id: 5
+                          name: "Иванов Иван"
+                          phone: "+7 999 111-22-33"
+                          email: "ivanov@mail.ru"
+                        - id: 7
+                          name: "Иванова Мария"
+                          phone: "+7 999 444-55-66"
+                          email: null
+                empty:
+                  summary: Ничего не найдено
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      contacts: []
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/contacts/{id}:
+    get:
+      summary: Карточка контакта
+      description: |
+        Возвращает полную информацию о контакте, включая все объекты, к которым он привязан,
+        со стадиями воронки.
+      tags:
+        - Контакты
+      operationId: contactShow
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+      responses:
+        '200':
+          description: Карточка контакта
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Карточка контакта
+                  value:
+                    code: 200
+                    status: success
+                    data:
+                      contact:
+                        id: 5
+                        name: "Иванов Иван Иванович"
+                        phone: "+7 999 111-22-33"
+                        phone_secondary: null
+                        email: "ivanov@mail.ru"
+                        telegram_username: "ivanov"
+                        comment: "Ищет 2к квартиру в центре"
+                        object_clients:
+                          - id: 1
+                            property:
+                              id: 1
+                              title: "2к квартира на Ленина"
+                              address: "ул. Ленина 15"
+                              price: 5200000
+                              deal_type: "sale"
+                            pipeline_stage:
+                              id: 3
+                              name: "Квалификация"
+                              color: "#9C27B0"
+                            next_contact_at: "2026-02-15T10:00:00Z"
+                        created_at: "2026-02-13T10:00:00Z"
+                        updated_at: "2026-02-13T12:30:00Z"
+        '404':
+          description: Контакт не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_found:
+                  summary: Контакт не найден
+                  value:
+                    code: 404
+                    status: error
+                    message: "Контакт не найден"
+                    error: "not_found"
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Обновить контакт
+      description: Обновляет данные контакта. Передавать только изменённые поля.
+      tags:
+        - Контакты
+      operationId: contactUpdate
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                phone_secondary:
+                  type: string
+                email:
+                  type: string
+                telegram_username:
+                  type: string
+                comment:
+                  type: string
+            examples:
+              update:
+                summary: Обновить телефон
+                value:
+                  phone: "+7 999 999-88-77"
+                  comment: "Новый номер"
+      responses:
+        '200':
+          description: Контакт обновлён
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Контакт обновлён
+                  value:
+                    code: 200
+                    status: success
+                    message: "Контакт обновлён"
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Контакт не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Удалить контакт
+      description: Удаляет контакт и все связанные записи object_clients (CASCADE).
+      tags:
+        - Контакты
+      operationId: contactDelete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID контакта
+      responses:
+        '200':
+          description: Контакт удалён
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Контакт удалён
+                  value:
+                    code: 200
+                    status: success
+                    message: "Контакт удалён"
+        '404':
+          description: Контакт не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Внутренняя ошибка сервера
           content:

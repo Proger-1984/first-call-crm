@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { clientsApi } from '../../services/api';
+import { Tooltip } from '../../components/UI/Tooltip';
+import { ConfirmDialog } from '../../components/UI/ConfirmDialog';
 import type { PipelineStage } from '../../types/client';
 import './StageSettings.css';
 
@@ -22,6 +24,20 @@ export function StageSettings({ onClose, onSaved }: StageSettingsProps) {
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
 
+  // Drag-n-drop
+  const dragIndexRef = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Диалог подтверждения
+  const [dialog, setDialog] = useState<{
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null);
+
   const loadStages = useCallback(async () => {
     setLoading(true);
     try {
@@ -38,6 +54,11 @@ export function StageSettings({ onClose, onSaved }: StageSettingsProps) {
     loadStages();
   }, [loadStages]);
 
+  /** Показать ошибку через диалог */
+  const showError = (message: string) => {
+    setDialog({ title: 'Ошибка', message, variant: 'danger', onConfirm: () => setDialog(null) });
+  };
+
   /** Создать стадию */
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -48,7 +69,7 @@ export function StageSettings({ onClose, onSaved }: StageSettingsProps) {
       setNewColor('#808080');
       loadStages();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка создания');
+      showError(err.response?.data?.message || 'Ошибка создания');
     } finally {
       setCreating(false);
     }
@@ -69,19 +90,37 @@ export function StageSettings({ onClose, onSaved }: StageSettingsProps) {
       setEditingId(null);
       loadStages();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка обновления');
+      showError(err.response?.data?.message || 'Ошибка обновления');
     }
   };
 
   /** Удалить стадию */
-  const handleDelete = async (stageId: number) => {
-    if (!confirm('Удалить стадию?')) return;
-    try {
-      await clientsApi.deleteStage(stageId);
-      loadStages();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка удаления');
+  const handleDelete = (stage: PipelineStage) => {
+    if (stage.clients_count > 0) {
+      setDialog({
+        title: 'Невозможно удалить',
+        message: `На стадии "${stage.name}" находятся ${stage.clients_count} клиентов. Переместите их на другую стадию.`,
+        variant: 'warning',
+        onConfirm: () => setDialog(null),
+      });
+      return;
     }
+    setDialog({
+      title: 'Удаление стадии',
+      message: `Удалить стадию "${stage.name}"?`,
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      variant: 'danger',
+      onConfirm: async () => {
+        setDialog(null);
+        try {
+          await clientsApi.deleteStage(stage.id);
+          loadStages();
+        } catch (err: any) {
+          showError(err.response?.data?.message || 'Ошибка удаления');
+        }
+      },
+    });
   };
 
   /** Переместить вверх/вниз */
@@ -100,9 +139,47 @@ export function StageSettings({ onClose, onSaved }: StageSettingsProps) {
     }
   };
 
+  /** Drag-n-drop: начало перетаскивания */
+  const handleDragStart = (index: number) => {
+    dragIndexRef.current = index;
+  };
+
+  /** Drag-n-drop: наведение на элемент */
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (dragIndexRef.current === null || dragIndexRef.current === index) return;
+    setDragOverIndex(index);
+  };
+
+  /** Drag-n-drop: бросок */
+  const handleDrop = async (targetIndex: number) => {
+    const sourceIndex = dragIndexRef.current;
+    if (sourceIndex === null || sourceIndex === targetIndex) return;
+
+    const newStages = [...stages];
+    const [moved] = newStages.splice(sourceIndex, 1);
+    newStages.splice(targetIndex, 0, moved);
+    setStages(newStages);
+
+    dragIndexRef.current = null;
+    setDragOverIndex(null);
+
+    try {
+      await clientsApi.reorderStages(newStages.map(s => s.id));
+    } catch {
+      loadStages(); // Откат
+    }
+  };
+
+  /** Drag-n-drop: конец перетаскивания */
+  const handleDragEnd = () => {
+    dragIndexRef.current = null;
+    setDragOverIndex(null);
+  };
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="stage-settings-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="stage-settings-modal">
         <div className="modal-header">
           <h2>Настройка стадий воронки</h2>
           <button className="close-btn" onClick={() => { onSaved(); onClose(); }}>
@@ -120,7 +197,15 @@ export function StageSettings({ onClose, onSaved }: StageSettingsProps) {
               {/* Список стадий */}
               <div className="stages-list">
                 {stages.map((stage, index) => (
-                  <div key={stage.id} className="stage-row">
+                  <div
+                    key={stage.id}
+                    className={`stage-row ${dragIndexRef.current === index ? 'stage-dragging' : ''} ${dragOverIndex === index ? 'stage-drag-over' : ''}`}
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDrop={() => handleDrop(index)}
+                    onDragEnd={handleDragEnd}
+                  >
                     {editingId === stage.id ? (
                       <div className="stage-edit-form">
                         <input
@@ -146,41 +231,51 @@ export function StageSettings({ onClose, onSaved }: StageSettingsProps) {
                     ) : (
                       <>
                         <div className="stage-info">
+                          <span className="drag-handle material-icons">drag_indicator</span>
                           <span className="stage-color-dot" style={{ backgroundColor: stage.color }} />
                           <span className="stage-name">{stage.name}</span>
                           {stage.is_system && <span className="system-badge">Системная</span>}
                           {stage.is_final && <span className="final-badge">Финал</span>}
-                          <span className="clients-count">{stage.clients_count}</span>
+                          {stage.clients_count > 0 && (
+                            <Tooltip content={`Клиентов на стадии: ${stage.clients_count}`} position="top">
+                              <span className="clients-count-badge">{stage.clients_count} кл.</span>
+                            </Tooltip>
+                          )}
                         </div>
                         <div className="stage-actions">
-                          <button
-                            className="icon-btn"
-                            onClick={() => moveStage(index, 'up')}
-                            disabled={index === 0}
-                            title="Вверх"
-                          >
-                            <span className="material-icons">arrow_upward</span>
-                          </button>
-                          <button
-                            className="icon-btn"
-                            onClick={() => moveStage(index, 'down')}
-                            disabled={index === stages.length - 1}
-                            title="Вниз"
-                          >
-                            <span className="material-icons">arrow_downward</span>
-                          </button>
-                          <button className="icon-btn" onClick={() => startEdit(stage)} title="Редактировать">
-                            <span className="material-icons">edit</span>
-                          </button>
-                          {!stage.is_system && (
+                          <Tooltip content="Вверх" position="top">
                             <button
-                              className="icon-btn danger"
-                              onClick={() => handleDelete(stage.id)}
-                              title="Удалить"
-                              disabled={stage.clients_count > 0}
+                              className="icon-btn"
+                              onClick={() => moveStage(index, 'up')}
+                              disabled={index === 0}
                             >
-                              <span className="material-icons">delete_outline</span>
+                              <span className="material-icons">arrow_upward</span>
                             </button>
+                          </Tooltip>
+                          <Tooltip content="Вниз" position="top">
+                            <button
+                              className="icon-btn"
+                              onClick={() => moveStage(index, 'down')}
+                              disabled={index === stages.length - 1}
+                            >
+                              <span className="material-icons">arrow_downward</span>
+                            </button>
+                          </Tooltip>
+                          <Tooltip content="Редактировать" position="top">
+                            <button className="icon-btn" onClick={() => startEdit(stage)}>
+                              <span className="material-icons">edit</span>
+                            </button>
+                          </Tooltip>
+                          {!stage.is_system && (
+                            <Tooltip content={stage.clients_count > 0 ? `Невозможно: ${stage.clients_count} кл.` : 'Удалить'} position="top">
+                              <button
+                                className="icon-btn danger"
+                                onClick={() => handleDelete(stage)}
+                                disabled={stage.clients_count > 0}
+                              >
+                                <span className="material-icons">delete_outline</span>
+                              </button>
+                            </Tooltip>
                           )}
                         </div>
                       </>
@@ -205,7 +300,7 @@ export function StageSettings({ onClose, onSaved }: StageSettingsProps) {
                   className="name-input"
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                 />
-                <button className="btn-primary" onClick={handleCreate} disabled={creating || !newName.trim()}>
+                <button className="btn btn-primary" onClick={handleCreate} disabled={creating || !newName.trim()}>
                   Добавить
                 </button>
               </div>
@@ -213,6 +308,19 @@ export function StageSettings({ onClose, onSaved }: StageSettingsProps) {
           )}
         </div>
       </div>
+
+      {/* Диалог подтверждения */}
+      {dialog && (
+        <ConfirmDialog
+          title={dialog.title}
+          message={dialog.message}
+          confirmText={dialog.confirmText}
+          cancelText={dialog.cancelText}
+          variant={dialog.variant}
+          onConfirm={dialog.onConfirm}
+          onCancel={() => setDialog(null)}
+        />
+      )}
     </div>
   );
 }

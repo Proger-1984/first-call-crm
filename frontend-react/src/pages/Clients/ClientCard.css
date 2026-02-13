@@ -22,17 +22,17 @@
   gap: 4px;
   padding: 6px 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--border-radius-sm);
   background: transparent;
-  color: var(--text-secondary, #666);
-  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-size: 13px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .back-btn:hover {
-  background: var(--bg-hover, #f5f5f5);
-  color: var(--text-primary, #333);
+  background: var(--primary-50);
+  color: var(--text-primary);
 }
 
 .card-top-actions {
@@ -65,7 +65,7 @@
   font-size: 1.5rem;
   font-weight: 600;
   margin: 0;
-  color: var(--text-primary, #1a1a1a);
+  color: var(--text-primary);
 }
 
 .card-badges {
@@ -74,26 +74,27 @@
 }
 
 .archived-badge {
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 0.75rem;
-  background: #FFEBEE;
-  color: #C62828;
+  padding: 3px 10px;
+  border-radius: var(--border-radius-sm);
+  font-size: 12px;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 /* Секции */
 .card-section {
   padding: 16px;
-  background: var(--bg-primary, #fff);
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .card-section h3 {
-  font-size: 0.9rem;
+  font-size: 14px;
   font-weight: 600;
   margin: 0 0 12px 0;
-  color: var(--text-primary, #1a1a1a);
+  color: var(--text-primary);
 }
 
 .section-header {
@@ -112,14 +113,16 @@
   align-items: center;
   padding: 4px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius-sm);
   background: transparent;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .settings-btn:hover {
-  background: var(--bg-hover, #f0f0f0);
+  background: var(--primary-light);
+  color: var(--primary);
 }
 
 .settings-btn .material-icons {
@@ -128,8 +131,8 @@
 
 .card-comment {
   margin: 0;
-  font-size: 0.875rem;
-  color: var(--text-primary, #333);
+  font-size: 13px;
+  color: var(--text-primary);
   line-height: 1.5;
   white-space: pre-wrap;
 }
@@ -145,11 +148,11 @@
   padding: 4px 12px;
   border: 1px solid;
   border-radius: 16px;
-  font-size: 0.8rem;
+  font-size: 12px;
   font-weight: 500;
   background: transparent;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .stage-option:hover {
@@ -172,8 +175,8 @@
   justify-content: space-between;
   align-items: flex-start;
   padding: 8px 12px;
-  background: var(--bg-secondary, #f8f9fa);
-  border-radius: 8px;
+  background: var(--bg-main);
+  border-radius: var(--border-radius-sm);
 }
 
 .criteria-content {
@@ -185,21 +188,21 @@
 
 .criteria-tag {
   padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  background: var(--bg-primary, #fff);
-  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: var(--border-radius-sm);
+  font-size: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 .criteria-price,
 .criteria-area {
-  font-size: 0.8rem;
-  color: var(--text-secondary, #666);
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .criteria-notes {
-  font-size: 0.8rem;
-  color: var(--text-secondary, #888);
+  font-size: 12px;
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -215,8 +218,8 @@
   justify-content: space-between;
   align-items: flex-start;
   padding: 10px 12px;
-  background: var(--bg-secondary, #f8f9fa);
-  border-radius: 8px;
+  background: var(--bg-main);
+  border-radius: var(--border-radius-sm);
   gap: 12px;
 }
 
@@ -226,9 +229,9 @@
 }
 
 .listing-title a {
-  font-size: 0.875rem;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--primary-color, #2196F3);
+  color: var(--primary);
   text-decoration: none;
 }
 
@@ -239,14 +242,14 @@
 .listing-details {
   display: flex;
   gap: 12px;
-  font-size: 0.8rem;
-  color: var(--text-secondary, #888);
+  font-size: 12px;
+  color: var(--text-secondary);
   margin-top: 4px;
 }
 
 .listing-comment {
-  font-size: 0.8rem;
-  color: var(--text-secondary, #666);
+  font-size: 12px;
+  color: var(--text-secondary);
   margin-top: 4px;
   font-style: italic;
 }
@@ -260,10 +263,10 @@
 
 .listing-status {
   padding: 3px 8px;
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 6px;
-  font-size: 0.75rem;
-  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  font-size: 12px;
+  background: var(--bg-card);
   cursor: pointer;
 }
 
@@ -278,14 +281,15 @@
   padding: 4px;
   border: none;
   background: transparent;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-muted);
   cursor: pointer;
   border-radius: 4px;
+  transition: all var(--transition-fast);
 }
 
 .remove-btn:hover {
-  background: #FFEBEE;
-  color: #F44336;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .remove-btn .material-icons {
@@ -294,8 +298,8 @@
 
 .empty-text {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--text-secondary, #aaa);
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 /* Боковая панель */
@@ -307,15 +311,16 @@
 
 .sidebar-section {
   padding: 16px;
-  background: var(--bg-primary, #fff);
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .sidebar-section h4 {
-  font-size: 0.8rem;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0 0 10px 0;
@@ -323,14 +328,14 @@
 
 .sidebar-section p {
   margin: 0;
-  font-size: 0.875rem;
-  color: var(--text-primary, #333);
+  font-size: 13px;
+  color: var(--text-primary);
 }
 
 .source-details {
   margin-top: 4px !important;
-  font-size: 0.8rem !important;
-  color: var(--text-secondary, #888) !important;
+  font-size: 12px !important;
+  color: var(--text-secondary) !important;
 }
 
 /* Контакты */
@@ -344,16 +349,16 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.875rem;
+  font-size: 13px;
 }
 
 .contact-item .material-icons {
   font-size: 18px;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .contact-item a {
-  color: var(--primary-color, #2196F3);
+  color: var(--primary);
   text-decoration: none;
 }
 
@@ -371,19 +376,19 @@
 .date-item {
   display: flex;
   justify-content: space-between;
-  font-size: 0.8rem;
+  font-size: 12px;
 }
 
 .date-item span:first-child {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .date-item span:last-child {
-  color: var(--text-primary, #333);
+  color: var(--text-primary);
 }
 
 .date-item.overdue span:last-child {
-  color: var(--danger-color, #F44336);
+  color: var(--danger);
   font-weight: 500;
 }
 

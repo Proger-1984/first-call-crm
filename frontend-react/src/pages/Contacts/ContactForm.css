@@ -1,0 +1,138 @@
+/* ===========================================
+   Форма контакта (модальное окно)
+   =========================================== */
+
+/* .modal-overlay — глобальные стили в styles/index.css */
+
+.contact-form-modal {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.2s ease;
+}
+
+/* Форма */
+.contact-form {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contact-form .form-error {
+  padding: 10px 14px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+}
+
+.contact-form .form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.contact-form .form-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.contact-form .form-field.full {
+  flex: 1 1 100%;
+}
+
+.contact-form .form-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.contact-form .form-field input,
+.contact-form .form-field textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  transition: border-color var(--transition-fast);
+}
+
+.contact-form .form-field input:focus,
+.contact-form .form-field textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.contact-form .form-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Footer формы (стиль AdminBilling) */
+.contact-form-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0 -24px -24px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-main);
+}
+
+.contact-form-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.contact-form-btn.secondary {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.contact-form-btn.secondary:hover {
+  background: var(--border-light);
+}
+
+.contact-form-btn.primary {
+  background: var(--primary);
+  color: white;
+}
+
+.contact-form-btn.primary:hover {
+  background: var(--primary-hover);
+}
+
+.contact-form-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Адаптивность */
+@media (max-width: 640px) {
+  .contact-form .form-row {
+    flex-direction: column;
+  }
+
+  .contact-form-modal {
+    max-height: 95vh;
+  }
+}

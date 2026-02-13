@@ -135,7 +135,7 @@ src/
 │   ├── Layout/      # Header, Sidebar
 │   ├── UI/          # Переиспользуемые компоненты
 │   └── Auth/        # Авторизация
-├── pages/           # Страницы (Dashboard, Login, Profile, Settings, Tariffs, Billing)
+├── pages/           # Страницы (Dashboard, Login, Profile, Settings, Tariffs, Billing, Properties, Contacts)
 ├── stores/          # Zustand stores (authStore, uiStore)
 ├── services/api.ts  # Axios клиент
 ├── types/           # TypeScript типы
@@ -174,7 +174,7 @@ SubscriptionMiddleware проверяет наличие активной под
 
 ---
 
-## Основные таблицы БД (30 таблиц)
+## Основные таблицы БД (35 таблиц)
 
 | Таблица | Назначение | Записей |
 |---|---|---|
@@ -197,6 +197,10 @@ SubscriptionMiddleware проверяет наличие активной под
 | `user_favorite_statuses` | Пользовательские статусы избранного | 2 |
 | `refresh_tokens` | JWT refresh токены | 2 |
 | `user_source_cookies` | Куки авторизации на источниках | 2 |
+| `pipeline_stages` | Стадии воронки продаж CRM | — |
+| `properties` | Объекты недвижимости (CRM v2) | — |
+| `contacts` | Контакты покупателей/арендаторов (CRM v2) | — |
+| `object_clients` | Связка объект+контакт, воронка (CRM v2) | — |
 
 Полная схема: `docs/DATABASE.md`
 
@@ -214,6 +218,10 @@ SubscriptionMiddleware проверяет наличие активной под
 | GET | `/api/v1/tariffs` | Список тарифов |
 | GET | `/api/v1/listings` | Список объявлений |
 | GET | `/api/v1/source-auth/status` | Статус авторизации на источниках |
+| GET | `/api/v1/properties` | Список объектов недвижимости (CRM) |
+| GET | `/api/v1/properties/pipeline` | Kanban-доска объектов |
+| GET | `/api/v1/contacts` | Справочник контактов (CRM) |
+| GET | `/api/v1/contacts/search` | Поиск контактов |
 
 Формат ответа: `{ code, status, message, data }`
 

@@ -69,11 +69,19 @@ class PipelineStage extends Model
     }
 
     /**
-     * Клиенты на этой стадии
+     * Клиенты на этой стадии (старая модель — deprecated)
      */
     public function clients(): HasMany
     {
         return $this->hasMany(Client::class, 'pipeline_stage_id');
+    }
+
+    /**
+     * Связки объект+контакт на этой стадии (новая модель)
+     */
+    public function objectClients(): HasMany
+    {
+        return $this->hasMany(ObjectClient::class, 'pipeline_stage_id');
     }
 
     /**
@@ -151,7 +159,15 @@ class PipelineStage extends Model
     }
 
     /**
-     * Получить количество клиентов на этой стадии
+     * Получить количество связок на этой стадии (новая модель)
+     */
+    public function getObjectClientsCount(): int
+    {
+        return $this->objectClients()->count();
+    }
+
+    /**
+     * Получить количество клиентов на этой стадии (старая модель — deprecated)
      */
     public function getClientsCount(): int
     {

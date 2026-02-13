@@ -34,14 +34,14 @@ class PipelineStageController
 
             // Используем withCount вместо N+1 запросов getClientsCount()
             $stages = PipelineStage::where('user_id', $userId)
-                ->withCount(['clients' => fn($query) => $query->where('is_archived', false)])
+                ->withCount('objectClients')
                 ->orderBy('sort_order')
                 ->get();
 
             if ($stages->isEmpty()) {
                 PipelineStage::createDefaultStages($userId);
                 $stages = PipelineStage::where('user_id', $userId)
-                    ->withCount(['clients' => fn($query) => $query->where('is_archived', false)])
+                    ->withCount('objectClients')
                     ->orderBy('sort_order')
                     ->get();
             }
@@ -54,7 +54,7 @@ class PipelineStageController
                     'sort_order' => $stage->sort_order,
                     'is_system' => $stage->is_system,
                     'is_final' => $stage->is_final,
-                    'clients_count' => $stage->clients_count,
+                    'clients_count' => (int)$stage->object_clients_count,
                 ];
             })->toArray();
 
@@ -272,23 +272,13 @@ class PipelineStageController
                 return $this->respondWithError($response, 'Системную стадию нельзя удалить', 'validation_error', 400);
             }
 
-            // Проверяем, есть ли клиенты на этой стадии (включая архивных)
-            $activeCount = $stage->clients()->where('is_archived', false)->count();
-            $archivedCount = $stage->clients()->where('is_archived', true)->count();
-            $totalCount = $activeCount + $archivedCount;
+            // Проверяем, есть ли связки объект-контакт на этой стадии
+            $objectClientsCount = $stage->objectClients()->count();
 
-            if ($totalCount > 0) {
-                $details = [];
-                if ($activeCount > 0) {
-                    $details[] = "активных: {$activeCount}";
-                }
-                if ($archivedCount > 0) {
-                    $details[] = "архивных: {$archivedCount}";
-                }
-                $detailsStr = implode(', ', $details);
+            if ($objectClientsCount > 0) {
                 return $this->respondWithError(
                     $response,
-                    "Нельзя удалить стадию с клиентами ({$detailsStr}). Сначала переместите клиентов.",
+                    "Нельзя удалить стадию с привязанными объектами ({$objectClientsCount}). Сначала переместите их.",
                     'validation_error',
                     400
                 );

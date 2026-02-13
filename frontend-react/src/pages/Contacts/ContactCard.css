@@ -1,0 +1,155 @@
+/* ===========================================
+   Карточка контакта
+   =========================================== */
+
+.contact-card-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Контент — сетка: основная часть + сайдбар */
+.contact-card-content {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 24px;
+}
+
+/* Основная часть */
+.contact-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.contact-card-header-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.contact-card-name {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+/* Секция информации */
+.contact-info-section {
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.contact-info-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+}
+
+.contact-comment-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Секция объектов */
+.contact-properties-section {
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.contact-properties-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+}
+
+/* Таблица объектов */
+.contact-properties-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.contact-properties-table thead th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border);
+}
+
+.contact-properties-table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.contact-properties-table tbody tr:hover {
+  background: var(--primary-50);
+}
+
+.contact-properties-table td {
+  padding: 10px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* Кнопка-ссылка "Перейти" */
+.btn-link {
+  padding: 4px 10px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-link:hover {
+  background: var(--primary-light);
+  text-decoration: underline;
+}
+
+/* Бейдж стадии */
+.contact-properties-table .stage-badge {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: var(--border-radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid;
+}
+
+/* Боковая панель */
+.contact-card-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .contact-card-page {
+    padding: 16px;
+  }
+
+  .contact-card-content {
+    grid-template-columns: 1fr;
+  }
+}

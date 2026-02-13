@@ -1266,6 +1266,156 @@ export const clientsApi = {
     api.put<ApiResponse<{ message: string }>>('/clients/stages/reorder', { order }),
 };
 
+// === PROPERTIES API (объекты недвижимости — новая CRM модель) ===
+
+import type {
+  Property,
+  Contact as CrmContact,
+  PipelineColumn as PropertyPipelineColumn,
+  PipelineCard,
+  PropertyStats,
+  PropertyFilters,
+  ContactFilters,
+  ObjectClientItem,
+} from '../types/property';
+
+export const propertiesApi = {
+  /**
+   * Получить список объектов
+   * GET /api/v1/properties
+   */
+  getAll: (params?: PropertyFilters) =>
+    api.get<ApiResponse<{ properties: Property[]; pagination: { page: number; per_page: number; total: number; total_pages: number } }>>('/properties', { params }),
+
+  /**
+   * Получить карточку объекта
+   * GET /api/v1/properties/{id}
+   */
+  getById: (id: number) =>
+    api.get<ApiResponse<{ property: Property }>>(`/properties/${id}`),
+
+  /**
+   * Создать объект
+   * POST /api/v1/properties
+   */
+  create: (data: Record<string, any>) =>
+    api.post<ApiResponse<{ property: Property; message: string }>>('/properties', data),
+
+  /**
+   * Обновить объект
+   * PUT /api/v1/properties/{id}
+   */
+  update: (id: number, data: Record<string, any>) =>
+    api.put<ApiResponse<{ property: Property; message: string }>>(`/properties/${id}`, data),
+
+  /**
+   * Удалить объект
+   * DELETE /api/v1/properties/{id}
+   */
+  delete: (id: number) =>
+    api.delete<ApiResponse<{ message: string }>>(`/properties/${id}`),
+
+  /**
+   * Архивировать/разархивировать
+   * PATCH /api/v1/properties/{id}/archive
+   */
+  archive: (id: number, isArchived: boolean = true) =>
+    api.patch<ApiResponse<{ is_archived: boolean; message: string }>>(`/properties/${id}/archive`, { is_archived: isArchived }),
+
+  /**
+   * Получить kanban-доску
+   * GET /api/v1/properties/pipeline
+   */
+  getPipeline: () =>
+    api.get<ApiResponse<{ pipeline: PropertyPipelineColumn[] }>>('/properties/pipeline'),
+
+  /**
+   * Получить статистику
+   * GET /api/v1/properties/stats
+   */
+  getStats: () =>
+    api.get<ApiResponse<PropertyStats>>('/properties/stats'),
+
+  /**
+   * Привязать контакт к объекту
+   * POST /api/v1/properties/{id}/contacts
+   */
+  attachContact: (propertyId: number, contactId: number, stageId?: number) =>
+    api.post<ApiResponse<{ object_client: ObjectClientItem; message: string }>>(`/properties/${propertyId}/contacts`, {
+      contact_id: contactId,
+      pipeline_stage_id: stageId,
+    }),
+
+  /**
+   * Отвязать контакт от объекта
+   * DELETE /api/v1/properties/{id}/contacts/{contactId}
+   */
+  detachContact: (propertyId: number, contactId: number) =>
+    api.delete<ApiResponse<{ message: string }>>(`/properties/${propertyId}/contacts/${contactId}`),
+
+  /**
+   * Сменить стадию связки
+   * PATCH /api/v1/properties/{id}/contacts/{contactId}/stage
+   */
+  moveContactStage: (propertyId: number, contactId: number, stageId: number) =>
+    api.patch<ApiResponse<{ pipeline_stage: any; message: string }>>(`/properties/${propertyId}/contacts/${contactId}/stage`, {
+      pipeline_stage_id: stageId,
+    }),
+
+  /**
+   * Обновить связку (комментарий, даты)
+   * PATCH /api/v1/properties/{id}/contacts/{contactId}
+   */
+  updateContact: (propertyId: number, contactId: number, data: Record<string, any>) =>
+    api.patch<ApiResponse<{ message: string }>>(`/properties/${propertyId}/contacts/${contactId}`, data),
+};
+
+// === CONTACTS API (справочник контактов — новая CRM модель) ===
+
+export const contactsApi = {
+  /**
+   * Получить список контактов
+   * GET /api/v1/contacts
+   */
+  getAll: (params?: ContactFilters) =>
+    api.get<ApiResponse<{ contacts: CrmContact[]; pagination: { page: number; per_page: number; total: number; total_pages: number } }>>('/contacts', { params }),
+
+  /**
+   * Получить карточку контакта
+   * GET /api/v1/contacts/{id}
+   */
+  getById: (id: number) =>
+    api.get<ApiResponse<{ contact: CrmContact }>>(`/contacts/${id}`),
+
+  /**
+   * Создать контакт
+   * POST /api/v1/contacts
+   */
+  create: (data: Record<string, any>) =>
+    api.post<ApiResponse<{ contact: CrmContact; message: string }>>('/contacts', data),
+
+  /**
+   * Обновить контакт
+   * PUT /api/v1/contacts/{id}
+   */
+  update: (id: number, data: Record<string, any>) =>
+    api.put<ApiResponse<{ contact: CrmContact; message: string }>>(`/contacts/${id}`, data),
+
+  /**
+   * Удалить контакт
+   * DELETE /api/v1/contacts/{id}
+   */
+  delete: (id: number) =>
+    api.delete<ApiResponse<{ message: string }>>(`/contacts/${id}`),
+
+  /**
+   * Поиск контактов (для ContactPicker)
+   * GET /api/v1/contacts/search?q=...
+   */
+  search: (query: string) =>
+    api.get<ApiResponse<{ contacts: CrmContact[] }>>('/contacts/search', { params: { q: query } }),
+};
+
 // === SOURCE AUTH API (авторизация на источниках: CIAN, Avito) ===
 
 export interface SourceAuthStatus {

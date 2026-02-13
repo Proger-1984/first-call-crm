@@ -1,0 +1,347 @@
+/* ===========================================
+   Контакты — основная страница (справочник)
+   =========================================== */
+
+.contacts-page {
+  padding: 24px;
+}
+
+/* Заголовок */
+.contacts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.contacts-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+/* Фильтры (стиль AdminBilling) */
+.contacts-filters {
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.contacts-filters-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.contacts-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.contacts-filter-group > label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+/* Input поиска */
+.contacts-filter-input {
+  width: 100%;
+  min-width: 260px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  transition: all var(--transition-fast);
+}
+
+.contacts-filter-input:hover {
+  border-color: var(--text-muted);
+}
+
+.contacts-filter-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.contacts-filter-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Контейнер input + кнопка очистки */
+.contacts-filter-with-clear {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.contacts-filter-with-clear .contacts-filter-input {
+  padding-right: 30px;
+}
+
+/* Кнопка очистки (x) */
+.contacts-clear-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+
+.contacts-clear-btn:hover {
+  background: var(--text-muted);
+}
+
+.contacts-clear-btn .material-icons {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+/* Чекбокс */
+.contacts-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 9px 0;
+  white-space: nowrap;
+}
+
+.contacts-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+/* Кнопки фильтров */
+.contacts-filter-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Таблица */
+.contacts-table-wrapper {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 320px);
+  min-height: 400px;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+}
+
+.contacts-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* Ширины колонок: Имя | Телефон | Email | Telegram | Объектов | Создан | Действия */
+.contacts-table th:nth-child(1) { width: 20%; }
+.contacts-table th:nth-child(2) { width: 15%; }
+.contacts-table th:nth-child(3) { width: 20%; }
+.contacts-table th:nth-child(4) { width: 15%; }
+.contacts-table th:nth-child(5) { width: 9%; }
+.contacts-table th:nth-child(6) { width: 12%; }
+.contacts-table th:nth-child(7) { width: 60px; }
+
+.contacts-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 12px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--bg-main);
+}
+
+/* Сортировка */
+.contacts-table thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--transition-fast);
+}
+
+.contacts-table thead th.sortable:hover {
+  color: var(--primary);
+}
+
+.contacts-table thead th.sorted {
+  color: var(--primary);
+}
+
+.contacts-table thead th .sort-icon {
+  font-size: 14px;
+  vertical-align: middle;
+  margin-left: 2px;
+  opacity: 0.5;
+}
+
+.contacts-table thead th.sorted .sort-icon {
+  opacity: 1;
+}
+
+.contacts-table tbody tr {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.contacts-table tbody tr:hover {
+  background: var(--primary-50);
+}
+
+/* Чередующиеся строки */
+.contacts-table tbody tr:nth-child(even) {
+  background: rgba(236, 242, 244, 0.4);
+}
+
+.contacts-table tbody tr:nth-child(even):hover {
+  background: var(--primary-50);
+}
+
+.contacts-table tbody tr.archived {
+  opacity: 0.6;
+}
+
+.contacts-table td {
+  padding: 12px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contacts-table .cell-name {
+  font-weight: 500;
+}
+
+.contacts-table .cell-phone .phone-link,
+.contacts-table .cell-email .email-link,
+.contacts-table .cell-telegram .telegram-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.contacts-table .cell-phone .phone-link:hover,
+.contacts-table .cell-email .email-link:hover,
+.contacts-table .cell-telegram .telegram-link:hover {
+  text-decoration: underline;
+}
+
+.contacts-table .cell-count {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.contacts-table .cell-date {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* Действия */
+.contacts-table .cell-actions-inner {
+  display: flex;
+  gap: 4px;
+}
+
+/* Состояния (переиспользуем глобальные стили) */
+.contacts-page .loading-state,
+.contacts-page .error-state,
+.contacts-page .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+}
+
+.contacts-page .loading-state .loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+.contacts-page .error-state .material-icons,
+.contacts-page .empty-state .material-icons {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.contacts-page .error-state button,
+.contacts-page .empty-state button {
+  margin-top: 12px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .contacts-page {
+    padding: 16px;
+  }
+
+  .contacts-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .contacts-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .contacts-filter-input {
+    min-width: auto;
+  }
+
+  .contacts-table-wrapper {
+    max-height: none;
+    min-height: auto;
+  }
+}

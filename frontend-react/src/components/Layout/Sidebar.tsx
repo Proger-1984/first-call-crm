@@ -29,7 +29,8 @@ const menuSections: MenuSection[] = [
       { icon: 'workspace_premium', label: 'Тарифы', path: '/tariffs', alwaysVisible: true },
       { icon: 'receipt_long', label: 'Мои подписки', path: '/billing', alwaysVisible: true },
       { icon: 'star', label: 'Избранное', path: '/favorites', requiresSubscription: true },
-      { icon: 'people_alt', label: 'Клиенты', path: '/clients', requiresSubscription: true },
+      { icon: 'apartment', label: 'Объекты', path: '/properties', requiresSubscription: true },
+      { icon: 'contacts', label: 'Контакты', path: '/contacts', requiresSubscription: true },
     ],
   },
   {
