@@ -757,9 +757,16 @@ class TelegramService
         $contactPhone = $contact?->phone ?? '';
         $stageName = $stage?->name ?? '—';
 
+        // Телефон на отдельной строке в чистом формате — Telegram автоопределяет как кликабельный
+        $phoneLine = '';
+        if ($contactPhone) {
+            $cleanPhone = preg_replace('/[^\d+]/', '', $contactPhone);
+            $phoneLine = "\n📞 {$cleanPhone}";
+        }
+
         $message = "🔔 <b>Напоминание CRM</b>\n\n" .
             "📍 <b>Объект:</b> {$address}\n" .
-            "👤 <b>Контакт:</b> {$contactName}" . ($contactPhone ? ", {$contactPhone}" : '') . "\n" .
+            "👤 <b>Контакт:</b> {$contactName}{$phoneLine}\n" .
             "📋 <b>Стадия:</b> {$stageName}\n\n" .
             "💬 {$reminder->message}";
 
