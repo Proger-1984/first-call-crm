@@ -67,8 +67,10 @@ export function ReminderForm({ isOpen, propertyId, contactId, onClose, onSaved }
     setSaving(true);
 
     try {
+      // Отправляем локальное время без конвертации в UTC,
+      // бэкенд работает в Europe/Moscow и парсит как московское
       await remindersApi.create(propertyId, contactId, {
-        remind_at: remindDate.toISOString(),
+        remind_at: isoDate,
         message: message.trim(),
       });
       onSaved();

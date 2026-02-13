@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { ConfirmDialog } from '../../components/UI/ConfirmDialog';
+import { Tooltip } from '../../components/UI/Tooltip';
 import type { PipelineColumn, PipelineCard, DealType } from '../../types/property';
 import { DEAL_TYPE_LABELS } from '../../types/property';
 import './Pipeline.css';
@@ -248,22 +249,24 @@ export function Pipeline({ stages, onMoveCard, onCardClick, onAddInteraction, on
                 {(onAddInteraction || onAddReminder) && (
                   <div className="pipeline-card-actions">
                     {onAddInteraction && (
-                      <button
-                        className="pipeline-action-btn"
-                        title="Добавить взаимодействие"
-                        onClick={(event) => { event.stopPropagation(); onAddInteraction(card.property_id, card.contact_id); }}
-                      >
-                        <span className="material-icons">forum</span>
-                      </button>
+                      <Tooltip content="Добавить взаимодействие" position="top">
+                        <button
+                          className="pipeline-action-btn"
+                          onClick={(event) => { event.stopPropagation(); onAddInteraction(card.property_id, card.contact_id); }}
+                        >
+                          <span className="material-icons">forum</span>
+                        </button>
+                      </Tooltip>
                     )}
                     {onAddReminder && (
-                      <button
-                        className="pipeline-action-btn"
-                        title="Создать напоминание"
-                        onClick={(event) => { event.stopPropagation(); onAddReminder(card.property_id, card.contact_id); }}
-                      >
-                        <span className="material-icons">notifications</span>
-                      </button>
+                      <Tooltip content="Создать напоминание" position="top">
+                        <button
+                          className="pipeline-action-btn"
+                          onClick={(event) => { event.stopPropagation(); onAddReminder(card.property_id, card.contact_id); }}
+                        >
+                          <span className="material-icons">notifications</span>
+                        </button>
+                      </Tooltip>
                     )}
                   </div>
                 )}

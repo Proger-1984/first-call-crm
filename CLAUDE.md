@@ -316,6 +316,8 @@ docker exec -it slim_php-cli php bin/app.php photo-tasks        # Обработ
 - [ ] Обработать loading/error состояния
 - [ ] CSS переменные вместо хардкода цветов
 - [ ] Именованный + default экспорт компонентов
+- [ ] Всплывающие подсказки: ТОЛЬКО компонент `<Tooltip>`, НИКОГДА нативный `title` (см. "UI правила" ниже)
+- [ ] Material Icons: ВСЕГДА задавать явные `width`, `height`, `line-height: 1` (см. "UI правила" ниже)
 
 ### Общее
 - [ ] Строгая типизация (`declare(strict_types=1)` в PHP, TypeScript во фронте)
@@ -324,6 +326,64 @@ docker exec -it slim_php-cli php bin/app.php photo-tasks        # Обработ
 - [ ] Контроллеры тонкие — логика в сервисах
 - [ ] ResponseTrait для ответов API
 - [ ] Обновить PROJECT_STATUS.md после завершения задачи
+
+---
+
+## UI правила Frontend
+
+### Всплывающие подсказки (Tooltip)
+- **НИКОГДА не использовать нативный атрибут `title`** — его стиль не контролируется и отличается от проекта
+- **ВСЕГДА использовать компонент `<Tooltip>`** из `components/UI/Tooltip`
+- Стиль: белый фон, тень, `border-radius: 8px`, `padding: 10px 14px` — единый для всего проекта
+- Импорт: `import { Tooltip } from '../../components/UI/Tooltip';`
+- Пример:
+  ```tsx
+  <Tooltip content="Удалить" position="top">
+    <button className="remove-btn">
+      <span className="material-icons">close</span>
+    </button>
+  </Tooltip>
+  ```
+- **НЕ менять базовый стиль тултипа** без согласования — он единый для всего проекта
+
+### Material Icons — центрирование
+- Глобальный `.material-icons` задаёт `font-size: 24px` — это **НЕ значит**, что элемент будет 24×24
+- **ВСЕГДА явно задавать размеры** при переопределении `font-size`, иначе элемент останется 24×24 при меньшем шрифте:
+  ```css
+  .my-btn .material-icons {
+    font-size: 16px;
+    line-height: 1;   /* ОБЯЗАТЕЛЬНО */
+    width: 16px;       /* ОБЯЗАТЕЛЬНО */
+    height: 16px;      /* ОБЯЗАТЕЛЬНО */
+  }
+  ```
+- Без явных `width`/`height`/`line-height` иконка визуально смещается и ломает центрирование
+- Это касается ВСЕХ случаев, когда `font-size` отличается от базовых 24px
+
+### Тестирование фронтенда через Playwright/браузер
+- **Dev-сервер:** `http://localhost:3000` (Vite, порт 3000), API проксируется на `https://local.firstcall.com`
+- **Production:** `https://local.firstcall.com` (nginx → `frontend-react/dist/`)
+- **Авторизация:** токен хранится в `localStorage` под ключом `access_token`
+- Чтобы авторизоваться в Playwright, нужно либо:
+  1. Открыть `http://localhost:3000` — если в localStorage уже есть валидный `access_token`, авторизация произойдёт автоматически
+  2. Или установить токен вручную через `browser_evaluate`:
+    ```js
+    await page.evaluate(() => localStorage.setItem('access_token', 'ТОКЕН'));
+    ```
+    Затем перейти на нужную страницу
+- **Получить токен** можно через API:
+  ```bash
+  curl -s https://local.firstcall.com/api/v1/auth/telegram -X POST -H 'Content-Type: application/json' -d '...'
+  ```
+- **Проверка авторизации:** при загрузке страницы `authStore.checkAuth()` читает `access_token` из localStorage и вызывает `GET /api/v1/me/info`
+- Если токен протух — interceptor автоматически пробует refresh через cookie
+- **После пересборки фронта** (`npm run build`) нужно обновить страницу с очисткой кеша (Ctrl+Shift+R) — nginx кеширует `index.html` с заголовком `no-cache`
+
+### Дата и время — timezone
+- Бэкенд работает в `Europe/Moscow` (`config/app.php` → `timezone`)
+- **НИКОГДА не конвертировать время в UTC** на фронтенде при отправке на API (не использовать `.toISOString()`)
+- Отправлять локальное время как строку: `"2026-02-14T10:00:00"` (без суффикса `Z`, без offset)
+- `Carbon::parse()` на бэкенде интерпретирует строку без timezone как московское время — это корректно
 
 ---
 
