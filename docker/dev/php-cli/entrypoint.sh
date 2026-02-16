@@ -36,5 +36,22 @@ echo "=== Запуск Supervisor ==="
 echo "Cron задачи:"
 crontab -l
 
-# Запускаем Supervisor (он запустит cron и parse-metro-stations)
-exec /usr/bin/supervisord -c /etc/supervisord.conf
+# Запускаем Supervisor в фоне
+/usr/bin/supervisord -c /etc/supervisord.conf &
+SUPERVISORD_PID=$!
+
+# Ждём инициализации supervisor
+sleep 3
+
+# Проверяем рабочее время для parse-yandex (7:00-0:59, остановка в 1:00)
+CURRENT_HOUR=$(date +%-H)
+if [ "$CURRENT_HOUR" -ge 7 ] || [ "$CURRENT_HOUR" -eq 0 ]; then
+    echo "Рабочее время ($CURRENT_HOUR:xx), запускаем parse-yandex..."
+    /usr/bin/supervisorctl start parse-yandex >> /var/log/supervisor/cron.log 2>&1 || true
+else
+    echo "Нерабочее время ($CURRENT_HOUR:xx), parse-yandex запустится по крону в 7:00"
+fi
+
+# Перехватываем сигналы для корректной остановки контейнера
+trap "kill -TERM $SUPERVISORD_PID" SIGTERM SIGINT
+wait $SUPERVISORD_PID

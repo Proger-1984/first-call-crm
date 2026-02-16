@@ -307,6 +307,7 @@ docker exec -it slim_php-cli php bin/app.php photo-tasks        # Обработ
 
 ### При изменении БД
 - [ ] Создать НОВУЮ миграцию (НЕ изменять старые!)
+- [ ] Если миграция **модифицирует** существующую таблицу (add_, update_, fill_, rename_) — **ОБЯЗАТЕЛЬНО** добавить метод `modifiesExistingTable(): bool { return true; }`, иначе `run.php` пропустит миграцию с "Таблица уже существует"
 - [ ] Обновить `docs/DATABASE.md`
 - [ ] Timestamps (created_at, updated_at)
 - [ ] Индексы на внешних ключах

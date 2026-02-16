@@ -190,7 +190,8 @@ class ListingFilterService
         
         // Получаем активные подписки пользователя
         $subscriptions = UserSubscription::where('user_id', $userId)
-            ->where('status', 'active')
+            ->whereIn('status', ['active', 'extend_pending'])
+            ->where('end_date', '>=', Carbon::now())
             ->get();
         
         if ($subscriptions->isEmpty()) {

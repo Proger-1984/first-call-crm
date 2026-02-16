@@ -16,4 +16,8 @@
 # (защита от дубликатов реализована через поле sent_at)
 */5 * * * * /usr/bin/supervisorctl start crm-send-reminders >> /var/log/supervisor/cron.log 2>&1
 
+# Парсер Яндекс.Недвижимости — запуск в 7:00, остановка в 1:00
+0 7 * * * /usr/bin/supervisorctl start parse-yandex >> /var/log/supervisor/cron.log 2>&1
+0 1 * * * /usr/bin/supervisorctl stop parse-yandex >> /var/log/supervisor/cron.log 2>&1
+
 # Пустая строка в конце обязательна для cron

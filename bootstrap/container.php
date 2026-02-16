@@ -20,6 +20,7 @@ use App\Services\ObjectClientService;
 use App\Services\InteractionService;
 use App\Services\ReminderService;
 use App\Services\SourceAuthService;
+use App\Services\YandexParserService;
 use App\Controllers\AnalyticsController;
 use App\Controllers\AuthController;
 use App\Controllers\ClientController;
@@ -126,6 +127,13 @@ return function (array $config) {
 
         ReminderService::class => factory(function (ContainerInterface $c) {
             return new ReminderService();
+        }),
+
+        YandexParserService::class => factory(function (ContainerInterface $c) use ($config) {
+            return new YandexParserService(
+                $c->get(LoggerInterface::class),
+                $config['yandex'] ?? []
+            );
         }),
 
         ObjectClientService::class => factory(function (ContainerInterface $c) {

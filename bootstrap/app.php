@@ -16,6 +16,7 @@ $config = [
     'jwt' => require __DIR__ . '/../config/jwt.php',
     'error_handler' => require __DIR__ . '/../config/error_handler.php',
     'telegram' => require __DIR__ . '/../config/telegram.php',
+    'yandex' => require __DIR__ . '/../config/yandex.php',
 ];
 
 /** Инициализируем Eloquent ORM */

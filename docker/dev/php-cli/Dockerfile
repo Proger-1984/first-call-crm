@@ -28,8 +28,8 @@ RUN apk add --no-cache \
 # Конфигурируем и устанавливаем GD
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg
 
-# Устанавливаем расширения PHP (PostgreSQL + MySQL + GD)
-RUN docker-php-ext-install pdo pdo_pgsql pgsql pdo_mysql zip gd
+# Устанавливаем расширения PHP (PostgreSQL + MySQL + GD + pcntl для многопоточного парсера)
+RUN docker-php-ext-install pdo pdo_pgsql pgsql pdo_mysql zip gd pcntl
 
 # Устанавливаем расширение parallel
 RUN pecl install parallel && docker-php-ext-enable parallel

@@ -13,6 +13,7 @@ use App\Models\Source;
 use App\Models\User;
 use App\Models\UserSubscription;
 use App\Traits\ResponseTrait;
+use Carbon\Carbon;
 use Exception;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -89,7 +90,8 @@ class FilterController
             // Получаем активные подписки пользователя
             $subscriptions = UserSubscription::with(['category', 'location'])
                 ->where('user_id', $userId)
-                ->where('status', 'active')
+                ->whereIn('status', ['active', 'extend_pending'])
+                ->where('end_date', '>=', Carbon::now())
                 ->get();
             
             // 1. Категории

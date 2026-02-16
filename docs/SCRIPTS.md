@@ -13,6 +13,7 @@
 | [NotifySubscriptionExpiredCommand](#notifysubscriptionexpiredcommand) | Уведомления об истечении подписки |
 | [UpdateExpiredSubscriptionsCommand](#updateexpiredsubscriptionscommand) | Обновление статуса истекших подписок |
 | [SendRemindersCommand](#sendreminderscommand) | Отправка Telegram-уведомлений по CRM-напоминаниям |
+| [ParseYandexCommand](#parseyandexcommand) | Многопоточный парсер Яндекс.Недвижимости (daemon) |
 
 ## Руководство по документированию скриптов
 
@@ -516,4 +517,350 @@ docker exec slim_php-cli supervisorctl status crm-send-reminders
 Файлы логов:
 - Приложение: `logs/YYYY-MM-DD.log`
 - Supervisor stdout: `/var/log/supervisor/crm-send-reminders.log`
-- Supervisor stderr: `/var/log/supervisor/crm-send-reminders-error.log` 
+- Supervisor stderr: `/var/log/supervisor/crm-send-reminders-error.log`
+
+---
+
+## ParseYandexCommand
+
+### Назначение
+Многопоточный парсер объявлений с Яндекс.Недвижимости. Запрашивает мобильное API Яндекса, фильтрует объявления, сохраняет в БД и привязывает к ближайшим станциям метро. Работает в режиме демона через Supervisor.
+
+### Расположение файлов
+- Команда: `src/Commands/ParseYandexCommand.php`
+- Сервис: `src/Services/YandexParserService.php`
+- Конфиг: `config/yandex.php`
+- Supervisor: `docker/dev/php-cli/supervisor.d/parse-yandex.ini`
+
+### Архитектура
+
+```
+ParseYandexCommand (родитель, PID=1)
+│
+├── setupSignalHandlers()     — SIGTERM/SIGINT → shouldStop = true
+├── collectWorkers()          — собирает пары location+category из конфига
+├── forkWorker()              — pcntl_fork() для каждой пары
+│   └── runChildProcess()     — КРИТИЧНО: переинициализация Eloquent
+│       ├── new Capsule()     — новое соединение с БД (после fork)
+│       ├── pcntl_signal()    — обработчик SIGTERM в дочернем
+│       └── YandexParserService::runLoop(&$shouldStop)
+│           ├── loadExistingItems()   — кеш дедупликации из БД
+│           ├── loadMetroStations()   — кеш станций метро
+│           └── while (!$shouldStop):
+│               ├── pcntl_signal_dispatch()
+│               ├── shouldRotateCache()    — перезагрузка кеша каждые 60 мин
+│               ├── HTTP GET → Яндекс API
+│               └── parseOffers() → saveListing() → saveMetroLink()
+│
+└── monitorChildren()         — мониторинг + автоперезапуск упавших воркеров
+```
+
+### Критические особенности
+
+#### 1. Переинициализация БД после fork()
+После `pcntl_fork()` дочерний процесс наследует file descriptor сокета БД от родителя. Два процесса **не могут** безопасно использовать один сокет. Поэтому в `runChildProcess()` создаётся **новый Capsule** с собственным соединением.
+
+#### 2. Ротация кеша дедупликации
+`$existingItems` — in-memory массив `[external_id => external_id]` для быстрой проверки дублей без SELECT. Проблема: в бесконечном цикле массив только растёт, утечка памяти. Решение: каждые 60 минут массив **полностью заменяется** свежей выборкой из БД (за последние 30 дней). Старый массив уничтожается, GC освобождает память. Интервал настраивается: `config/yandex.php` → `cache_rotation_minutes`.
+
+#### 3. Соединения с БД
+Соединения **не плодятся**:
+- Каждый дочерний процесс создаёт ровно **1 соединение** при инициализации Capsule
+- `loadExistingItems()` при ротации кеша использует тот же `DB::table()` — тот же connection
+- `DB::connection()->reconnect()` в `saveListing()` — **пере**подключение (закрывает старое, открывает новое)
+- Итого: 1 родитель + N дочерних = **N+1 соединений** к PostgreSQL (сейчас N=1)
+
+#### 4. Graceful stop
+- Родитель: `SIGTERM/SIGINT` → `shouldStop = true` → `terminateChildren()` (SIGTERM детям, ожидание 10 сек, потом SIGKILL)
+- Дочерний: `SIGTERM` → `shouldStop = true` → `runLoop()` завершает текущую итерацию и выходит из цикла
+- `pcntl_signal_dispatch()` вызывается в каждой итерации цикла
+
+#### 5. Reconnect БД при ошибках
+`saveListing()` обёрнут в try-catch: при ошибке вызывается `DB::connection()->reconnect()` и повторная запись. Если повторная тоже упала — возвращает null, объявление пропускается.
+
+#### 6. Error backoff
+Счётчик `$consecutiveErrors` увеличивается при каждой ошибке HTTP/API. После 10 ошибок подряд — пауза 30 секунд, счётчик сбрасывается. При успешном запросе — сброс. Защита от бесконечного долбления упавшего API.
+
+### Конфигурация (`config/yandex.php`)
+
+| Параметр | Значение | Описание |
+|----------|----------|----------|
+| `api_url` | `https://api.realty.yandex.net/...` | Мобильное API Яндекс.Недвижимости |
+| `auth_token` | env `YANDEX_REALTY_AUTH_TOKEN` | Токен мобильного приложения |
+| `user_agent` | `com.yandex.mobile.realty/...` | User-Agent Android-приложения |
+| `sleep_min_us` | 1 000 000 (1 сек) | Минимальная задержка между запросами |
+| `sleep_max_us` | 2 000 000 (2 сек) | Максимальная задержка между запросами |
+| `page_size` | 20 | Объявлений на страницу |
+| `source_id` | 2 | ID в таблице `sources` |
+| `cache_rotation_minutes` | 60 | Интервал ротации кеша дедупликации |
+| `proxy.enabled` | false | Включение прокси |
+| `proxy.list` | [] | Список прокси для ротации |
+
+### Конфигурация локаций
+
+Каждая пара `location + category` = отдельный дочерний процесс (воркер).
+
+| Параметр | Описание |
+|----------|----------|
+| `rgid` | ID региона в API Яндекса |
+| `api_params` | Параметры запроса к API (type, rentTime, priceMin, priceMax, commercialType и др.) |
+| `filter_today_only` | Только сегодняшние объявления (false для всех категорий) |
+
+Цены задаются как массив `[min, max]` — при каждом запросе выбирается случайное значение кратное 1000₽ для обхода кеширования API.
+
+Текущая конфигурация: **8 воркеров** (2 локации × 4 категории):
+
+| # | Локация | Категория | type | Воркер |
+|---|---------|-----------|------|--------|
+| 1 | Москва | Аренда жилая | RENT | `yandex-москва-rent-1` |
+| 2 | Москва | Аренда коммерческая | RENT (COMMERCIAL) | `yandex-москва-rent-2` |
+| 3 | Москва | Продажа жилая | SELL | `yandex-москва-sell-3` |
+| 4 | Москва | Продажа коммерческая | SELL (COMMERCIAL) | `yandex-москва-sell-4` |
+| 5 | СПб | Аренда жилая | RENT | `yandex-спб-rent-1` |
+| 6 | СПб | Аренда коммерческая | RENT (COMMERCIAL) | `yandex-спб-rent-2` |
+| 7 | СПб | Продажа жилая | SELL | `yandex-спб-sell-3` |
+| 8 | СПб | Продажа коммерческая | SELL (COMMERCIAL) | `yandex-спб-sell-4` |
+
+### Маппинг полей (Яндекс API → таблица listings)
+
+| Поле listings | Источник | Обработка |
+|---|---|---|
+| `external_id` | `offer.offerId` | строка |
+| `source_id` | константа | 2 |
+| `category_id` | из конфига | зависит от воркера (1-4) |
+| `location_id` | из конфига | зависит от воркера (1-2) |
+| `room_id` | `offer.roomsTotal` (жилая) / `offer.commercial.commercialTypes[0]` (коммерческая) | см. ниже |
+| `title` | roomsTotal + area / commercialType + area | "2-к. квартира, 45 м²" / "Офис, 120 м²" |
+| `address` | `offer.location.structuredAddress` | city + street + house |
+| `price` | `offer.price.value` | float |
+| `square_meters` | `offer.area.value` | float |
+| `floor` | `offer.floorsOffered[0]` | int |
+| `floors_total` | `offer.floorsTotal` | int |
+| `phone` | `offer.author.phones[0]` | нормализация → 7XXXXXXXXXX |
+| `url` | `offer.shareUrl` | строка |
+| `lat` / `lng` | `offer.location.latitude/longitude` | координаты объекта |
+
+#### Определение room_id
+
+**Жилая недвижимость** (категории 1, 3): по `offer.roomsTotal`:
+| roomsTotal | room_id | Тип |
+|------------|---------|-----|
+| STUDIO | 1 | Студия |
+| 1 | 2 | 1-к. квартира |
+| 2 | 3 | 2-к. квартира |
+| 3 | 4 | 3-к. квартира |
+| 4 | 5 | 4-к. квартира |
+| PLUS_4 | 6 | 5+ комн |
+
+**Коммерческая недвижимость** (категории 2, 4): по `offer.commercial.commercialTypes[0]`:
+| commercialType | room_id | Тип |
+|----------------|---------|-----|
+| OFFICE | 8 | Офис |
+| RETAIL | 9 | Торговое помещение |
+| FREE_PURPOSE | 10 | Помещение свободного назначения |
+| WAREHOUSE | 11 | Склад |
+| MANUFACTURING | 12 | Производство |
+| PUBLIC_CATERING | 13 | Общепит |
+| AUTO_REPAIR | 14 | Автосервис |
+| HOTEL | 15 | Гостиница |
+| BUSINESS | 16 | Готовый бизнес |
+
+### Поднятые объявления + история цен
+- Флаги `raised`/`promoted` из API → `listing_status_id = 2` (Поднятое)
+- Для поднятых: запрос карточки `cardWithViews.json` → `history.prices` → JSONB `price_history`
+- Задержка 500мс перед запросом карточки (rate-limit)
+- Прокси используется и для карточки (если включён)
+
+### Фильтрация объявлений (pipeline)
+
+1. **Дедупликация** — `$existingItems[offerId]` (in-memory кеш)
+2. **Дата** — `filter_today_only` (false для всех категорий — пропускает все объявления)
+3. **Маппинг** — преобразование в формат БД (жилая / коммерческая логика)
+4. **Ближайшее метро** — Haversine по кешу станций (объявления без метро тоже сохраняются)
+5. **Сохранение** — `DB::transaction()`: upsert `listings` + PostGIS point + `listing_metro` (атомарно)
+
+### Запуск скрипта
+
+#### Расписание работы
+Парсер работает по расписанию: **7:00 — 1:00** (Москва).
+
+| Событие | Что происходит |
+|---------|---------------|
+| **Крон 7:00** | `supervisorctl start parse-yandex` — запуск парсера |
+| **Крон 1:00** | `supervisorctl stop parse-yandex` — остановка (graceful, SIGTERM) |
+| **Docker restart** | Entrypoint проверяет текущий час: если 7:00-0:59 — запускает, если 1:00-6:59 — ждёт крона |
+| **Падение процесса** | `autorestart=true` — supervisor автоматически перезапустит (до 20 попыток) |
+
+Конфигурация расписания: `docker/dev/php-cli/crontab`
+Конфигурация Supervisor: `docker/dev/php-cli/supervisor.d/parse-yandex.ini`
+Логика автозапуска при рестарте: `docker/dev/php-cli/entrypoint.sh`
+
+#### Вариант 1: Через Supervisor (production)
+```bash
+# Запуск
+docker exec slim_php-cli supervisorctl start parse-yandex
+
+# Остановка (graceful — SIGTERM → дочерние процессы завершат текущую итерацию)
+docker exec slim_php-cli supervisorctl stop parse-yandex
+
+# Перезапуск
+docker exec slim_php-cli supervisorctl restart parse-yandex
+
+# Статус
+docker exec slim_php-cli supervisorctl status parse-yandex
+```
+Логи дочерних процессов идут в файлы supervisor (см. «Просмотр логов» ниже).
+
+#### Вариант 2: Ручной запуск в консоли (отладка)
+```bash
+# Сначала остановить supervisor-версию, чтобы не было двух экземпляров
+docker exec slim_php-cli supervisorctl stop parse-yandex
+
+# Запустить напрямую — stdout дочерних процессов виден в консоли
+docker exec -it slim_php-cli php bin/app.php parse-yandex
+```
+Ctrl+C — graceful stop (SIGINT → родитель шлёт SIGTERM детям → ожидание → выход).
+Удобно для отладки: `print_r()`, `var_dump()` — всё видно в терминале.
+
+#### Вариант 3: Запуск внутри контейнера
+```bash
+# Войти в контейнер
+docker exec -it slim_php-cli sh
+
+# Запустить парсер
+php bin/app.php parse-yandex
+```
+
+### Просмотр логов
+
+#### Логи дочерних воркеров (основные)
+Дочерние процессы пишут через Monolog в stdout → supervisor перенаправляет в файл.
+```bash
+# Последние 50 строк
+docker exec slim_php-cli sh -c "tail -50 /var/log/supervisor/parse-yandex.log"
+
+# В реальном времени (follow) — Ctrl+C для выхода
+docker exec slim_php-cli sh -c "tail -f /var/log/supervisor/parse-yandex.log"
+
+# Только ошибки
+docker exec slim_php-cli sh -c "tail -50 /var/log/supervisor/parse-yandex-error.log"
+```
+
+#### Логи родительского процесса (команда)
+Родительский процесс логирует через LogService (запуск, fork, мониторинг, остановка).
+```bash
+# В файле приложения
+docker exec slim_php-cli sh -c "tail -30 /var/www/logs/parse-yandex.log"
+```
+
+#### Общие логи контейнера (всё вместе)
+```bash
+# Все supervisor-программы вперемешку
+docker logs slim_php-cli | tail -50
+
+# В реальном времени
+docker logs -f slim_php-cli
+```
+
+#### Файлы логов (сводка)
+
+| Файл | Содержимое |
+|------|-----------|
+| `/var/log/supervisor/parse-yandex.log` | stdout дочерних воркеров (объявления, кеш, метро) |
+| `/var/log/supervisor/parse-yandex-error.log` | stderr дочерних воркеров (ошибки PHP) |
+| `/var/www/logs/parse-yandex.log` | родительский процесс (fork, мониторинг, сигналы) |
+| `/var/log/supervisor/cron.log` | крон-задачи (запуск/остановка по расписанию) |
+
+#### Примеры сообщений в логах
+
+```
+# Запуск воркеров (8 штук)
+[yandex-москва-rent-1] Запуск воркера {location_id: 1, category_id: 1}
+[yandex-москва-rent-2] Запуск воркера {location_id: 1, category_id: 2}
+[yandex-москва-sell-3] Запуск воркера {location_id: 1, category_id: 3}
+[yandex-москва-sell-4] Запуск воркера {location_id: 1, category_id: 4}
+[yandex-спб-rent-1] Запуск воркера {location_id: 2, category_id: 1}
+
+# Загрузка кешей
+[yandex-москва-rent-1] Загружено существующих объявлений: 1250
+[yandex-москва-rent-1] Загружено станций метро: 452
+
+# Новые объявления (жилая)
+[yandex-москва-rent-1] Новое объявление {offer_id: "853...", listing_id: 1379386, price: 78000, metro: "Свиблово"}
+
+# Новые объявления (коммерческая)
+[yandex-москва-rent-2] Новое объявление {offer_id: "912...", listing_id: 1379450, price: 150000, metro: "Арбатская"}
+
+# Поднятое объявление — запрос карточки
+[yandex-москва-rent-1] Поднятое объявление {offer_id: "853...", listing_status_id: 2, price_history: [...]}
+
+# Ротация кеша (каждые 60 минут)
+[yandex-москва-rent-1] Ротация кеша: 1340
+
+# Ошибки
+[yandex-москва-rent-1] Ошибка HTTP запроса {error: "Connection timed out"}
+[yandex-москва-rent-1] Слишком много ошибок подряд (10), пауза 30 сек
+[yandex-москва-rent-1] Ошибка БД, пробуем переподключиться {error: "..."}
+
+# Остановка
+[yandex-москва-rent-1] Воркер остановлен
+```
+
+### Таблицы в базе данных
+
+#### Запись данных
+- `listings` — объявления (upsert по `external_id` + `source_id`)
+- `listing_metro` — привязка к ближайшей станции метро
+
+#### Чтение данных
+- `listings` — загрузка `external_id` для дедупликации (кеш)
+- `metro_stations` — загрузка станций с координатами (кеш)
+
+### Добавление новой локации/категории
+
+Для добавления нового города — добавить запись в `config/yandex.php` → `locations`:
+
+```php
+3 => [  // location_id = 3
+    'name' => 'Екатеринбург',
+    'rgid' => 559132,
+    'categories' => [
+        1 => [  // category_id = 1 (Аренда жилая)
+            'filter_today_only' => false,
+            'api_params' => [
+                'type' => 'RENT',
+                'rentTime' => 'LARGE',
+                'priceMin' => [10000, 20000],     // рандом кратный 1000₽
+                'priceMax' => [80000, 100000],
+            ],
+        ],
+        3 => [  // category_id = 3 (Продажа жилая)
+            'filter_today_only' => false,
+            'api_params' => [
+                'type' => 'SELL',
+                'objectType' => 'OFFER',
+                'priceMin' => [300000, 500000],
+                'priceMax' => [500000000, 700000000],
+            ],
+        ],
+    ],
+],
+```
+
+Автоматически создастся ещё один дочерний процесс. Перезапуск: `supervisorctl restart parse-yandex`.
+
+### Поддержка прокси
+
+В `config/yandex.php` включить прокси и указать список:
+
+```php
+'proxy' => [
+    'enabled' => true,
+    'list' => [
+        'http://user:pass@proxy1.example.com:8080',
+        'http://user:pass@proxy2.example.com:8080',
+    ],
+],
+```
+
+При каждом HTTP запросе выбирается случайный прокси из списка (ротация).
